@@ -1,51 +1,80 @@
 package com.packabunch.data
 
+import android.content.Context
+import com.packabunch.data.db.PackDatabase
+import com.packabunch.data.db.ProjectDao
+import com.packabunch.data.db.toEntity
+import com.packabunch.data.db.toItemEntities
+import com.packabunch.data.db.toProject
+import com.packabunch.data.db.toSummaryEntity
 import com.packabunch.packing.Dimensions
 import com.packabunch.packing.ItemSpec
 import com.packabunch.packing.MeasurementSource
+import com.packabunch.packing.PackingEngine
+import com.packabunch.packing.SolveBudget
+import com.packabunch.packing.SolveResult
 import com.packabunch.packing.Space
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 /**
- * Where packs live.
+ * Where packs live. Backed by Room, so they survive the app being killed.
  *
- * In memory for now, deliberately: the screens need something to read long before Room
- * entities and migrations are worth writing, and keeping the interface narrow means
- * swapping the implementation later touches this file and nothing else.
- *
- * **This does not survive process death yet.** Nothing here is persisted, so a pack is lost
- * when the app is killed. That is a known gap, not a design choice — the plan's own release
- * gate requires projects to survive a restart, and it is not met until Room lands.
+ * The arrangement itself is not stored — see [com.packabunch.data.db.PlanSummaryEntity].
+ * The engine is deterministic, so inputs plus a revision fingerprint are enough to
+ * reproduce a plan exactly, and [solvedProject] is how a saved pack gets its placements
+ * back when it is opened.
  */
-class ProjectRepository {
+class ProjectRepository(private val dao: ProjectDao) {
 
-    private val _projects = MutableStateFlow<List<Project>>(listOf(sampleProject()))
-    val projects: StateFlow<List<Project>> = _projects.asStateFlow()
+    val projects: Flow<List<Project>> =
+        dao.observeAll().map { rows -> rows.map { it.toProject() } }
 
-    fun project(id: String): Project? = _projects.value.firstOrNull { it.id == id }
+    suspend fun project(id: String): Project? = withContext(Dispatchers.IO) {
+        dao.byId(id)?.toProject()
+    }
 
-    fun upsert(project: Project) {
-        _projects.update { current ->
-            val stamped = project.copy(updatedAtMillis = System.currentTimeMillis())
-            val index = current.indexOfFirst { it.id == project.id }
-            if (index >= 0) current.toMutableList().apply { set(index, stamped) }
-            else current + stamped
+    /**
+     * A saved project with its placements recomputed.
+     *
+     * Reading a project back gives metrics but no positions. This re-runs the search, which
+     * returns the same arrangement it did when it was saved — that is what determinism buys.
+     */
+    suspend fun solvedProject(id: String): Project? = withContext(Dispatchers.Default) {
+        val stored = project(id) ?: return@withContext null
+        if (stored.items.isEmpty()) return@withContext stored
+
+        when (val result = PackingEngine.solve(stored.request, SolveBudget(timeBudgetMillis = 2_000))) {
+            is SolveResult.Solved -> stored.copy(plan = result.plan)
+            is SolveResult.InvalidInput -> stored.copy(plan = null)
         }
     }
 
-    fun delete(id: String) {
-        _projects.update { current -> current.filterNot { it.id == id } }
+    suspend fun upsert(project: Project) = withContext(Dispatchers.IO) {
+        val stamped = project.copy(updatedAtMillis = System.currentTimeMillis())
+        dao.save(
+            project = stamped.toEntity(),
+            items = stamped.toItemEntities(),
+            summary = stamped.toSummaryEntity(),
+        )
     }
 
-    /** For the undo on the "deleted" state — the row goes back exactly as it was. */
-    fun restore(project: Project) {
-        _projects.update { current -> current + project }
+    suspend fun delete(id: String) = withContext(Dispatchers.IO) { dao.deleteProject(id) }
+
+    /** Undo on the "deleted" state: the row goes back exactly as it was, id and all. */
+    suspend fun restore(project: Project) = upsert(project)
+
+    /** Seeds the sample pack, once, so a first run has something to look at. */
+    suspend fun seedIfEmpty() = withContext(Dispatchers.IO) {
+        if (dao.count() == 0) upsert(sampleProject())
     }
 
     companion object {
+        fun create(context: Context): ProjectRepository =
+            ProjectRepository(PackDatabase.get(context).projectDao())
+
         /**
          * The sample pack offered on first run. Real measurements of a real crate, so the
          * numbers on screen are plausible and the arrangement is one the engine actually

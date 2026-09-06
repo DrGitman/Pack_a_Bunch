@@ -20,6 +20,13 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // Room writes the schema out so migrations can be written against a real diff rather
+    // than from memory. These files belong in version control.
+    ksp {
+        arg("room.schemaLocation", "$projectDir/schemas")
+        arg("room.generateKotlin", "true")
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

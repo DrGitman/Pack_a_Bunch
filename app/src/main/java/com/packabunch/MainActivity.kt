@@ -19,7 +19,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             PackABunchTheme {
-                val appViewModel: AppViewModel = viewModel()
+                val appViewModel: AppViewModel = viewModel(
+                    factory = AppViewModel.Factory(applicationContext),
+                )
                 PackNavHost(
                     viewModel = appViewModel,
                     modifier = Modifier.fillMaxSize().background(Ground),
