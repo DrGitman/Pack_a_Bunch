@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Placeholder mark: the same isometric crate the artboards use, inside the 72dp safe zone.
+  A real icon and feature graphic are day-5 work; this exists so the build has something
+  honest to install rather than the default Android robot.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Open top -->
+    <path
+        android:fillColor="#E7CFB6"
+        android:pathData="M20,42 L54,26 L88,42 L54,58 Z" />
+    <!-- Left face -->
+    <path
+        android:fillColor="#C98A5C"
+        android:pathData="M20,42 L54,58 L54,82 L20,66 Z" />
+    <!-- Right face -->
+    <path
+        android:fillColor="#A96B3D"
+        android:pathData="M54,58 L88,42 L88,66 L54,82 Z" />
+    <!-- Rim -->
+    <path
+        android:strokeColor="#8E4E28"
+        android:strokeWidth="2.4"
+        android:strokeLineJoin="round"
+        android:pathData="M20,42 L54,26 L88,42 L54,58 Z" />
+</vector>
