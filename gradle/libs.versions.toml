@@ -5,7 +5,10 @@ agp = "8.13.2"
 kotlin = "2.2.20"
 ksp = "2.2.20-2.0.4"
 
-composeBom = "2026.08.00"
+# 2026.08.00 pulls Compose 1.12, which demands AGP 9.1+ and compileSdk 37. This is the
+# newest BOM that still works with the AGP 8.13.2 / compileSdk 36 pin above. Moving past it
+# is an AGP 9 migration, not a version bump — deliberately not doing that mid-sprint.
+composeBom = "2026.06.01"
 activityCompose = "1.12.4"
 navigationCompose = "2.9.8"
 lifecycle = "2.9.4"
