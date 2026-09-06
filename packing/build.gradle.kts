@@ -11,11 +11,10 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.kotlinx.coroutines.core)
-
+    // No dependencies at all, on purpose. Cancellation and the time budget come in through
+    // SolveBudget, so the engine does not need coroutines to be interruptible or testable.
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 tasks.withType<Test>().configureEach {
