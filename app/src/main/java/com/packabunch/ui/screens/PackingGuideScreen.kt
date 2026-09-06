@@ -60,6 +60,7 @@ fun PackingGuideScreen(
     unit: LengthUnit,
     onStepChange: (Int) -> Unit,
     onMarkPacked: (String, Boolean) -> Unit,
+    onFinished: () -> Unit = {},
     onBack: () -> Unit,
     onDoesntFit: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -187,7 +188,7 @@ fun PackingGuideScreen(
                     text = if (step >= placements.size - 1) "Done" else "Placed it",
                     onClick = {
                         current?.let { onMarkPacked(it.instanceId, true) }
-                        if (step < placements.size - 1) onStepChange(step + 1)
+                        if (step < placements.size - 1) onStepChange(step + 1) else onFinished()
                     },
                     modifier = Modifier.weight(1f),
                 )

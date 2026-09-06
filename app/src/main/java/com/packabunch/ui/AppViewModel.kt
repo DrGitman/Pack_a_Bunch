@@ -239,6 +239,31 @@ class AppViewModel(
 
     fun setGuideStep(step: Int) = _editor.update { it.copy(guideStep = step) }
 
+    /**
+     * "Did it actually go in?"
+     *
+     * The single most valuable signal the app can collect, because it is the only thing
+     * that connects the geometric model to real crates. Held locally for now — it is not
+     * sent anywhere, and it must not be until there is a privacy policy and a Data safety
+     * declaration that cover it.
+     */
+    fun recordDidItFit(fitted: Boolean) {
+        _editor.update { it.copy(realWorldFitReport = fitted) }
+    }
+
+    /**
+     * Deletes everything on the device.
+     *
+     * Genuinely everything: the packs, and the item photo files with them. A delete that
+     * leaves photos behind would make the Data safety declaration untrue.
+     */
+    fun deleteAllLocalData() {
+        viewModelScope.launch {
+            repository.deleteAll()
+            _editor.value = PackEditorState()
+        }
+    }
+
     class Factory(private val context: Context) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
@@ -264,6 +289,8 @@ data class PackEditorState(
     val packedInstanceIds: Set<String> = emptySet(),
     val guideStep: Int = 0,
     val isNew: Boolean = true,
+    /** Null until the user answers "did it actually go in?" on the finished screen. */
+    val realWorldFitReport: Boolean? = null,
 ) {
     val pieceCount: Int get() = items.sumOf { it.quantity }
 

@@ -24,6 +24,10 @@ import com.packabunch.ui.screens.CreateSpaceScreen
 import com.packabunch.ui.screens.ItemsScreen
 import com.packabunch.ui.screens.MeasureScreen
 import com.packabunch.ui.screens.PackingGuideScreen
+import com.packabunch.ui.components.NavDestination
+import com.packabunch.ui.screens.PackingDoneScreen
+import com.packabunch.ui.screens.SettingsScreen
+import com.packabunch.ui.screens.UpgradeScreen
 import com.packabunch.ui.screens.PlanResultScreen
 import com.packabunch.ui.screens.ProjectsScreen
 import com.packabunch.ui.screens.WelcomeScreen
@@ -42,6 +46,9 @@ object Routes {
     const val ITEMS = "items"              // Items.dc.html
     const val PLAN_RESULT = "planResult"   // PlanResult.dc.html
     const val PACKING_GUIDE = "packingGuide" // PackingGuide.dc.html
+    const val PACKING_DONE = "packingDone"   // PackingDone.dc.html
+    const val SETTINGS = "settings"          // Settings.dc.html
+    const val UPGRADE = "upgrade"            // Upgrade.dc.html
 }
 
 /**
@@ -209,6 +216,65 @@ fun PackNavHost(
                 unit = settings.unit,
                 onStepChange = viewModel::setGuideStep,
                 onMarkPacked = viewModel::markPacked,
+                onFinished = { navController.navigate(Routes.PACKING_DONE) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(
+            Routes.PACKING_DONE,
+            enterTransition = { resultEnter() },
+        ) {
+            PackingDoneScreen(
+                state = editor,
+                limits = viewModel.limits,
+                savedPackCount = projects.size,
+                onDone = {
+                    navController.popBackStack(Routes.WELCOME, inclusive = false)
+                },
+                onSeePlan = { navController.popBackStack(Routes.PLAN_RESULT, inclusive = false) },
+                onUpgrade = { navController.navigate(Routes.UPGRADE) },
+                onFitAnswer = viewModel::recordDidItFit,
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            SettingsScreen(
+                settings = settings,
+                savedPackCount = projects.size,
+                onUnitChange = viewModel::setUnit,
+                onNavigate = { destination ->
+                    if (destination == NavDestination.Projects) {
+                        navController.navigate(Routes.PROJECTS) { launchSingleTop = true }
+                    }
+                },
+                onNewPack = {
+                    viewModel.startNewPack()
+                    navController.navigate(Routes.CREATE_SPACE)
+                },
+                onUpgrade = { navController.navigate(Routes.UPGRADE) },
+                onManageSubscription = {},
+                onRestorePurchases = {},
+                onNotifications = {},
+                onDeleteAllData = viewModel::deleteAllLocalData,
+                onPrivacy = {},
+                onTerms = {},
+                onSupport = {},
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.UPGRADE) {
+            UpgradeScreen(
+                // Null until Play Billing is wired: the button stays disabled rather than
+                // showing a price we invented.
+                price = null,
+                period = "a month",
+                purchaseEnabled = false,
+                onSubscribe = {},
+                onRestore = {},
+                onTerms = {},
+                onPrivacy = {},
                 onBack = { navController.popBackStack() },
             )
         }
