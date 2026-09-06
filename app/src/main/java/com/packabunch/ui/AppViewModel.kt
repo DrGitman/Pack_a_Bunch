@@ -19,6 +19,8 @@ import com.packabunch.packing.Space
 import com.packabunch.packing.Tier
 import com.packabunch.packing.TierLimits
 import com.packabunch.ui.format.LengthUnit
+import com.packabunch.ui.screens.LibraryItem
+import com.packabunch.ui.screens.NotificationPreferences
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -60,6 +62,39 @@ class AppViewModel(
     fun setUnit(unit: LengthUnit) = _settings.update { it.copy(unit = unit) }
 
     fun setTier(tier: Tier) = _settings.update { it.copy(tier = tier) }
+
+    fun setNotificationPreferences(preferences: NotificationPreferences) =
+        _settings.update { it.copy(notifications = preferences) }
+
+    /** Turns off every notification the app has. There is no sixth kind hiding elsewhere. */
+    fun turnAllNotificationsOff() = _settings.update {
+        it.copy(
+            notifications = NotificationPreferences(
+                halfFinishedPack = false,
+                backupState = false,
+                billing = false,
+                newKindsOfSpace = false,
+                askHowItWent = false,
+            ),
+        )
+    }
+
+    /**
+     * Every distinct item measured across every saved pack.
+     *
+     * Deduplicated by name and size rather than by id, because the same real object added
+     * to two packs separately is one measured thing to the person who measured it.
+     */
+    fun libraryItems(projects: List<Project>): List<LibraryItem> = projects
+        .flatMap { project -> project.items.map { project.id to it } }
+        .groupBy { (_, spec) -> spec.name.trim().lowercase() to spec.dimensions }
+        .map { (_, entries) ->
+            LibraryItem(
+                spec = entries.first().second,
+                usedInPackCount = entries.map { it.first }.distinct().size,
+            )
+        }
+        .sortedByDescending { it.usedInPackCount }
 
     // -- editing a pack -------------------------------------------------------------------
 
@@ -275,6 +310,7 @@ data class AppSettings(
     val unit: LengthUnit = LengthUnit.CENTIMETRES,
     val tier: Tier = Tier.FREE,
     val scansToday: Int = 0,
+    val notifications: NotificationPreferences = NotificationPreferences(),
 )
 
 /** Everything the create-a-pack flow is holding, across its several screens. */

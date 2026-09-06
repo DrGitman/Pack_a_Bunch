@@ -28,6 +28,10 @@ import com.packabunch.ui.components.NavDestination
 import com.packabunch.ui.screens.PackingDoneScreen
 import com.packabunch.ui.screens.SettingsScreen
 import com.packabunch.ui.screens.UpgradeScreen
+import com.packabunch.ui.screens.ItemLibraryScreen
+import com.packabunch.ui.screens.LibraryItem
+import com.packabunch.ui.screens.NotificationSettingsScreen
+import com.packabunch.ui.screens.PlanLayersScreen
 import com.packabunch.ui.screens.PlanResultScreen
 import com.packabunch.ui.screens.ProjectsScreen
 import com.packabunch.ui.screens.WelcomeScreen
@@ -49,6 +53,9 @@ object Routes {
     const val PACKING_DONE = "packingDone"   // PackingDone.dc.html
     const val SETTINGS = "settings"          // Settings.dc.html
     const val UPGRADE = "upgrade"            // Upgrade.dc.html
+    const val PLAN_LAYERS = "planLayers"     // PlanLayers.dc.html
+    const val ITEM_LIBRARY = "itemLibrary"   // ItemLibrary.dc.html / LockedLibrary.dc.html
+    const val NOTIFICATION_SETTINGS = "notificationSettings" // NotificationSettings.dc.html
 }
 
 /**
@@ -206,6 +213,44 @@ fun PackNavHost(
                     navController.navigate(Routes.PACKING_GUIDE)
                 },
                 onEditItems = { navController.popBackStack() },
+                onShowLayers = { navController.navigate(Routes.PLAN_LAYERS) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.PLAN_LAYERS) {
+            PlanLayersScreen(
+                state = editor,
+                unit = settings.unit,
+                onShowOverview = { navController.popBackStack() },
+                onStartPacking = {
+                    viewModel.setGuideStep(0)
+                    navController.navigate(Routes.PACKING_GUIDE)
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.ITEM_LIBRARY) {
+            ItemLibraryScreen(
+                items = viewModel.libraryItems(projects),
+                unlocked = viewModel.limits.itemLibrary,
+                unit = settings.unit,
+                price = null,
+                onUse = viewModel::upsertItem,
+                onMeasureNew = { navController.popBackStack() },
+                onUpgrade = { navController.navigate(Routes.UPGRADE) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.NOTIFICATION_SETTINGS) {
+            NotificationSettingsScreen(
+                preferences = settings.notifications,
+                systemNotificationsAllowed = true,
+                onPreferencesChange = viewModel::setNotificationPreferences,
+                onOpenSystemSettings = {},
+                onTurnEverythingOff = viewModel::turnAllNotificationsOff,
                 onBack = { navController.popBackStack() },
             )
         }
@@ -255,7 +300,7 @@ fun PackNavHost(
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
                 onManageSubscription = {},
                 onRestorePurchases = {},
-                onNotifications = {},
+                onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
                 onDeleteAllData = viewModel::deleteAllLocalData,
                 onPrivacy = {},
                 onTerms = {},

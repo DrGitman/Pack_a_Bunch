@@ -2,6 +2,7 @@ package com.packabunch.ui.screens
 
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,6 +38,7 @@ import com.packabunch.ui.components.warmShadow
 import com.packabunch.ui.format.LengthUnit
 import com.packabunch.ui.format.formatDimensions
 import com.packabunch.ui.motion.Motion
+import com.packabunch.ui.motion.pressScale
 import com.packabunch.ui.render.IsometricCrate
 import com.packabunch.ui.theme.BrandTint
 import com.packabunch.ui.theme.CautionTint
@@ -64,6 +66,7 @@ fun PlanResultScreen(
     unit: LengthUnit,
     onStartPacking: () -> Unit,
     onEditItems: () -> Unit,
+    onShowLayers: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -108,6 +111,19 @@ fun PlanResultScreen(
                                 itemColor(state.items.indexOfFirst { it.id == placement.specId })
                             },
                         )
+                    }
+
+                    // Overview / Layers, top left, exactly where the artboard puts it.
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(12.dp)
+                            .background(Color(0xF0FFFFFF), RoundedCornerShape(999.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    ) {
+                        PreviewModeChip(text = "Overview", selected = true, onClick = {})
+                        PreviewModeChip(text = "Layers", selected = false, onClick = onShowLayers)
                     }
 
                     Row(
@@ -215,6 +231,28 @@ fun PlanResultScreen(
         }
 
         Spacer(Modifier.height(Spacing.sm))
+    }
+}
+
+@Composable
+private fun PreviewModeChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .pressScale(pressedScale = 0.95f)
+            .background(
+                if (selected) com.packabunch.ui.theme.ChromeAlt else Color.Transparent,
+                RoundedCornerShape(999.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 15.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = text,
+            color = if (selected) com.packabunch.ui.theme.Ground else Color(0xFF8A7565),
+            fontFamily = UiFamily,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
+            fontSize = 12.5f.sp,
+        )
     }
 }
 
