@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors docs/design-tokens.json. Compose reads the Kotlin copies in ui/theme. -->
+    <color name="ground">#F7EFE6</color>
+    <color name="primary">#A65C34</color>
+    <color name="chrome">#3F2718</color>
+    <color name="brand_tint">#F5E4D6</color>
+</resources>

@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  body { margin:0; font-family:"Plus Jakarta Sans","Segoe UI",Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#A65C34; } a:hover { color:#7C4223; }
+</style>
+</helmet>
+
+<div style="width:412px;height:916px;overflow:hidden;background:#F7EFE6;display:flex;flex-direction:column;">
+
+  <div style="height:30px;flex-shrink:0;"></div>
+
+  <div style="display:flex;align-items:center;gap:6px;padding:6px 12px 0 12px;">
+    <button style="width:44px;height:44px;border:0;border-radius:22px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div style="flex-grow:1;">
+      <div style="font-size:18px;font-weight:700;color:#2B1D14;">Moving crate</div>
+      <div style="font-family:'DM Mono',ui-monospace,monospace;font-size:11.5px;color:#8A7565;">Looking straight down</div>
+    </div>
+  </div>
+
+  <div style="padding:12px 20px 0 20px;">
+    <div style="display:flex;background:#F0E5D9;border-radius:999px;padding:4px;">
+      <div style="flex-grow:1;text-align:center;padding:9px 0;font-size:13px;font-weight:600;color:#8A7565;">Overview</div>
+      <div style="flex-grow:1;text-align:center;background:#4A2E1F;border-radius:999px;padding:9px 0;font-size:13px;font-weight:700;color:#F7EFE6;">Layers</div>
+    </div>
+  </div>
+
+  <div style="padding:16px 20px 0 20px;">
+    <div style="background:#FFFFFF;border-radius:26px;padding:16px;box-shadow:0 10px 26px rgba(90,58,35,0.08);">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:17px;font-weight:800;color:#2B1D14;">Layer 2 of 3</div>
+          <div style="font-family:'DM Mono',ui-monospace,monospace;font-size:11.5px;color:#8A7565;margin-top:2px;">12 – 24 cm from the floor</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button style="width:44px;height:44px;border:1.5px solid #EADCCC;border-radius:22px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C4223" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>
+          </button>
+          <button style="width:44px;height:44px;border:1.5px solid #EADCCC;border-radius:22px;background:#FFFFFF;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C4223" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;background:#F5E4D6;border-radius:18px;padding:14px;">
+        <div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:800;color:#9C7B58;letter-spacing:1px;">
+          <span>LEFT</span><span>BACK</span><span>RIGHT</span>
+        </div>
+        <svg width="332" height="228" viewBox="0 0 332 228" fill="none" style="display:block;margin-top:6px;">
+          <rect x="1" y="1" width="330" height="226" rx="8" fill="#EFE1D0" stroke="#B98E63" stroke-width="2"/>
+
+          <rect x="8" y="8" width="164" height="164" rx="6" fill="#3C5C9E" opacity="0.16"/>
+          <rect x="8" y="8" width="164" height="164" rx="6" fill="none" stroke="#3C5C9E" stroke-width="2.4"/>
+          <circle cx="90" cy="90" r="17" fill="#3C5C9E"/>
+          <text x="90" y="96" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="17" font-weight="800" fill="#FFFFFF">3</text>
+          <text x="90" y="122" text-anchor="middle" font-family="DM Mono, monospace" font-size="11" fill="#2B4479">30 × 30</text>
+
+          <rect x="180" y="8" width="110" height="181" rx="6" fill="#3F7A5A" opacity="0.16"/>
+          <rect x="180" y="8" width="110" height="181" rx="6" fill="none" stroke="#3F7A5A" stroke-width="2.4"/>
+          <circle cx="235" cy="90" r="17" fill="#3F7A5A"/>
+          <text x="235" y="96" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif" font-size="17" font-weight="800" fill="#FFFFFF">2</text>
+          <text x="235" y="122" text-anchor="middle" font-family="DM Mono, monospace" font-size="11" fill="#2C5B43">20 × 33</text>
+
+          <rect x="298" y="8" width="26" height="212" rx="5" fill="none" stroke="#C4A483" stroke-width="1.6" stroke-dasharray="5 5"/>
+          <text x="311" y="120" text-anchor="middle" font-family="DM Mono, monospace" font-size="10" fill="#9C7B58" transform="rotate(-90 311 120)">5 cm free</text>
+        </svg>
+        <div style="text-align:center;font-size:10.5px;font-weight:800;color:#9C7B58;letter-spacing:1px;margin-top:4px;">FRONT</div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px;">
+        <div style="display:flex;align-items:center;gap:11px;">
+          <div style="width:26px;height:26px;border-radius:9px;background:#3C5C9E;color:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">3</div>
+          <div style="flex-grow:1;font-size:14px;font-weight:600;color:#2B1D14;">Board game</div>
+          <div style="font-size:12.5px;color:#8A7565;">back left</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:11px;">
+          <div style="width:26px;height:26px;border-radius:9px;background:#3F7A5A;color:#FFFFFF;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">2</div>
+          <div style="flex-grow:1;font-size:14px;font-weight:600;color:#2B1D14;">Shoe box <span style="color:#8A7565;font-weight:500;">· turned sideways</span></div>
+          <div style="font-size:12.5px;color:#8A7565;">right</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:14px 20px 0 20px;">
+    <div style="display:flex;gap:9px;">
+      <div style="flex-grow:1;background:#FFFFFF;border-radius:18px;padding:12px;text-align:center;box-shadow:0 4px 14px rgba(90,58,35,0.05);opacity:0.6;">
+        <div style="font-size:12px;font-weight:700;color:#8A7565;">Layer 1</div>
+        <div style="font-size:11px;color:#A2907F;margin-top:2px;">2 pieces</div>
+      </div>
+      <div style="flex-grow:1;background:#4A2E1F;border-radius:18px;padding:12px;text-align:center;">
+        <div style="font-size:12px;font-weight:700;color:#F7EFE6;">Layer 2</div>
+        <div style="font-size:11px;color:#C9B29E;margin-top:2px;">2 pieces</div>
+      </div>
+      <div style="flex-grow:1;background:#FFFFFF;border-radius:18px;padding:12px;text-align:center;box-shadow:0 4px 14px rgba(90,58,35,0.05);opacity:0.6;">
+        <div style="font-size:12px;font-weight:700;color:#8A7565;">Layer 3</div>
+        <div style="font-size:11px;color:#A2907F;margin-top:2px;">2 pieces</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow:1;"></div>
+
+  <div style="padding:0 20px;">
+    <button style="width:100%;height:56px;border:0;border-radius:28px;background:#A65C34;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(166,92,52,0.28);">Start packing</button>
+  </div>
+
+  <div style="height:28px;flex-shrink:0;"></div>
+</div>
+</x-dc>
+</body>
+</html>

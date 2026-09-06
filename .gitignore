@@ -1,0 +1,17 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Signing material never belongs in the repository.
+*.jks
+*.keystore
+keystore.properties
+/app/release/
+play-service-account*.json

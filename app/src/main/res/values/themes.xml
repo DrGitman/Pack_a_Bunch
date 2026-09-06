@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      The real theme lives in Compose (ui/theme/Theme.kt). This exists only so the window
+      is the right colour before the first frame draws, and so the app is edge-to-edge with
+      the real system bars — the artboards leave the top 30dp and the gesture strip empty
+      for exactly that reason.
+    -->
+    <style name="Theme.PackABunch" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/ground</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
+</resources>

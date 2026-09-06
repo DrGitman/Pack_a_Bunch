@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  body { margin:0; font-family:"Plus Jakarta Sans","Segoe UI",Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#A65C34; } a:hover { color:#7C4223; }
+</style>
+</helmet>
+
+<div style="width:412px;height:916px;overflow:hidden;background:#F7EFE6;display:flex;flex-direction:column;">
+
+  <div style="height:30px;flex-shrink:0;"></div>
+
+  <div style="display:flex;align-items:center;gap:6px;padding:6px 16px 0 12px;">
+    <button style="width:44px;height:44px;border:0;border-radius:22px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div style="font-size:18px;font-weight:700;color:#2B1D14;">Log in</div>
+  </div>
+
+  <div style="padding:20px 20px 0 20px;">
+    <div style="font-size:29px;line-height:36px;font-weight:800;color:#2B1D14;letter-spacing:-0.9px;text-wrap:pretty;">Welcome back</div>
+    <div style="margin-top:10px;font-size:15px;line-height:23px;color:#7C6857;text-wrap:pretty;">Your packs, items and photos come back with you.</div>
+  </div>
+
+  <div style="padding:24px 20px 0 20px;">
+    <button style="width:100%;height:56px;border:1.5px solid #DCC6AF;border-radius:28px;background:#FFFFFF;color:#2B1D14;font-family:inherit;font-size:15.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:11px;box-shadow:0 6px 16px rgba(90,58,35,0.06);">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none"><path d="M21.6 12.23c0-.71-.06-1.4-.18-2.05H12v3.88h5.38a4.6 4.6 0 01-2 3.02v2.5h3.23c1.89-1.74 2.99-4.3 2.99-7.35z" fill="#4285F4"/><path d="M12 22c2.7 0 4.96-.9 6.61-2.42l-3.23-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0012 22z" fill="#34A853"/><path d="M6.41 13.92a6 6 0 010-3.83V7.5H3.07a10 10 0 000 9l3.34-2.58z" fill="#FBBC05"/><path d="M12 5.98c1.47 0 2.79.51 3.83 1.5l2.86-2.86C16.96 2.98 14.7 2 12 2A10 10 0 003.07 7.5l3.34 2.59C7.2 7.74 9.4 5.98 12 5.98z" fill="#EA4335"/></svg>
+      Continue with Google
+    </button>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:14px;padding:22px 20px 0 20px;">
+    <div style="height:1px;background:#E4D6C5;flex-grow:1;"></div>
+    <span style="font-size:12.5px;font-weight:600;color:#A2907F;">or with email</span>
+    <div style="height:1px;background:#E4D6C5;flex-grow:1;"></div>
+  </div>
+
+  <div style="padding:20px 20px 0 20px;display:flex;flex-direction:column;gap:12px;">
+
+    <div style="background:#FFFFFF;border:1.5px solid #EADCCC;border-radius:20px;padding:14px 16px;box-shadow:0 6px 16px rgba(90,58,35,0.05);">
+      <div style="font-size:11.5px;font-weight:700;color:#A2907F;letter-spacing:0.4px;">EMAIL</div>
+      <div style="margin-top:5px;font-size:16px;color:#2B1D14;">orili@example.com</div>
+    </div>
+
+    <div style="background:#FFFFFF;border:1.5px solid #A65C34;border-radius:20px;padding:14px 16px;box-shadow:0 8px 20px rgba(90,58,35,0.07);">
+      <div style="font-size:11.5px;font-weight:700;color:#A2907F;letter-spacing:0.4px;">PASSWORD</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:5px;">
+        <span style="font-family:'DM Mono',ui-monospace,monospace;font-size:17px;color:#2B1D14;letter-spacing:2px;flex-grow:1;">••••••••</span>
+        <div style="width:2px;height:20px;background:#A65C34;border-radius:2px;"></div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8A7565" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0 20px;">
+    <div style="display:flex;align-items:center;gap:11px;">
+      <div style="width:24px;height:24px;border-radius:8px;background:#A65C34;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <span style="font-size:14px;font-weight:600;color:#5C4A3A;">Stay logged in</span>
+    </div>
+    <a href="#" style="font-size:14px;font-weight:600;text-decoration:none;">Forgot password?</a>
+  </div>
+
+  <div style="padding:20px 20px 0 20px;">
+    <div style="background:#F0E5D9;border-radius:20px;padding:15px;display:flex;gap:12px;align-items:flex-start;">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7C4223" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><rect x="5" y="10.5" width="14" height="9.5" rx="2.2"/><path d="M8.2 10.5V7.8a3.8 3.8 0 017.6 0v2.7"/></svg>
+      <div style="font-size:13.5px;line-height:20px;color:#6B5849;text-wrap:pretty;">Logging in on a phone that already has packs on it will merge them into your account.</div>
+    </div>
+  </div>
+
+  <div style="flex-grow:1;"></div>
+
+  <div style="padding:0 20px;">
+    <button style="width:100%;height:56px;border:0;border-radius:28px;background:#A65C34;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(166,92,52,0.28);">Log in</button>
+    <div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-top:16px;">
+      <span style="font-size:14.5px;color:#7C6857;">New here?</span>
+      <a href="#" style="font-size:14.5px;font-weight:700;text-decoration:none;">Create an account</a>
+    </div>
+  </div>
+
+  <div style="height:30px;flex-shrink:0;"></div>
+</div>
+</x-dc>
+</body>
+</html>

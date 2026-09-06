@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  body { margin:0; font-family:"Plus Jakarta Sans","Segoe UI",Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#A65C34; } a:hover { color:#7C4223; }
+</style>
+</helmet>
+
+<div style="width:412px;height:916px;overflow:hidden;background:#F7EFE6;display:flex;flex-direction:column;">
+  <div style="height:30px;flex-shrink:0;"></div>
+
+  <div style="display:flex;align-items:center;gap:6px;padding:6px 16px 0 12px;">
+    <button style="width:44px;height:44px;border:0;border-radius:22px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div style="font-size:18px;font-weight:700;color:#2B1D14;">Working out the pack</div>
+  </div>
+
+  <div style="padding:22px 20px 0 20px;">
+    <div style="background:#FFFFFF;border-radius:28px;padding:14px;box-shadow:0 10px 28px rgba(90,58,35,0.09);">
+      <div style="background:#F5E4D6;border-radius:22px;height:250px;display:flex;align-items:center;justify-content:center;overflow:hidden;">
+        <svg width="300" height="230" viewBox="0 0 300 230" fill="none">
+          <path d="M30 96 L150 36 L270 96 L150 156 Z" fill="#E7CFB6"/>
+          <path d="M30 96 L150 156 L150 214 L30 154 Z" fill="#B4713F"/>
+          <path d="M150 156 L270 96 L270 154 L150 214 Z" fill="#99552C"/>
+          <path d="M100 84 L142 105 L100 126 L58 105 Z" fill="#C9714A"/>
+          <path d="M58 105 L100 126 L100 156 L58 135 Z" fill="#A85433"/>
+          <path d="M100 126 L142 105 L142 135 L100 156 Z" fill="#8E4326"/>
+          <path d="M186 88 L216 103 L186 118 L156 103 Z" fill="#5B8F72"/>
+          <path d="M156 103 L186 118 L186 140 L156 125 Z" fill="#3F7A5A"/>
+          <path d="M186 118 L216 103 L216 125 L186 140 Z" fill="#33654A"/>
+          <path d="M196 56 L226 71 L196 86 L166 71 Z" fill="none" stroke="#8E4E28" stroke-width="2" stroke-dasharray="7 6" stroke-linejoin="round"/>
+          <path d="M166 71 L196 86 L196 104 L166 89 Z" fill="none" stroke="#8E4E28" stroke-width="2" stroke-dasharray="7 6" stroke-linejoin="round"/>
+          <path d="M30 96 L150 36 L270 96 L150 156 Z" fill="none" stroke="#8E4E28" stroke-width="2.4" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div style="margin-top:16px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:13px;font-weight:700;color:#2B1D14;">Trying different orders</span>
+          <span style="font-family:'DM Mono',ui-monospace,monospace;font-size:12.5px;color:#8A7565;">4 of 6</span>
+        </div>
+        <div style="height:8px;border-radius:999px;background:#F0E5D9;margin-top:9px;overflow:hidden;">
+          <div style="width:66%;height:8px;border-radius:999px;background:#A65C34;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:16px 20px 0 20px;">
+    <div style="background:#FAEEDA;border-radius:24px;padding:18px;">
+      <div style="display:flex;gap:12px;align-items:flex-start;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#8A5A10" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:1px;"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
+        <div>
+          <div style="font-size:16px;font-weight:800;color:#6E4708;letter-spacing:-0.2px;">This one is taking a while</div>
+          <div style="font-size:14px;line-height:21px;color:#7A5A25;margin-top:6px;text-wrap:pretty;">Nineteen pieces with rotations makes a lot of combinations. We already have a valid arrangement — you can take it, or let the search keep running for a better one.</div>
+        </div>
+      </div>
+
+      <div style="background:#FFFFFF;border-radius:16px;padding:14px;margin-top:14px;">
+        <div style="font-size:12.5px;font-weight:700;color:#A2907F;letter-spacing:0.5px;">BEST SO FAR</div>
+        <div style="display:flex;gap:22px;margin-top:9px;">
+          <div>
+            <div style="font-family:'DM Mono',ui-monospace,monospace;font-size:20px;color:#2B1D14;">17/19</div>
+            <div style="font-size:11.5px;font-weight:600;color:#8A7565;margin-top:2px;">pieces placed</div>
+          </div>
+          <div>
+            <div style="font-family:'DM Mono',ui-monospace,monospace;font-size:20px;color:#2B1D14;">68%</div>
+            <div style="font-size:11.5px;font-weight:600;color:#8A7565;margin-top:2px;">modelled fill</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow:1;"></div>
+
+  <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;">
+    <button style="height:56px;border:0;border-radius:28px;background:#A65C34;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(166,92,52,0.28);">Use what we have</button>
+    <button style="height:54px;border:1.5px solid #DCC6AF;border-radius:27px;background:transparent;color:#7C4223;font-family:inherit;font-size:15.5px;font-weight:600;cursor:pointer;">Keep looking</button>
+    <div style="text-align:center;font-size:12.5px;color:#A2907F;">Nothing is lost either way — your items stay saved.</div>
+  </div>
+
+  <div style="height:26px;flex-shrink:0;"></div>
+</div>
+</x-dc>
+</body>
+</html>

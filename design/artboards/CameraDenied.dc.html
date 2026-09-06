@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  body { margin:0; font-family:"Plus Jakarta Sans","Segoe UI",Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#A65C34; } a:hover { color:#7C4223; }
+</style>
+</helmet>
+
+<div style="width:412px;height:916px;overflow:hidden;background:#F7EFE6;display:flex;flex-direction:column;">
+  <div style="height:30px;flex-shrink:0;"></div>
+
+  <div style="display:flex;align-items:center;gap:6px;padding:6px 16px 0 12px;">
+    <button style="width:44px;height:44px;border:0;border-radius:22px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div style="font-size:18px;font-weight:700;color:#2B1D14;">Measure with the camera</div>
+  </div>
+
+  <div style="padding:58px 28px 0 28px;display:flex;flex-direction:column;align-items:center;text-align:center;">
+    <div style="width:96px;height:96px;border-radius:32px;background:#F2E0D4;display:flex;align-items:center;justify-content:center;">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#A65C34" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l1.4-2h7.2L17 8h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13.4" r="3.2"/><path d="M3 3l18 18"/></svg>
+    </div>
+    <div style="margin-top:26px;font-size:25px;line-height:32px;font-weight:800;color:#2B1D14;letter-spacing:-0.6px;text-wrap:pretty;">Camera access is off</div>
+    <div style="margin-top:11px;font-size:15px;line-height:23px;color:#7C6857;text-wrap:pretty;">Pack a Bunch needs the camera to measure a space by pointing at it. You can turn it on in Android settings — or just type your measurements instead.</div>
+  </div>
+
+  <div style="padding:28px 20px 0 20px;">
+    <div style="background:#FFFFFF;border-radius:22px;padding:16px;display:flex;gap:12px;align-items:flex-start;box-shadow:0 6px 18px rgba(90,58,35,0.06);">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3F7A5A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6L9 17l-5-5"/></svg>
+      <div style="font-size:14px;line-height:21px;color:#2B1D14;text-wrap:pretty;">Typing measurements does everything the camera does. Nothing in the app is locked behind it.</div>
+    </div>
+  </div>
+
+  <div style="flex-grow:1;"></div>
+
+  <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;">
+    <button style="height:56px;border:0;border-radius:28px;background:#A65C34;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(166,92,52,0.28);">Type the measurements</button>
+    <button style="height:54px;border:1.5px solid #DCC6AF;border-radius:27px;background:transparent;color:#7C4223;font-family:inherit;font-size:15.5px;font-weight:600;cursor:pointer;">Open Android settings</button>
+  </div>
+
+  <div style="height:30px;flex-shrink:0;"></div>
+</div>
+</x-dc>
+</body>
+</html>

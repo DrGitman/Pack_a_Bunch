@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  body { margin:0; font-family:"Plus Jakarta Sans","Segoe UI",Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#A65C34; } a:hover { color:#7C4223; }
+</style>
+</helmet>
+
+<div style="width:412px;height:916px;overflow:hidden;background:#F7EFE6;display:flex;flex-direction:column;">
+
+  <div style="height:30px;flex-shrink:0;"></div>
+
+  <div style="display:flex;align-items:center;gap:6px;padding:6px 12px 0 12px;">
+    <button style="width:44px;height:44px;border:0;border-radius:22px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div style="flex-grow:1;font-size:18px;font-weight:700;color:#2B1D14;">Notifications</div>
+    <button style="height:40px;padding:0 14px;border:0;border-radius:20px;background:transparent;color:#7C4223;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;">Mark all read</button>
+  </div>
+
+  <div style="padding:18px 20px 0 20px;font-size:12.5px;font-weight:700;color:#A2907F;letter-spacing:0.8px;">NEW</div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;padding:10px 20px 0 20px;">
+
+    <div style="background:#FFFFFF;border-radius:22px;padding:15px;display:flex;gap:13px;align-items:flex-start;box-shadow:0 8px 22px rgba(90,58,35,0.08);position:relative;">
+      <div style="position:absolute;left:6px;top:20px;width:7px;height:7px;border-radius:999px;background:#A65C34;"></div>
+      <div style="width:44px;height:44px;border-radius:15px;background:#F2E0D4;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:6px;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#A65C34" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5V12l3 2"/></svg>
+      </div>
+      <div style="flex-grow:1;min-width:0;">
+        <div style="font-size:15px;font-weight:700;color:#2B1D14;">The moving crate is half packed</div>
+        <div style="font-size:13.5px;line-height:20px;color:#7C6857;margin-top:3px;text-wrap:pretty;">You stopped at step 3 of 6 yesterday. Four pieces still to go in.</div>
+        <div style="font-size:12px;color:#A2907F;margin-top:8px;">Yesterday, 18:40</div>
+      </div>
+    </div>
+
+    <div style="background:#FFFFFF;border-radius:22px;padding:15px;display:flex;gap:13px;align-items:flex-start;box-shadow:0 8px 22px rgba(90,58,35,0.08);position:relative;">
+      <div style="position:absolute;left:6px;top:20px;width:7px;height:7px;border-radius:999px;background:#A65C34;"></div>
+      <div style="width:44px;height:44px;border-radius:15px;background:#E1EEE7;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-left:6px;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#3F7A5A" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M18 16.5H7a4.5 4.5 0 01-.9-8.9"/><path d="M8 6.7A5.2 5.2 0 0117 9h.3a3.8 3.8 0 012.7 6.4"/><path d="M12 12v7M9.4 16.4L12 19l2.6-2.6"/></svg>
+      </div>
+      <div style="flex-grow:1;min-width:0;">
+        <div style="font-size:15px;font-weight:700;color:#2B1D14;">Backup finished</div>
+        <div style="font-size:13.5px;line-height:20px;color:#7C6857;margin-top:3px;text-wrap:pretty;">14 packs and 38 MB of photos are safe in your account.</div>
+        <div style="font-size:12px;color:#A2907F;margin-top:8px;">Yesterday, 09:12</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:20px 20px 0 20px;font-size:12.5px;font-weight:700;color:#A2907F;letter-spacing:0.8px;">EARLIER</div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;padding:10px 20px 0 20px;">
+
+    <div style="background:#FFFFFF;border-radius:22px;padding:15px;display:flex;gap:13px;align-items:flex-start;box-shadow:0 4px 14px rgba(90,58,35,0.05);opacity:0.78;">
+      <div style="width:44px;height:44px;border-radius:15px;background:#F0E5D9;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#8A7565" stroke-width="1.9" stroke-linejoin="round"><path d="M12 3l8 4.2v9.6L12 21l-8-4.2V7.2z"/><path d="M4 7.2l8 4.2 8-4.2"/><path d="M12 11.4V21"/></svg>
+      </div>
+      <div style="flex-grow:1;min-width:0;">
+        <div style="font-size:15px;font-weight:700;color:#2B1D14;">Car boots are supported now</div>
+        <div style="font-size:13.5px;line-height:20px;color:#7C6857;margin-top:3px;text-wrap:pretty;">Tested on a hatchback and an estate. Openings and parcel shelves are still on us to get right.</div>
+        <div style="font-size:12px;color:#A2907F;margin-top:8px;">28 August</div>
+      </div>
+    </div>
+
+    <div style="background:#FFFFFF;border-radius:22px;padding:15px;display:flex;gap:13px;align-items:flex-start;box-shadow:0 4px 14px rgba(90,58,35,0.05);opacity:0.78;">
+      <div style="width:44px;height:44px;border-radius:15px;background:#F5E4D6;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#7C4223" stroke-width="1.9" stroke-linejoin="round"><path d="M12 3l8 4.2v9.6L12 21l-8-4.2V7.2z"/></svg>
+      </div>
+      <div style="flex-grow:1;min-width:0;">
+        <div style="font-size:15px;font-weight:700;color:#2B1D14;">Pack Plus renewed</div>
+        <div style="font-size:13.5px;line-height:20px;color:#7C6857;margin-top:3px;text-wrap:pretty;">Billed by Google Play. Next renewal 6 October.</div>
+        <div style="font-size:12px;color:#A2907F;margin-top:8px;">6 September</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-grow:1;"></div>
+
+  <div style="padding:0 20px 22px 20px;">
+    <div style="display:flex;align-items:center;gap:12px;background:#F0E5D9;border-radius:20px;padding:14px 16px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C4223" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M4 7h7M16 7h4M4 17h4M13 17h7"/><circle cx="13.5" cy="7" r="2.3"/><circle cx="10.5" cy="17" r="2.3"/></svg>
+      <div style="flex-grow:1;font-size:14px;font-weight:600;color:#5C4A3A;">Choose what shows up here</div>
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#B09A85" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

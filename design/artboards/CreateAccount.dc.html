@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  body { margin:0; font-family:"Plus Jakarta Sans","Segoe UI",Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#A65C34; } a:hover { color:#7C4223; }
+</style>
+</helmet>
+
+<div style="width:412px;height:916px;overflow:hidden;background:#F7EFE6;display:flex;flex-direction:column;">
+
+  <div style="height:30px;flex-shrink:0;"></div>
+
+  <div style="display:flex;align-items:center;gap:6px;padding:6px 16px 0 12px;">
+    <button style="width:44px;height:44px;border:0;border-radius:22px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div style="font-size:18px;font-weight:700;color:#2B1D14;">Create an account</div>
+  </div>
+
+  <div style="padding:18px 20px 0 20px;">
+    <div style="font-size:15px;line-height:23px;color:#7C6857;text-wrap:pretty;">Only an email and a password. No phone number, no name required, nothing shared with anyone.</div>
+  </div>
+
+  <div style="padding:24px 20px 0 20px;display:flex;flex-direction:column;gap:12px;">
+
+    <div style="background:#FFFFFF;border:1.5px solid #EADCCC;border-radius:20px;padding:14px 16px;box-shadow:0 6px 16px rgba(90,58,35,0.05);">
+      <div style="font-size:11.5px;font-weight:700;color:#A2907F;letter-spacing:0.4px;">EMAIL</div>
+      <div style="margin-top:5px;font-size:16px;color:#2B1D14;">orili@example.com</div>
+    </div>
+
+    <div style="background:#FFFFFF;border:1.5px solid #A65C34;border-radius:20px;padding:14px 16px;box-shadow:0 8px 20px rgba(90,58,35,0.07);">
+      <div style="font-size:11.5px;font-weight:700;color:#A2907F;letter-spacing:0.4px;">PASSWORD</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:5px;">
+        <span style="font-family:'DM Mono',ui-monospace,monospace;font-size:17px;color:#2B1D14;letter-spacing:2px;flex-grow:1;">••••••••••</span>
+        <div style="width:2px;height:20px;background:#A65C34;border-radius:2px;"></div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8A7565" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>
+      </div>
+      <div style="display:flex;gap:5px;margin-top:12px;">
+        <div style="height:5px;flex-grow:1;border-radius:999px;background:#3F7A5A;"></div>
+        <div style="height:5px;flex-grow:1;border-radius:999px;background:#3F7A5A;"></div>
+        <div style="height:5px;flex-grow:1;border-radius:999px;background:#3F7A5A;"></div>
+        <div style="height:5px;flex-grow:1;border-radius:999px;background:#E7DACA;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:7px;margin-top:9px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3F7A5A" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        <span style="font-size:12.5px;font-weight:600;color:#3F7A5A;">Strong enough. 10 characters and a number.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:20px 20px 0 20px;">
+    <div style="background:#FFFFFF;border-radius:22px;padding:16px;box-shadow:0 6px 18px rgba(90,58,35,0.06);">
+      <div style="font-size:14.5px;font-weight:700;color:#2B1D14;">What the account is for</div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px;">
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3F7A5A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6L9 17l-5-5"/></svg>
+          <div style="font-size:13.5px;line-height:20px;color:#5C4A3A;">Your packs come back if you change or reset your phone</div>
+        </div>
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3F7A5A" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px;"><path d="M20 6L9 17l-5-5"/></svg>
+          <div style="font-size:13.5px;line-height:20px;color:#5C4A3A;">Pack Plus follows you rather than the handset</div>
+        </div>
+        <div style="display:flex;gap:11px;align-items:flex-start;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B4402B" stroke-width="2.4" stroke-linecap="round" style="flex-shrink:0;margin-top:2px;"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          <div style="font-size:13.5px;line-height:20px;color:#5C4A3A;">Not used for marketing, and never sold on</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:16px 20px 0 20px;">
+    <div style="display:flex;gap:12px;align-items:flex-start;">
+      <div style="width:24px;height:24px;border-radius:8px;background:#A65C34;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <div style="font-size:13.5px;line-height:20px;color:#5C4A3A;">Back up my packs, items and photos to this account</div>
+    </div>
+    <div style="display:flex;gap:12px;align-items:flex-start;margin-top:12px;">
+      <div style="width:24px;height:24px;border-radius:8px;border:2px solid #DFCEB8;flex-shrink:0;margin-top:1px;"></div>
+      <div style="font-size:13.5px;line-height:20px;color:#5C4A3A;">Email me when a new kind of space is supported</div>
+    </div>
+  </div>
+
+  <div style="flex-grow:1;"></div>
+
+  <div style="padding:0 20px;">
+    <button style="width:100%;height:56px;border:0;border-radius:28px;background:#A65C34;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(166,92,52,0.28);">Create account</button>
+    <div style="text-align:center;font-size:12.5px;line-height:19px;color:#A2907F;margin-top:12px;">You can delete the account and everything in it from Settings, at any time.</div>
+  </div>
+
+  <div style="height:28px;flex-shrink:0;"></div>
+</div>
+</x-dc>
+</body>
+</html>

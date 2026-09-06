@@ -1,0 +1,109 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  body { margin:0; font-family:"Plus Jakarta Sans","Segoe UI",Helvetica,Arial,sans-serif; -webkit-font-smoothing:antialiased; }
+  a { color:#A65C34; } a:hover { color:#7C4223; }
+</style>
+</helmet>
+
+<div style="width:412px;height:916px;overflow:hidden;background:#F7EFE6;display:flex;flex-direction:column;">
+  <div style="height:30px;flex-shrink:0;"></div>
+
+  <div style="display:flex;align-items:center;gap:6px;padding:6px 16px 0 12px;">
+    <button style="width:44px;height:44px;border:0;border-radius:22px;background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2B1D14" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 19l-7-7 7-7"/></svg>
+    </button>
+    <div style="font-size:18px;font-weight:700;color:#2B1D14;">Check the measurements</div>
+  </div>
+
+  <div style="padding:16px 20px 0 20px;">
+    <div style="background:#B4402B;border-radius:22px;padding:16px;display:flex;gap:12px;align-items:flex-start;">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px;"><path d="M12 4l9 16H3z"/><path d="M12 10v4"/><circle cx="12" cy="17" r="0.9" fill="#FFFFFF" stroke="none"/></svg>
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#FFFFFF;">One edge couldn't be read</div>
+        <div style="font-size:13.5px;line-height:20px;color:#FBE4DF;margin-top:4px;text-wrap:pretty;">The height reading kept jumping around, so we're not going to guess at it. Type it in with a tape measure and the rest of the plan carries on as normal.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:14px 20px 0 20px;">
+    <div style="background:#FFFFFF;border-radius:26px;padding:16px;box-shadow:0 8px 24px rgba(90,58,35,0.08);">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:15.5px;font-weight:700;color:#2B1D14;">Inside measurements</div>
+        <div style="display:flex;background:#F4EDE4;border-radius:999px;padding:3px;">
+          <div style="background:#FFFFFF;border-radius:999px;padding:6px 14px;font-size:12.5px;font-weight:700;color:#2B1D14;box-shadow:0 1px 3px rgba(90,58,35,0.12);">cm</div>
+          <div style="padding:6px 14px;font-size:12.5px;font-weight:600;color:#9E8B79;">in</div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px;">
+
+        <div style="display:flex;align-items:center;gap:12px;background:#F9F4EE;border:1.5px solid #EADCCC;border-radius:16px;padding:12px 14px;">
+          <div style="flex-grow:1;">
+            <div style="font-size:12.5px;font-weight:700;color:#8A7565;">Width</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="font-family:'DM Mono',ui-monospace,monospace;font-size:19px;color:#2B1D14;">58.4</span>
+              <span style="font-size:12.5px;color:#A2907F;">cm</span>
+              <span style="font-size:10.5px;font-weight:700;color:#7C4223;background:#F5E4D6;border-radius:999px;padding:3px 8px;">CAMERA ESTIMATE</span>
+            </div>
+          </div>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#A65C34" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/></svg>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px;background:#F9F4EE;border:1.5px solid #EADCCC;border-radius:16px;padding:12px 14px;">
+          <div style="flex-grow:1;">
+            <div style="font-size:12.5px;font-weight:700;color:#8A7565;">Depth</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+              <span style="font-family:'DM Mono',ui-monospace,monospace;font-size:19px;color:#2B1D14;">39.6</span>
+              <span style="font-size:12.5px;color:#A2907F;">cm</span>
+              <span style="font-size:10.5px;font-weight:700;color:#7C4223;background:#F5E4D6;border-radius:999px;padding:3px 8px;">CAMERA ESTIMATE</span>
+            </div>
+          </div>
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#A65C34" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/></svg>
+        </div>
+
+        <div style="background:#FDF3F1;border:1.5px solid #B4402B;border-radius:16px;padding:12px 14px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="flex-grow:1;">
+              <div style="font-size:12.5px;font-weight:700;color:#B4402B;">Height</div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:4px;">
+                <span style="font-family:'DM Mono',ui-monospace,monospace;font-size:19px;color:#C0A79C;">— —</span>
+                <span style="font-size:10.5px;font-weight:700;color:#8E3322;background:#FBE4DF;border-radius:999px;padding:3px 8px;">NOT MEASURED</span>
+              </div>
+            </div>
+            <div style="width:2px;height:24px;background:#B4402B;border-radius:2px;"></div>
+          </div>
+          <div style="font-size:12.5px;line-height:18px;color:#8E3322;margin-top:8px;">Needs a number before this space can be saved.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:14px 20px 0 20px;">
+    <div style="background:#FFFFFF;border-radius:22px;padding:16px;box-shadow:0 6px 18px rgba(90,58,35,0.06);">
+      <div style="font-size:14.5px;font-weight:700;color:#2B1D14;">Why this happens</div>
+      <div style="font-size:13.5px;line-height:20px;color:#7C6857;margin-top:6px;text-wrap:pretty;">Plain, shiny or dark inside walls give the camera nothing to lock on to. A tape measure is quicker here than another attempt.</div>
+    </div>
+  </div>
+
+  <div style="flex-grow:1;"></div>
+
+  <div style="padding:0 20px;display:flex;flex-direction:column;gap:10px;">
+    <button style="height:56px;border:0;border-radius:28px;background:#A65C34;color:#FFFFFF;font-family:inherit;font-size:16px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(166,92,52,0.28);">Type the height</button>
+    <button style="height:54px;border:1.5px solid #DCC6AF;border-radius:27px;background:transparent;color:#7C4223;font-family:inherit;font-size:15.5px;font-weight:600;cursor:pointer;">Try measuring it again</button>
+  </div>
+
+  <div style="height:28px;flex-shrink:0;"></div>
+</div>
+</x-dc>
+</body>
+</html>

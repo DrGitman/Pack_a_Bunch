@@ -1,0 +1,132 @@
+{
+  "$comment": "Pack a Bunch design tokens. Lengths in dp, type sizes in sp. Source of truth for the mockups in artboards/.",
+  "color": {
+    "ground": "#F7EFE6",
+    "surface": "#FFFFFF",
+    "surfaceSunken": "#F0E5D9",
+    "surfaceField": "#F9F4EE",
+    "surfaceMuted": "#F4EDE4",
+    "brandTint": "#F5E4D6",
+    "outline": "#EADCCC",
+    "outlineStrong": "#DCC6AF",
+    "divider": "#F2E9DE",
+
+    "primary": "#A65C34",
+    "primaryDark": "#7C4223",
+    "onPrimary": "#FFFFFF",
+    "chrome": "#3F2718",
+    "chromeAlt": "#4A2E1F",
+    "accent": "#E08A46",
+
+    "textPrimary": "#2B1D14",
+    "textSecondary": "#7C6857",
+    "textTertiary": "#A2907F",
+    "textDisabled": "#B09A85",
+
+    "success": "#3F7A5A",
+    "successTint": "#E1EEE7",
+    "caution": "#B4761A",
+    "cautionTint": "#FAEEDA",
+    "cautionText": "#6E4708",
+    "error": "#B4402B",
+    "errorTint": "#FBE4DF",
+    "errorText": "#8E3322",
+    "onCamera": "#F2A03D",
+
+    "item": {
+      "1": "#A65C34",
+      "2": "#3F7A5A",
+      "3": "#3C5C9E",
+      "4": "#B4761A",
+      "5": "#6B4E9B",
+      "6": "#A03A5B"
+    },
+    "itemTint": {
+      "1": "#F2E0D4",
+      "2": "#E1EEE7",
+      "3": "#E2E8F3",
+      "4": "#FAEEDA",
+      "5": "#EDE6F3",
+      "6": "#F7E3EA"
+    },
+    "provenance": {
+      "cameraEstimateText": "#7C4223",
+      "cameraEstimateTint": "#F5E4D6",
+      "typedText": "#3F5F7A",
+      "typedTint": "#E2EAF2"
+    }
+  },
+
+  "typography": {
+    "family": {
+      "ui": "Plus Jakarta Sans",
+      "uiFallback": "Roboto",
+      "numeric": "DM Mono",
+      "numericFallback": "monospace"
+    },
+    "$comment": "Every measurement, count and percentage uses the numeric family.",
+    "scale": {
+      "display":      { "size": 33, "lineHeight": 39, "weight": 800, "tracking": -1.0 },
+      "headline":     { "size": 29, "lineHeight": 36, "weight": 800, "tracking": -0.9 },
+      "screenTitle":  { "size": 25, "lineHeight": 32, "weight": 800, "tracking": -0.6 },
+      "appBar":       { "size": 18, "lineHeight": 24, "weight": 700, "tracking": -0.2 },
+      "cardTitle":    { "size": 15.5, "lineHeight": 21, "weight": 700, "tracking": 0 },
+      "body":         { "size": 15, "lineHeight": 23, "weight": 400, "tracking": 0 },
+      "bodySmall":    { "size": 13.5, "lineHeight": 20, "weight": 400, "tracking": 0 },
+      "label":        { "size": 12.5, "lineHeight": 18, "weight": 600, "tracking": 0 },
+      "sectionLabel": { "size": 12.5, "lineHeight": 18, "weight": 700, "tracking": 0.8, "case": "upper" },
+      "badge":        { "size": 11, "lineHeight": 14, "weight": 800, "tracking": 0.6, "case": "upper" },
+      "numeralLarge": { "size": 21, "lineHeight": 26, "weight": 400, "family": "numeric" },
+      "numeralField": { "size": 19, "lineHeight": 24, "weight": 400, "family": "numeric" },
+      "numeralChip":  { "size": 11.5, "lineHeight": 16, "weight": 400, "family": "numeric" }
+    }
+  },
+
+  "spacing": { "xs": 4, "sm": 8, "md": 12, "base": 16, "lg": 20, "xl": 24, "xxl": 32, "screenGutter": 20 },
+
+  "radius": {
+    "chip": 999,
+    "button": 999,
+    "field": 16,
+    "card": 22,
+    "cardLarge": 26,
+    "hero": 30,
+    "sheet": 30,
+    "iconTile": 15
+  },
+
+  "size": {
+    "frameWidth": 412,
+    "frameHeight": 916,
+    "statusInset": 30,
+    "gestureInset": 28,
+    "buttonPrimary": 56,
+    "buttonSecondary": 54,
+    "buttonText": 48,
+    "minTouchTarget": 44,
+    "appBarRow": 44,
+    "iconTile": 44,
+    "iconSmall": 19,
+    "icon": 21,
+    "iconLarge": 24,
+    "shutter": 76,
+    "navPillHeight": 52,
+    "navFab": 56
+  },
+
+  "stroke": { "icon": 1.9, "iconBold": 2.3, "border": 1.5, "borderSelected": 2 },
+
+  "elevation": {
+    "card": "0 6px 18px rgba(90,58,35,0.06)",
+    "cardRaised": "0 8px 22px rgba(90,58,35,0.08)",
+    "hero": "0 10px 28px rgba(90,58,35,0.10)",
+    "primaryButton": "0 8px 20px rgba(166,92,52,0.28)",
+    "nav": "0 12px 30px rgba(63,39,24,0.30)",
+    "sheet": "0 -14px 40px rgba(43,29,20,0.26)",
+    "dialog": "0 22px 54px rgba(0,0,0,0.42)"
+  },
+
+  "scrim": { "sheet": "rgba(43,29,20,0.48)", "dialog": "rgba(43,29,20,0.58)", "camera": "rgba(22,18,14,0.68)" },
+
+  "motion": { "durationShortMs": 150, "durationMediumMs": 250 }
+}
