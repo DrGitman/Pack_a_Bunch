@@ -2,19 +2,42 @@ package com.packabunch.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.packabunch.R
 
 /**
  * Plus Jakarta Sans for UI, DM Mono for every measurement, count and percentage.
  *
- * Drop the .ttf files into res/font and replace these with FontFamily(Font(R.font.…)).
- * Roboto and the platform monospace are the intended fallbacks — the layout was sized
- * with enough slack to survive the swap.
+ * Plus Jakarta Sans ships as one variable font, so each weight is an axis setting on the
+ * same file rather than eight separate files. Variable fonts need API 26, which is minSdk.
+ *
+ * DM Mono is here for one reason: lining numerals. It is what keeps "58.4 × 39.6 × 35.0 cm"
+ * lining up between the review screen, the item list and the plan, so measurements stay
+ * comparable between screens and never read as prose.
  */
-val UiFamily: FontFamily = FontFamily.SansSerif      // → Plus Jakarta Sans
-val NumericFamily: FontFamily = FontFamily.Monospace // → DM Mono
+
+private fun jakarta(weight: Int) = Font(
+    resId = R.font.plus_jakarta_sans,
+    weight = FontWeight(weight),
+    variationSettings = FontVariation.Settings(FontVariation.weight(weight)),
+)
+
+val UiFamily: FontFamily = FontFamily(
+    jakarta(400),
+    jakarta(500),
+    jakarta(600),
+    jakarta(700),
+    jakarta(800),
+)
+
+val NumericFamily: FontFamily = FontFamily(
+    Font(R.font.dm_mono_regular, FontWeight.Normal),
+    Font(R.font.dm_mono_medium, FontWeight.Medium),
+)
 
 val PackABunchTypography = Typography(
     displaySmall = TextStyle(
@@ -59,6 +82,12 @@ val PackABunchTypography = Typography(
 val SectionLabel = TextStyle(
     fontFamily = UiFamily, fontWeight = FontWeight.Bold,
     fontSize = 12.5f.sp, lineHeight = 18.sp, letterSpacing = 0.8.sp,
+)
+
+/** The small label above a field — "NAME", "STEP 1 OF 3 · THE SPACE". */
+val FieldLabel = TextStyle(
+    fontFamily = UiFamily, fontWeight = FontWeight.SemiBold,
+    fontSize = 12.sp, lineHeight = 16.sp, letterSpacing = 0.4.sp,
 )
 
 /** Big result numerals — "6/7", "71%". */
