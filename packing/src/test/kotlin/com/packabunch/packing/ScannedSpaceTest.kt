@@ -221,19 +221,31 @@ class ScannedSpaceTest {
 
     @Test
     fun `an item with room inside but no way in is reported as exactly that`() {
-        // The artboard case: a tailgate of 740 x 580, a bookshelf whose smallest face is
-        // 780 x 620. It fits in the boot. It does not go through the hole.
-        val space = scannedSpace(
-            grid = VoxelGrid.forRectangle(1000, 800, 500, resolutionMm = 50),
-            opening = Opening(widthMm = 740, heightMm = 580),
+        // The artboard case: a tailgate of 740 x 580 and a bookshelf whose smallest face is
+        // 780 x 620. A bookshelf is *tall* — 780 and 620 are its two smallest edges and the
+        // long one is the height. That is the only shape for which the screen's claim holds:
+        // there is room in the boot with the seats down, and still no way through the hole.
+        val space = Space(
+            id = "boot",
+            name = "Car boot, seats down",
+            dimensions = Dimensions(1900, 800, 700),
+            measurementSource = MeasurementSource.CAMERA_ESTIMATE,
+            scan = ScannedSpace(
+                baseGrid = VoxelGrid.forRectangle(1900, 800, 700, resolutionMm = 50),
+                opening = Opening(widthMm = 740, heightMm = 580),
+            ),
         )
 
-        val bookshelf = item("bookshelf", 780, 620, 240)
-        val result = PackingEngine.solve(
-            PackingRequest(space, listOf(bookshelf)),
-            SolveBudget.unlimited(),
+        val bookshelf = item("bookshelf", 780, 620, 1800)
+        val request = PackingRequest(space, listOf(bookshelf))
+
+        // It genuinely fits inside — otherwise this would be the oversize case instead.
+        assertFalse(
+            space.volume().couldNeverHold(bookshelf.dimensions, bookshelf.allowedOrientations),
+            "the fixture only means anything if the bookshelf fits in the boot",
         )
-        val plan = (result as SolveResult.Solved).plan
+
+        val plan = (PackingEngine.solve(request, SolveBudget(timeBudgetMillis = 4_000)) as SolveResult.Solved).plan
 
         assertTrue(plan.placements.isEmpty())
         assertEquals(
@@ -246,14 +258,21 @@ class ScannedSpaceTest {
     fun `the opening check turns the item every way before giving up`() {
         val opening = Opening(widthMm = 740, heightMm = 580)
 
-        // Long, but thin enough to go through side-on.
+        // Long, but thin enough to go through end-on: the two smallest edges are 200 x 300.
         val plank = opening.admits(Dimensions(1800, 300, 200))
         assertTrue(plank.passes, "the two smallest edges fit, so it goes through lengthways")
 
-        val bookshelf = opening.admits(Dimensions(780, 620, 240))
+        // The bookshelf's smallest cross-section is 620 x 780, and neither pairing fits.
+        val bookshelf = opening.admits(Dimensions(780, 620, 1800))
         assertFalse(bookshelf.passes)
-        assertEquals(240, bookshelf.tightestFaceWidthMm)
-        assertEquals(620, bookshelf.tightestFaceHeightMm)
+        assertEquals(620, bookshelf.tightestFaceWidthMm)
+        assertEquals(780, bookshelf.tightestFaceHeightMm)
+
+        // A hair too wide in both pairings, but the diagonal does not rule it out — which
+        // the app reports as "might work corner-first", never as "it fits".
+        val awkward = opening.admits(Dimensions(600, 700, 2000))
+        assertFalse(awkward.passes)
+        assertTrue(awkward.diagonalMightWork)
     }
 
     @Test
