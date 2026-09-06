@@ -97,27 +97,22 @@ data class TierLimits(
         }
 
         /**
-         * **Blocks the piece-limit screen from shipping as drawn.**
+         * The twenty-piece cap on [FREE] is commercial: Plus lifts it. `LimitPieces.dc.html`
+         * was rewritten to say so, and the wording there is load-bearing rather than
+         * decorative — keep these three things true if that screen is edited again:
          *
-         * The twenty-piece cap on [FREE] is a commercial limit: Plus lifts it. That is a
-         * decided product choice and the code above reflects it.
-         *
-         * `design/artboards/LimitPieces.dc.html` was written for the opposite world. It
-         * argues the cap is a limit of the *search*, and says so outright: "This is not a
-         * paywall. Pack Plus has the same twenty. We don't sell a limit we haven't solved."
-         * Every one of those sentences is now false.
-         *
-         * That screen has to be rewritten before release. Not softened — rewritten. Telling
-         * someone a paywall is not a paywall, on the screen where they hit it, costs more
-         * trust than the paywall does. The honest version says the search handles far more
-         * than twenty, that twenty is where the free tier stops, and what Plus costs.
-         *
-         * The rest of that screen — split it into two packs, group identical items, drop
-         * the small stuff — is good advice either way and should survive the rewrite.
+         *  - It says twenty is where *the free plan* stops, not where the search stops.
+         *    Dressing a paywall as a technical limit, on the screen where somebody hits it,
+         *    costs more trust than the paywall itself.
+         *  - It still states the real ceiling ([PackingEngine.MAX_INSTANCE_COUNT]), because
+         *    that one applies to subscribers too and "unlimited" without it is a lie.
+         *  - It still offers the three ways out — split the pack, group identical items,
+         *    drop the small stuff. That advice is worth the same whoever is paying, and a
+         *    screen that only sells is a worse screen.
          */
-        const val PIECE_LIMIT_SCREEN_NEEDS_REWRITE: String =
-            "LimitPieces.dc.html says the piece cap is not a paywall. Under TierLimits.FREE " +
-                "it is one. Rewrite that screen's copy before release."
+        const val PIECE_LIMIT_COPY_RULE: String =
+            "LimitPieces.dc.html must say twenty is the free plan's limit, not the search's, " +
+                "and must still name the real ceiling that applies on every plan."
     }
 }
 

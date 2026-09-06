@@ -132,10 +132,7 @@ with the screen they attach to, not batched at the end — most of the real work
   safety form, and a web-reachable deletion route Play requires.
 - **Sign-in merge.** `LogIn` promises local packs merge into the account. Merge, replace,
   or ask?
-- **`LimitPieces.dc.html` must be rewritten before release.** Free stops at 20 pieces and
-  Plus lifts it, so the cap is commercial — but that screen still says "This is not a
-  paywall. Pack Plus has the same twenty." That is now false and cannot ship as drawn.
-  See `TierLimits.PIECE_LIMIT_SCREEN_NEEDS_REWRITE`.
+- **Accounts** (above) is the one that blocks Band 1. Everything else here is smaller.
 - **Application id.** `com.packabunch` is a placeholder; it is permanent once uploaded.
 - **Brand colour.** The logo brown (`#5C2626`) is not the token primary (`#A65C34`).
   The mark uses its own colour; the app interior uses the tokens.
