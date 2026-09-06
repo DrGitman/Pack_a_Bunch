@@ -58,7 +58,7 @@ data class TierLimits(
          * across-packs work.
          */
         val FREE = TierLimits(
-            maxPiecesPerPack = 25,
+            maxPiecesPerPack = 20,
             maxSavedPacks = 1,
             maxScansPerDay = 3,
             maxScannedSpaceLitres = 120,
@@ -69,12 +69,17 @@ data class TierLimits(
 
         /**
          * Plus lifts every cap. The differences a subscriber can point at:
-         *  - as many pieces as the planner can search, rather than 25
+         *  - as many pieces as the planner can search, rather than 20
          *  - any size of space — the car boot, the van, the wardrobe
          *  - scan as often as needed, with no daily count
          *  - as many saved packs as they like
          *  - the item library, so a thing measured once is measured forever
          *  - plan comparison, to keep two arrangements and choose
+         *
+         * "Unlimited" here means *no product limit*. [PackingEngine.MAX_INSTANCE_COUNT]
+         * still applies — past roughly four hundred pieces the search cannot return
+         * anything worth showing. That ceiling is technical, applies to everyone, and must
+         * never be described to a subscriber as unlimited without it.
          */
         val PLUS = TierLimits(
             maxPiecesPerPack = null,
@@ -92,21 +97,27 @@ data class TierLimits(
         }
 
         /**
-         * Unresolved content conflict, recorded here because it is a writing decision, not
-         * an engineering one.
+         * **Blocks the piece-limit screen from shipping as drawn.**
          *
-         * `design/artboards/LimitPieces.dc.html` currently argues that twenty pieces is a
-         * limit of the *search*, and says so in as many words: "This is not a paywall. Pack
-         * Plus has the same twenty. We don't sell a limit we haven't solved."
+         * The twenty-piece cap on [FREE] is a commercial limit: Plus lifts it. That is a
+         * decided product choice and the code above reflects it.
          *
-         * Under [FREE] the piece cap is now exactly the thing that screen swears it is not.
-         * Shipping both is a contradiction a user can see. Either that screen is rewritten
-         * to be honest about the cap being commercial, or the piece cap comes back out of
-         * the free tier and the differences stay scanning, packs, library and comparison.
+         * `design/artboards/LimitPieces.dc.html` was written for the opposite world. It
+         * argues the cap is a limit of the *search*, and says so outright: "This is not a
+         * paywall. Pack Plus has the same twenty. We don't sell a limit we haven't solved."
+         * Every one of those sentences is now false.
+         *
+         * That screen has to be rewritten before release. Not softened — rewritten. Telling
+         * someone a paywall is not a paywall, on the screen where they hit it, costs more
+         * trust than the paywall does. The honest version says the search handles far more
+         * than twenty, that twenty is where the free tier stops, and what Plus costs.
+         *
+         * The rest of that screen — split it into two packs, group identical items, drop
+         * the small stuff — is good advice either way and should survive the rewrite.
          */
-        const val PIECE_LIMIT_CONFLICT: String =
-            "LimitPieces.dc.html claims the piece cap is not a paywall; TierLimits.FREE " +
-                "makes it one. Rewrite the screen or drop maxPiecesPerPack from FREE."
+        const val PIECE_LIMIT_SCREEN_NEEDS_REWRITE: String =
+            "LimitPieces.dc.html says the piece cap is not a paywall. Under TierLimits.FREE " +
+                "it is one. Rewrite that screen's copy before release."
     }
 }
 

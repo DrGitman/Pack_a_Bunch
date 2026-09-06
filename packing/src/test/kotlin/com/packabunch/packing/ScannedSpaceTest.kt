@@ -379,4 +379,27 @@ class ScannedSpaceTest {
         assertFalse(TierLimits.FREE.allowsAnotherScanToday(3))
         assertFalse(TierLimits.FREE.itemLibrary)
     }
+
+    @Test
+    fun `free stops at twenty pieces and plus does not`() {
+        assertTrue(TierLimits.FREE.allowsPieces(20))
+        assertFalse(TierLimits.FREE.allowsPieces(21))
+        assertTrue(TierLimits.PLUS.allowsPieces(21))
+        assertTrue(TierLimits.PLUS.allowsPieces(300))
+    }
+
+    @Test
+    fun `plus is unlimited by product, not by physics`() {
+        // Nothing may tell a subscriber "unlimited" without this ceiling attached: past it
+        // the search cannot return anything worth showing, whatever anybody paid.
+        assertTrue(TierLimits.PLUS.allowsPieces(PackingEngine.MAX_INSTANCE_COUNT + 100))
+
+        val problems = problems(
+            space(6000, 4000, 3500),
+            item("many", 10, 10, 10, quantity = 199),
+            item("more", 10, 10, 10, quantity = 199),
+            item("yetmore", 10, 10, 10, quantity = 199),
+        )
+        assertEquals(listOf("items"), problems.map { it.field })
+    }
 }
