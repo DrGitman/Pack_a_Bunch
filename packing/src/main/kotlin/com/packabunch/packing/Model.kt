@@ -10,11 +10,18 @@ enum class MeasurementSource {
 }
 
 /**
- * The space being packed into: one empty, rectangular, unobstructed container loaded
- * through an open top. Cupboards with shelves, boot openings and fixed obstacles are
- * not this model and must not be presented as if they were.
+ * The space being packed into.
  *
- * [dimensions] are the **inside** measurements.
+ * Two kinds, and which one this is depends on whether [scan] is present:
+ *
+ *  - **Typed or measured as a rectangle.** One empty box loaded through an open top. Exact,
+ *    and the right model for a crate, a drawer or a storage tub.
+ *  - **Scanned.** An occupancy grid with obstructions, an opening, and — crucially — a
+ *    record of what the scan never saw. This is what a car boot needs, because a boot is
+ *    not a rectangle and cannot be honestly described as one.
+ *
+ * [dimensions] are the **inside** measurements, and for a scan they are the envelope the
+ * grid sits in — never the usable volume, which is almost always smaller.
  */
 data class Space(
     val id: String,
@@ -24,11 +31,18 @@ data class Space(
      * Breathing room left around the load, in mm. Applied as an inset on all four sides
      * and at the top; the floor is not inset because items rest on it. A visible setting,
      * not a hidden tolerance — and not a calibrated guarantee that anything will fit.
+     *
+     * Only meaningful for the rectangular case: a scan already knows the real surface, so
+     * inflating a margin around an irregular shape would be inventing geometry.
      */
     val edgeGapMm: Int = 0,
     val measurementSource: MeasurementSource = MeasurementSource.TYPED_IN,
+    /** Present when this space came from a scan rather than from three numbers. */
+    val scan: ScannedSpace? = null,
 ) {
-    /** The region the solver may place into, in space coordinates. */
+    val isScanned: Boolean get() = scan != null
+
+    /** The rectangular region the solver may place into. Meaningless for a scanned space. */
     val usableBox: Box
         get() = Box(
             minXMm = edgeGapMm,
@@ -39,7 +53,14 @@ data class Space(
             heightMm = dimensions.heightMm - edgeGapMm,
         )
 
-    val usableVolumeMm3: Long get() = usableBox.volumeMm3
+    /** The one thing the solver actually talks to. */
+    fun volume(): PackingVolume =
+        scan?.let { ScannedVolume(it) } ?: RectangularVolume(usableBox)
+
+    val usableVolumeMm3: Long get() = volume().usableVolumeMm3
+
+    /** The way in, when one is known. Absent for an open-top crate. */
+    val opening: Opening? get() = scan?.opening
 }
 
 /**
@@ -106,6 +127,13 @@ enum class UnplacedReason {
 
     /** This arrangement ran out of room for it. Another arrangement might not. */
     NO_ROOM_IN_THIS_ARRANGEMENT,
+
+    /**
+     * There is room inside, but no way in: the item's smallest cross-section is larger
+     * than the opening, in every orientation. Reported separately because the fix is
+     * completely different — fold the seats, re-measure the tailgate, or leave it out.
+     */
+    WILL_NOT_FIT_THROUGH_THE_OPENING,
 
     /** The search hit its time budget before reaching this item. */
     TIME_BUDGET_REACHED,

@@ -34,7 +34,7 @@ object PlanValidator {
     fun validate(request: PackingRequest, plan: PackingPlan): Result {
         val violations = mutableListOf<Violation>()
         val instances = request.expandInstances().associateBy { it.instanceId }
-        val usable = request.space.usableBox
+        val volume = request.space.volume()
 
         // --- identity: every requested instance is accounted for exactly once ----------
         val seen = mutableSetOf<String>()
@@ -83,11 +83,11 @@ object PlanValidator {
                 )
             }
 
-            if (!usable.containsInAllAxes(placement.box)) {
+            if (!volume.admits(placement.box)) {
                 violations += Violation(
                     Code.OUT_OF_BOUNDS,
                     "${placement.instanceId} at (${placement.xMm},${placement.yMm}," +
-                        "${placement.zMm}) leaves the usable space",
+                        "${placement.zMm}) is not inside space that was observed and empty",
                 )
             }
         }
@@ -108,7 +108,9 @@ object PlanValidator {
 
         // --- support --------------------------------------------------------------------
         plan.placements.forEach { placement ->
-            if (placement.zMm == usable.minZMm) return@forEach // resting on the floor
+            // Carried by the space itself — the floor of a crate, or the uneven floor and
+            // arches of a scan, checked column by column rather than against a flat plane.
+            if (volume.restsOnStructure(placement.box)) return@forEach
 
             val supporter = plan.placements.firstOrNull { other ->
                 other.instanceId != placement.instanceId &&

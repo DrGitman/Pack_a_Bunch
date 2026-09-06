@@ -208,15 +208,28 @@ class PackingEngineTest {
     }
 
     @Test
-    fun `more pieces than this version plans for is refused, not silently truncated`() {
+    fun `past the searchable ceiling is refused, not silently truncated`() {
         val found = problems(
             space(6000, 4000, 3500),
-            item("many", 10, 10, 10, quantity = 99),
-            item("more", 10, 10, 10, quantity = 99),
-            item("yetmore", 10, 10, 10, quantity = 99),
+            item("many", 10, 10, 10, quantity = 199),
+            item("more", 10, 10, 10, quantity = 199),
+            item("yetmore", 10, 10, 10, quantity = 199),
         )
 
         assertEquals(listOf("items"), found.map { it.field })
+    }
+
+    @Test
+    fun `the old twenty piece cap is gone from the engine`() {
+        // Thirty pieces used to be refused outright. The engine's only limit now is what it
+        // can search; anything narrower is a product decision and lives in TierLimits.
+        val plan = solved(
+            space(1200, 800, 800),
+            item("crate", 180, 180, 180, quantity = 30),
+        )
+
+        assertEquals(30, plan.metrics.requestedInstanceCount)
+        assertTrue(plan.placements.size > PackingEngine.BENCHMARK_INSTANCE_COUNT)
     }
 
     // -- determinism and budget -------------------------------------------------------------------------

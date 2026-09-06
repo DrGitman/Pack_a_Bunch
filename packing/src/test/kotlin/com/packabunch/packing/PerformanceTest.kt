@@ -26,8 +26,8 @@ class PerformanceTest {
                 item("cables", 180, 120, 90, quantity = 4),
             ),
         )
-        require(request.expandInstances().size == PackingEngine.SUPPORTED_INSTANCE_COUNT) {
-            "this fixture is meant to be exactly ${PackingEngine.SUPPORTED_INSTANCE_COUNT} pieces"
+        require(request.expandInstances().size == PackingEngine.BENCHMARK_INSTANCE_COUNT) {
+            "this fixture is meant to be exactly ${PackingEngine.BENCHMARK_INSTANCE_COUNT} pieces"
         }
 
         val startNanos = System.nanoTime()

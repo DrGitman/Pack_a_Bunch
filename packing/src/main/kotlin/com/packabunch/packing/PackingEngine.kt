@@ -22,27 +22,52 @@ object PackingEngine {
     const val SOLVER_VERSION: Int = 1
 
     /**
-     * The instance count the performance target is stated against. The engine solves past
-     * it; this is the number to benchmark and the only number the UI may promise.
+     * The count the published performance figure is measured at. Not a limit — the engine
+     * solves well past it. It exists so there is one fixed size to benchmark against on a
+     * real phone rather than a number quoted from nowhere.
      */
-    const val SUPPORTED_INSTANCE_COUNT: Int = 20
+    const val BENCHMARK_INSTANCE_COUNT: Int = 20
 
-    /** Hard ceiling, so a mistyped quantity cannot start an unbounded search. */
-    const val MAX_INSTANCE_COUNT: Int = 200
+    /**
+     * Technical ceiling, not a product one.
+     *
+     * Product limits belong to [Tier], not here: the engine must not know what somebody
+     * paid. This number exists only so a mistyped quantity cannot start a search that
+     * allocates unboundedly. Past it, the honest answer is not a worse plan but no plan.
+     *
+     * Above roughly a hundred pieces the search still returns — the time budget guarantees
+     * that — but it returns a best-effort partial answer, and items it never reached are
+     * reported as [UnplacedReason.TIME_BUDGET_REACHED] rather than passed off as unplaceable.
+     */
+    const val MAX_INSTANCE_COUNT: Int = 400
 
-    private const val MAX_QUANTITY: Int = 99
+    private const val MAX_QUANTITY: Int = 199
 
     fun solve(request: PackingRequest, budget: SolveBudget = SolveBudget()): SolveResult {
         val problems = validateInput(request)
         if (problems.isNotEmpty()) return SolveResult.InvalidInput(problems)
 
         val instances = request.expandInstances()
-        val usable = request.space.usableBox
+        val volume = request.space.volume()
+        val opening = request.space.opening
         val supportLookup = request.items.associate { it.id to it.maySupportItems }
 
-        // Items no pose of which fits the empty space are separated out before the search.
-        // This is the one case the app may state flatly: it does not depend on the search.
-        val (packable, oversize) = instances.partition { it.fitsEmpty(usable) }
+        // Two separations before the search, both of which are proofs rather than search
+        // failures, and both of which the user is told about differently.
+        //
+        // Too big for the space at all — no pose of it fits anywhere inside.
+        val oversize = instances.filter {
+            volume.couldNeverHold(it.spec.dimensions, it.spec.allowedOrientations)
+        }
+        // Fits inside, but will not pass through the way in. "There's room inside, but no
+        // way in" is a different problem with different fixes, so it is a different reason.
+        val blockedByOpening = instances.filter { instance ->
+            instance !in oversize &&
+                opening?.admits(instance.spec.dimensions)?.passes == false
+        }
+
+        val excluded = (oversize + blockedByOpening).mapTo(mutableSetOf()) { it.instanceId }
+        val packable = instances.filter { it.instanceId !in excluded }
 
         var orderingsTried = 0
         val attempts = buildList {
@@ -52,7 +77,8 @@ object PackingEngine {
                 val attempt = packGreedily(request, ordering, packable, supportLookup, budget)
                 // A plan that fails its own validator is a bug in this file. Drop it rather
                 // than show it: an arrangement that overlaps or floats is worse than none.
-                if (PlanValidator.validate(request, attempt.asPlan(request, oversize)).isValid) {
+                val candidate = attempt.asPlan(request, oversize, blockedByOpening)
+                if (PlanValidator.validate(request, candidate).isValid) {
                     add(attempt)
                 }
             }
@@ -69,7 +95,9 @@ object PackingEngine {
                 stoppedOnTimeBudget = true,
             )
 
-        return SolveResult.Solved(best.asPlan(request, oversize, stoppedOnBudget))
+        return SolveResult.Solved(
+            best.asPlan(request, oversize, blockedByOpening, stoppedOnBudget),
+        )
     }
 
     // -- input ----------------------------------------------------------------------------
@@ -124,20 +152,13 @@ object PackingEngine {
         if (total > MAX_INSTANCE_COUNT) {
             problems += InputProblem(
                 field = "items",
-                message = "That is $total pieces. This version plans up to $MAX_INSTANCE_COUNT.",
+                message = "That is $total pieces, past what the planner can search " +
+                    "($MAX_INSTANCE_COUNT). Split it into more than one pack.",
             )
         }
 
         return problems
     }
-
-    private fun ItemInstance.fitsEmpty(usable: Box): Boolean =
-        spec.allowedOrientations.any { orientation ->
-            val oriented = orientation.apply(spec.dimensions)
-            oriented.widthMm <= usable.widthMm &&
-                oriented.depthMm <= usable.depthMm &&
-                oriented.heightMm <= usable.heightMm
-        }
 
     // -- search ----------------------------------------------------------------------------
 
@@ -213,12 +234,13 @@ object PackingEngine {
         supportLookup: Map<String, Boolean>,
         budget: SolveBudget,
     ): Attempt {
-        val usable = request.space.usableBox
+        val volume = request.space.volume()
         val placed = mutableListOf<Placement>()
         val unreached = mutableSetOf<String>()
 
-        // Corner points: the origin, plus the three exposed corners of everything placed.
-        var candidates = listOf(Corner(usable.minXMm, usable.minYMm, usable.minZMm))
+        // Starting positions come from the space itself: one corner for a crate, every
+        // resting surface for a scan. Placing an item then exposes three more corners.
+        var candidates = volume.seedPositions()
         var hitBudget = false
 
         for (instance in ordering.sort(instances)) {
@@ -230,7 +252,7 @@ object PackingEngine {
 
             // No fit found is not an error and not a failure of the item — it is recorded
             // against the finished plan as "no room in this arrangement".
-            val choice = bestFitFor(instance, candidates, placed, usable, supportLookup) ?: continue
+            val choice = bestFitFor(instance, candidates, placed, volume, supportLookup) ?: continue
 
             placed += Placement(
                 instanceId = instance.instanceId,
@@ -244,7 +266,7 @@ object PackingEngine {
                 orientation = choice.orientation,
                 sequenceIndex = 0, // assigned bottom-up once the attempt is finished
             )
-            candidates = expandCorners(candidates, choice, usable, placed)
+            candidates = expandCorners(candidates, choice, volume, placed)
         }
 
         return Attempt(
@@ -255,10 +277,8 @@ object PackingEngine {
         )
     }
 
-    private data class Corner(val xMm: Int, val yMm: Int, val zMm: Int)
-
     private data class Choice(
-        val corner: Corner,
+        val corner: Position,
         val orientation: Orientation,
         val oriented: Dimensions,
     ) {
@@ -280,9 +300,9 @@ object PackingEngine {
      */
     private fun bestFitFor(
         instance: ItemInstance,
-        candidates: List<Corner>,
+        candidates: List<Position>,
         placed: List<Placement>,
-        usable: Box,
+        volume: PackingVolume,
         supportLookup: Map<String, Boolean>,
     ): Choice? {
         var best: Choice? = null
@@ -294,9 +314,9 @@ object PackingEngine {
                 val choice = Choice(corner, orientation, oriented)
                 val box = choice.box
 
-                if (!usable.containsInAllAxes(box)) continue
+                if (!volume.admits(box)) continue
                 if (placed.any { it.box.overlaps(box) }) continue
-                if (!isSupported(box, placed, usable, supportLookup)) continue
+                if (!isSupported(box, placed, volume, supportLookup)) continue
 
                 val key = intArrayOf(
                     box.maxZMm,
@@ -333,10 +353,13 @@ object PackingEngine {
     private fun isSupported(
         box: Box,
         placed: List<Placement>,
-        usable: Box,
+        volume: PackingVolume,
         supportLookup: Map<String, Boolean>,
     ): Boolean {
-        if (box.minZMm == usable.minZMm) return true
+        // Carried by the space itself: the floor of a crate, or the sloping floor and
+        // wheel arches of a scanned boot, checked column by column.
+        if (volume.restsOnStructure(box)) return true
+
         val supporter = placed.firstOrNull { candidate ->
             candidate.box.maxZMm == box.minZMm && candidate.box.coversFootprintOf(box)
         } ?: return false
@@ -344,23 +367,24 @@ object PackingEngine {
     }
 
     private fun expandCorners(
-        existing: List<Corner>,
+        existing: List<Position>,
         choice: Choice,
-        usable: Box,
+        volume: PackingVolume,
         placed: List<Placement>,
-    ): List<Corner> {
+    ): List<Position> {
+        val bounds = volume.boundsMm
         val box = choice.box
         val grown = existing + listOf(
-            Corner(box.maxXMm, box.minYMm, box.minZMm),
-            Corner(box.minXMm, box.maxYMm, box.minZMm),
-            Corner(box.minXMm, box.minYMm, box.maxZMm),
+            Position(box.maxXMm, box.minYMm, box.minZMm),
+            Position(box.minXMm, box.maxYMm, box.minZMm),
+            Position(box.minXMm, box.minYMm, box.maxZMm),
         )
         return grown
             .distinct()
             .filter { corner ->
-                corner.xMm in usable.minXMm until usable.maxXMm &&
-                    corner.yMm in usable.minYMm until usable.maxYMm &&
-                    corner.zMm in usable.minZMm until usable.maxZMm &&
+                corner.xMm in bounds.minXMm until bounds.maxXMm &&
+                    corner.yMm in bounds.minYMm until bounds.maxYMm &&
+                    corner.zMm in bounds.minZMm until bounds.maxZMm &&
                     // A point buried inside something already placed can never start a box.
                     placed.none { placement ->
                         val b = placement.box
@@ -387,10 +411,12 @@ object PackingEngine {
     private fun Attempt.asPlan(
         request: PackingRequest,
         oversize: List<ItemInstance>,
+        blockedByOpening: List<ItemInstance>,
         stoppedOnBudget: Boolean = stoppedOnTimeBudget,
     ): PackingPlan {
         val placedIds = placements.mapTo(mutableSetOf()) { it.instanceId }
         val oversizeIds = oversize.mapTo(mutableSetOf()) { it.instanceId }
+        val openingIds = blockedByOpening.mapTo(mutableSetOf()) { it.instanceId }
 
         val unplaced = request.expandInstances()
             .filter { it.instanceId !in placedIds }
@@ -401,6 +427,8 @@ object PackingEngine {
                     name = instance.spec.name,
                     reason = when {
                         instance.instanceId in oversizeIds -> UnplacedReason.LARGER_THAN_THE_SPACE
+                        instance.instanceId in openingIds ->
+                            UnplacedReason.WILL_NOT_FIT_THROUGH_THE_OPENING
                         instance.instanceId in unreached -> UnplacedReason.TIME_BUDGET_REACHED
                         else -> UnplacedReason.NO_ROOM_IN_THIS_ARRANGEMENT
                     },
