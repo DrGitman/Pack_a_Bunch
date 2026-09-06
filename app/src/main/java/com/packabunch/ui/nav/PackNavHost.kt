@@ -22,6 +22,7 @@ import com.packabunch.ui.AppViewModel
 import com.packabunch.ui.motion.Motion
 import com.packabunch.ui.screens.CreateSpaceScreen
 import com.packabunch.ui.screens.ItemsScreen
+import com.packabunch.ui.screens.MeasureScreen
 import com.packabunch.ui.screens.PackingGuideScreen
 import com.packabunch.ui.screens.PlanResultScreen
 import com.packabunch.ui.screens.ProjectsScreen
@@ -37,6 +38,7 @@ object Routes {
     const val WELCOME = "welcome"          // Main.dc.html
     const val PROJECTS = "projects"        // Projects.dc.html
     const val CREATE_SPACE = "createSpace" // CreateSpace.dc.html
+    const val MEASURE = "measure"          // Measure.dc.html + its recovery states
     const val ITEMS = "items"              // Items.dc.html
     const val PLAN_RESULT = "planResult"   // PlanResult.dc.html
     const val PACKING_GUIDE = "packingGuide" // PackingGuide.dc.html
@@ -149,6 +151,21 @@ fun PackNavHost(
                 onNameChange = viewModel::setSpaceName,
                 onDimensionsChange = viewModel::setSpaceDimensions,
                 onNext = { navController.navigate(Routes.ITEMS) },
+                onBack = { navController.popBackStack() },
+                onMeasureWithCamera = { navController.navigate(Routes.MEASURE) },
+            )
+        }
+
+        composable(Routes.MEASURE) {
+            MeasureScreen(
+                unit = settings.unit,
+                onMeasured = { dimensions, source ->
+                    viewModel.setSpaceDimensions(dimensions, source)
+                    // Straight back to the space screen, where every value is editable and
+                    // carries its provenance. A camera estimate is never stored unreviewed.
+                    navController.popBackStack()
+                },
+                onTypeInstead = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
             )
         }

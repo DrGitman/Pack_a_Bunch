@@ -2,11 +2,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!--
-      No camera permission yet. It is requested at the point of use (measuring or taking
-      an item photo), never at launch, and declining it must leave the typed path intact.
-      ARCore is declared "AR Optional" when the measurement slice lands, so the app stays
-      installable on phones without ARCore.
+      Requested at the point of use — when measuring or taking an item photo — never at
+      launch. Declining it must leave every typed path working exactly as before.
     -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!--
+      AR Optional, and both halves of that matter.
+
+      `required="false"` keeps the app installable on phones with no ARCore support at all,
+      which is a large share of Android. The `optional` meta-data stops the Play Store
+      installing ARCore automatically as a dependency.
+
+      Together they mean AR can be missing at runtime, so every entry point into it has to
+      check availability first and fall back to typing. There is no screen in this app that
+      only works with a camera.
+    -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
         android:name=".PackABunchApp"
@@ -29,6 +42,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
     </application>
 
 </manifest>
