@@ -32,6 +32,13 @@ import com.packabunch.ui.screens.ItemLibraryScreen
 import com.packabunch.ui.screens.LibraryItem
 import com.packabunch.ui.screens.NotificationSettingsScreen
 import com.packabunch.ui.screens.PlanLayersScreen
+import com.packabunch.ui.screens.ScanIncompleteScreen
+import com.packabunch.ui.screens.SpaceKind
+import com.packabunch.ui.screens.SpaceObstructionsScreen
+import com.packabunch.ui.screens.SpaceScanReviewScreen
+import com.packabunch.ui.screens.SpaceScanScreen
+import com.packabunch.ui.screens.SpaceTypeScreen
+import com.packabunch.packing.ScanCompleteness
 import com.packabunch.ui.screens.PlanResultScreen
 import com.packabunch.ui.screens.ProjectsScreen
 import com.packabunch.ui.screens.WelcomeScreen
@@ -56,6 +63,11 @@ object Routes {
     const val PLAN_LAYERS = "planLayers"     // PlanLayers.dc.html
     const val ITEM_LIBRARY = "itemLibrary"   // ItemLibrary.dc.html / LockedLibrary.dc.html
     const val NOTIFICATION_SETTINGS = "notificationSettings" // NotificationSettings.dc.html
+    const val SPACE_TYPE = "spaceType"             // SpaceType.dc.html
+    const val SPACE_SCAN = "spaceScan"             // SpaceScan.dc.html
+    const val SPACE_SCAN_REVIEW = "spaceScanReview" // SpaceScanReview.dc.html
+    const val SPACE_OBSTRUCTIONS = "spaceObstructions" // SpaceObstructions.dc.html
+    const val SCAN_INCOMPLETE = "scanIncomplete"   // ScanIncomplete.dc.html
 }
 
 /**
@@ -131,7 +143,7 @@ fun PackNavHost(
             WelcomeScreen(
                 onPlanAPack = {
                     viewModel.startNewPack()
-                    navController.navigate(Routes.CREATE_SPACE)
+                    navController.navigate(Routes.SPACE_TYPE)
                 },
                 onTrySample = {
                     viewModel.openPack("sample")
@@ -151,10 +163,95 @@ fun PackNavHost(
                 },
                 onNewPack = {
                     viewModel.startNewPack()
-                    navController.navigate(Routes.CREATE_SPACE)
+                    navController.navigate(Routes.SPACE_TYPE)
                 },
                 onBack = { navController.popBackStack() },
             )
+        }
+
+        composable(Routes.SPACE_TYPE) {
+            // Asked here rather than at launch: it costs a short-lived ARCore session, and
+            // this is the first moment the answer changes anything on screen.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                viewModel.setDepthCapable(
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        com.packabunch.ar.ArAvailability.supportsDepth(context)
+                    },
+                )
+            }
+
+            SpaceTypeScreen(
+                selected = editor.spaceKind,
+                // Not every ARCore phone can sense depth, and mapping needs it. Checked
+                // here so the choice is honest before it is made, not after.
+                depthCapable = viewModel.depthCapable,
+                limits = viewModel.limits,
+                onSelect = viewModel::setSpaceKind,
+                onContinue = {
+                    if (editor.spaceKind == SpaceKind.ANY_SHAPE) {
+                        navController.navigate(Routes.SPACE_SCAN)
+                    } else {
+                        navController.navigate(Routes.CREATE_SPACE)
+                    }
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SPACE_SCAN) {
+            SpaceScanScreen(
+                onScanned = { scan ->
+                    viewModel.setScannedSpace(scan)
+                    val report = scan.report()
+                    // Significant gaps get their own screen before anything is planned on it.
+                    if (report.completeness == ScanCompleteness.SIGNIFICANT_GAPS) {
+                        navController.navigate(Routes.SCAN_INCOMPLETE)
+                    } else {
+                        navController.navigate(Routes.SPACE_SCAN_REVIEW)
+                    }
+                },
+                onTypeInstead = { navController.navigate(Routes.CREATE_SPACE) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.SCAN_INCOMPLETE) {
+            val scan = editor.space?.scan
+            if (scan != null) {
+                ScanIncompleteScreen(
+                    report = scan.report(),
+                    onSweepAgain = { navController.popBackStack() },
+                    onUseSmaller = { navController.navigate(Routes.SPACE_SCAN_REVIEW) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+
+        composable(Routes.SPACE_SCAN_REVIEW) {
+            val scan = editor.space?.scan
+            if (scan != null) {
+                SpaceScanReviewScreen(
+                    scan = scan,
+                    report = scan.report(),
+                    onContinue = { navController.navigate(Routes.SPACE_OBSTRUCTIONS) },
+                    onScanAgain = { navController.popBackStack(Routes.SPACE_SCAN, false) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+
+        composable(Routes.SPACE_OBSTRUCTIONS) {
+            val scan = editor.space?.scan
+            if (scan != null) {
+                SpaceObstructionsScreen(
+                    scan = scan,
+                    report = scan.report(),
+                    onToggle = viewModel::setObstructionIncluded,
+                    onContinue = { navController.navigate(Routes.ITEMS) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
 
         composable(Routes.CREATE_SPACE) {
@@ -295,7 +392,7 @@ fun PackNavHost(
                 },
                 onNewPack = {
                     viewModel.startNewPack()
-                    navController.navigate(Routes.CREATE_SPACE)
+                    navController.navigate(Routes.SPACE_TYPE)
                 },
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
                 onManageSubscription = {},

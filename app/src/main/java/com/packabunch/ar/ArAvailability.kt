@@ -3,6 +3,8 @@ package com.packabunch.ar
 import android.app.Activity
 import android.content.Context
 import com.google.ar.core.ArCoreApk
+import com.google.ar.core.Config
+import com.google.ar.core.Session
 
 /**
  * Whether AR can run here, answered honestly.
@@ -60,6 +62,36 @@ object ArAvailability {
         // ARCore not present on the classpath at runtime, or a vendor-specific failure.
         // Anything unexpected means no AR, never "assume it works".
         ArSupport.Unknown(t.message ?: t::class.java.simpleName)
+    }
+
+    /**
+     * Whether this phone can produce depth, which mapping an irregular space needs.
+     *
+     * Answering it costs a short-lived [Session], because depth support is a property of a
+     * configured session rather than something the availability check reports. The session
+     * is never resumed, so the camera is not touched and no permission is required — and it
+     * is closed immediately, because holding one open would block the real one later.
+     *
+     * Returns false on any failure. A phone wrongly told it can map would sweep for a
+     * minute and get nothing, which is worse than not being offered it.
+     */
+    fun supportsDepth(context: Context): Boolean = try {
+        if (check(context) !is ArSupport.Ready) {
+            false
+        } else {
+            Session(context).use { session ->
+                session.isDepthModeSupported(Config.DepthMode.AUTOMATIC)
+            }
+        }
+    } catch (t: Throwable) {
+        false
+    }
+
+    /** `Session` is `Closeable` only on newer SDKs, so the close is explicit here. */
+    private inline fun <T> Session.use(block: (Session) -> T): T = try {
+        block(this)
+    } finally {
+        close()
     }
 
     /**

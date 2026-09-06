@@ -21,6 +21,8 @@ import com.packabunch.packing.TierLimits
 import com.packabunch.ui.format.LengthUnit
 import com.packabunch.ui.screens.LibraryItem
 import com.packabunch.ui.screens.NotificationPreferences
+import com.packabunch.ui.screens.SpaceKind
+import com.packabunch.packing.ScannedSpace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -52,6 +54,19 @@ class AppViewModel(
     val editor: StateFlow<PackEditorState> = _editor.asStateFlow()
 
     val limits: TierLimits get() = TierLimits.forTier(_settings.value.tier)
+
+    /**
+     * Whether this phone can sense depth, which mapping an irregular space needs.
+     *
+     * Set once from the AR availability check. Defaults to false, so the "any shape" route
+     * is offered only when it has been confirmed — never assumed and then failed at.
+     */
+    var depthCapable: Boolean = false
+        private set
+
+    fun setDepthCapable(capable: Boolean) {
+        depthCapable = capable
+    }
 
     init {
         viewModelScope.launch { repository.seedIfEmpty() }
@@ -123,6 +138,43 @@ class AppViewModel(
                 plan = project.plan,
                 packedInstanceIds = project.packedInstanceIds,
                 isNew = false,
+            )
+        }
+    }
+
+    fun setSpaceKind(kind: SpaceKind) = _editor.update { it.copy(spaceKind = kind) }
+
+    /**
+     * Attaches a finished scan to the pack being edited.
+     *
+     * The scan's own envelope becomes the space's nominal dimensions, but the *usable*
+     * volume comes from the grid and is almost always smaller. Nothing downstream should
+     * read the envelope as capacity.
+     */
+    fun setScannedSpace(scan: ScannedSpace) {
+        _editor.update { state ->
+            val bounds = scan.effectiveGrid.boundsMm
+            state.copy(
+                space = Space(
+                    id = "${state.projectId}-space",
+                    name = state.name,
+                    dimensions = Dimensions(bounds.widthMm, bounds.depthMm, bounds.heightMm),
+                    measurementSource = MeasurementSource.CAMERA_ESTIMATE,
+                    scan = scan,
+                ),
+                plan = null,
+            )
+        }
+        autosave()
+    }
+
+    /** Toggling an obstruction changes the usable volume, so the old plan is dropped. */
+    fun setObstructionIncluded(id: String, included: Boolean) {
+        _editor.update { state ->
+            val scan = state.space?.scan ?: return@update state
+            state.copy(
+                space = state.space.copy(scan = scan.withObstructionIncluded(id, included)),
+                plan = null,
             )
         }
     }
@@ -325,6 +377,7 @@ data class PackEditorState(
     val packedInstanceIds: Set<String> = emptySet(),
     val guideStep: Int = 0,
     val isNew: Boolean = true,
+    val spaceKind: SpaceKind = SpaceKind.BOX_SHAPED,
     /** Null until the user answers "did it actually go in?" on the finished screen. */
     val realWorldFitReport: Boolean? = null,
 ) {
