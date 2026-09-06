@@ -5,4 +5,12 @@
     <color name="primary">#A65C34</color>
     <color name="chrome">#3F2718</color>
     <color name="brand_tint">#F5E4D6</color>
+
+    <!--
+      The brown of the official logo, sampled from logos/logo_icon_white_inside.png.
+      Note it is NOT the token primary (#A65C34) or chrome (#3F2718) — it is deeper and
+      redder than both. It is used for the launcher icon and the brand tile only, so the
+      mark stays exactly as drawn; the in-app palette is still the token palette.
+    -->
+    <color name="logo_brown">#5C2626</color>
 </resources>
