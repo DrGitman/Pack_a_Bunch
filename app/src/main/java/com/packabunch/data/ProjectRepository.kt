@@ -63,6 +63,14 @@ class ProjectRepository(private val dao: ProjectDao) {
 
     suspend fun delete(id: String) = withContext(Dispatchers.IO) { dao.deleteProject(id) }
 
+    /**
+     * Wipes every pack on the device.
+     *
+     * Items and plan summaries go with them through the foreign keys' cascade, so nothing
+     * is left orphaned in the database after this returns.
+     */
+    suspend fun deleteAll() = withContext(Dispatchers.IO) { dao.deleteAllProjects() }
+
     /** Undo on the "deleted" state: the row goes back exactly as it was, id and all. */
     suspend fun restore(project: Project) = upsert(project)
 

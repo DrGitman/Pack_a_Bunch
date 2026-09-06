@@ -50,6 +50,9 @@ interface ProjectDao {
     @Query("DELETE FROM projects WHERE id = :id")
     suspend fun deleteProject(id: String)
 
+    @Query("DELETE FROM projects")
+    suspend fun deleteAllProjects()
+
     /**
      * Items are replaced wholesale rather than diffed. A pack has a handful of rows, and
      * deleting an item then re-adding it under the same name must not leave the old row
