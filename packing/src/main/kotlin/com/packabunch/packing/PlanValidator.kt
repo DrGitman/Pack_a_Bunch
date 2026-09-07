@@ -93,11 +93,17 @@ object PlanValidator {
         }
 
         // --- pairs ----------------------------------------------------------------------
+        // Shapes, not boxes. A validator using a cruder model than the engine would reject
+        // perfectly good arrangements — two items nesting is not two items overlapping.
         for (i in plan.placements.indices) {
             for (j in i + 1 until plan.placements.size) {
                 val a = plan.placements[i]
                 val b = plan.placements[j]
-                if (a.box.overlaps(b.box)) {
+                val shapeA = instances[a.instanceId]?.spec?.effectiveShape
+                    ?: ItemShape.Cuboid(Dimensions(a.orientedWidthMm, a.orientedDepthMm, a.orientedHeightMm))
+                val shapeB = instances[b.instanceId]?.spec?.effectiveShape
+                    ?: ItemShape.Cuboid(Dimensions(b.orientedWidthMm, b.orientedDepthMm, b.orientedHeightMm))
+                if (ItemShape.collide(shapeA, a.box, shapeB, b.box)) {
                     violations += Violation(
                         Code.OVERLAP,
                         "${a.instanceId} and ${b.instanceId} share space",
@@ -116,6 +122,15 @@ object PlanValidator {
                 other.instanceId != placement.instanceId &&
                     other.box.maxZMm == placement.zMm &&
                     other.box.coversFootprintOf(placement.box)
+            } ?: plan.placements.firstOrNull { other ->
+                // A shaped supporter carries weight wherever its material actually is, which
+                // may be well below the top of its bounding box — an item in an L's notch
+                // rests on the L's bottom arm, not on the top of the L.
+                other.instanceId != placement.instanceId &&
+                    other.box.minZMm < placement.zMm &&
+                    other.box.maxZMm >= placement.zMm &&
+                    (instances[other.instanceId]?.spec?.shape as? ItemShape.VoxelMask)
+                        ?.supportsFootprintAt(other.box, placement.box) == true
             }
 
             if (supporter == null) {
@@ -198,4 +213,37 @@ internal fun metricsFor(
         usableVolumeMm3 = request.space.usableVolumeMm3,
         occupiedBoundsVolumeMm3 = boundsVolume,
     )
+}
+
+
+/**
+ * Whether this shape has material directly under every part of [resting]'s base.
+ *
+ * Written here rather than shared with the engine on purpose: the validator re-derives its
+ * answer from scratch, and borrowing the engine's helper would mean a bug in that helper
+ * could never be caught by the check meant to catch it.
+ */
+private fun ItemShape.VoxelMask.supportsFootprintAt(
+    ownBox: Box,
+    resting: Box,
+): Boolean {
+    val res = resolutionMm
+    val below = resting.minZMm - res
+    if (below < ownBox.minZMm || below >= ownBox.maxZMm) return false
+
+    var x = resting.minXMm
+    while (x < resting.maxXMm) {
+        var y = resting.minYMm
+        while (y < resting.maxYMm) {
+            val filled = isOccupied(
+                (x - ownBox.minXMm) / res,
+                (y - ownBox.minYMm) / res,
+                (below - ownBox.minZMm) / res,
+            )
+            if (!filled) return false
+            y += res
+        }
+        x += res
+    }
+    return true
 }

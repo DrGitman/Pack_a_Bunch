@@ -140,8 +140,28 @@ data class ItemSpec(
      */
     val maySupportItems: Boolean = true,
     val measurementSource: MeasurementSource = MeasurementSource.TYPED_IN,
+    /**
+     * The item's real form, when a scan measured one.
+     *
+     * Null means "assume it fills its box", which is right for anything typed in or looked
+     * up — we have three numbers and no shape, and inventing one would be worse than
+     * admitting it. A scan produces an [ItemShape.VoxelMask] of the actual solid, so a
+     * kettle's handle or an L-shaped thing stops reserving the air around it.
+     */
+    val shape: ItemShape? = null,
 ) {
     val allowedOrientations: List<Orientation> get() = Orientation.allowedFor(keepUpright)
+
+    /** What the solver collides against: the measured form, or the box if there isn't one. */
+    val effectiveShape: ItemShape get() = shape ?: ItemShape.Cuboid(dimensions)
+
+    /**
+     * Material rather than envelope.
+     *
+     * Modelled fill uses this so a shaped item stops counting the air inside its bounding
+     * box as packed. A crate holding one L-shaped thing is not two-thirds full.
+     */
+    val solidVolumeMm3: Long get() = effectiveShape.solidVolumeMm3
 }
 
 /**

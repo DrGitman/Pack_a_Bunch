@@ -51,6 +51,7 @@ object PackingEngine {
         val volume = request.space.volume()
         val opening = request.space.opening
         val supportLookup = request.items.associate { it.id to it.maySupportItems }
+        val shapeLookup = request.items.associate { it.id to it.effectiveShape }
 
         // Two separations before the search, both of which are proofs rather than search
         // failures, and both of which the user is told about differently.
@@ -74,7 +75,7 @@ object PackingEngine {
             for (ordering in Ordering.entries) {
                 if (budget.isExhausted()) break
                 orderingsTried++
-                val attempt = packGreedily(request, ordering, packable, supportLookup, budget)
+                val attempt = packGreedily(request, ordering, packable, supportLookup, shapeLookup, budget)
                 // A plan that fails its own validator is a bug in this file. Drop it rather
                 // than show it: an arrangement that overlaps or floats is worse than none.
                 val candidate = attempt.asPlan(request, oversize, blockedByOpening)
@@ -232,6 +233,7 @@ object PackingEngine {
         ordering: Ordering,
         instances: List<ItemInstance>,
         supportLookup: Map<String, Boolean>,
+        shapeLookup: Map<String, ItemShape>,
         budget: SolveBudget,
     ): Attempt {
         val volume = request.space.volume()
@@ -252,7 +254,9 @@ object PackingEngine {
 
             // No fit found is not an error and not a failure of the item — it is recorded
             // against the finished plan as "no room in this arrangement".
-            val choice = bestFitFor(instance, candidates, placed, volume, supportLookup) ?: continue
+            val choice = bestFitFor(
+                instance, candidates, placed, volume, supportLookup, shapeLookup,
+            ) ?: continue
 
             placed += Placement(
                 instanceId = instance.instanceId,
@@ -266,7 +270,9 @@ object PackingEngine {
                 orientation = choice.orientation,
                 sequenceIndex = 0, // assigned bottom-up once the attempt is finished
             )
-            candidates = expandCorners(candidates, choice, volume, placed)
+            candidates = expandCorners(
+                candidates, choice, volume, placed, shapeLookup[instance.spec.id], shapeLookup,
+            )
         }
 
         return Attempt(
@@ -304,6 +310,7 @@ object PackingEngine {
         placed: List<Placement>,
         volume: PackingVolume,
         supportLookup: Map<String, Boolean>,
+        shapeLookup: Map<String, ItemShape>,
     ): Choice? {
         var best: Choice? = null
         var bestKey: IntArray? = null
@@ -315,8 +322,28 @@ object PackingEngine {
                 val box = choice.box
 
                 if (!volume.admits(box)) continue
-                if (placed.any { it.box.overlaps(box) }) continue
-                if (!isSupported(box, placed, volume, supportLookup)) continue
+
+                // Shape against shape, not box against box. `collide` still rejects on the
+                // boxes first when it can, so the ordinary case costs what it always did —
+                // but a block that fits inside an L's notch is now found rather than
+                // refused for overlapping air.
+                val myShape = shapeLookup[instance.spec.id] ?: ItemShape.Cuboid(oriented)
+                val hits = placed.any { other ->
+                    ItemShape.collide(
+                        myShape,
+                        box,
+                        shapeLookup[other.specId] ?: ItemShape.Cuboid(
+                            Dimensions(
+                                other.orientedWidthMm,
+                                other.orientedDepthMm,
+                                other.orientedHeightMm,
+                            ),
+                        ),
+                        other.box,
+                    )
+                }
+                if (hits) continue
+                if (!isSupported(box, placed, volume, supportLookup, shapeLookup, myShape)) continue
 
                 val key = intArrayOf(
                     box.maxZMm,
@@ -355,22 +382,100 @@ object PackingEngine {
         placed: List<Placement>,
         volume: PackingVolume,
         supportLookup: Map<String, Boolean>,
+        shapeLookup: Map<String, ItemShape>,
+        shape: ItemShape,
     ): Boolean {
         // Carried by the space itself: the floor of a crate, or the sloping floor and
         // wheel arches of a scanned boot, checked column by column.
         if (volume.restsOnStructure(box)) return true
 
-        val supporter = placed.firstOrNull { candidate ->
+        // The box case, unchanged and cheap: wholly on top of one flat-topped item.
+        val flatSupporter = placed.firstOrNull { candidate ->
             candidate.box.maxZMm == box.minZMm && candidate.box.coversFootprintOf(box)
-        } ?: return false
-        return supportLookup[supporter.specId] ?: true
+        }
+        if (flatSupporter != null) return supportLookup[flatSupporter.specId] ?: true
+
+        // The shaped case. An item sitting in an L's notch rests on the L's bottom arm, not
+        // on the top of the L's bounding box — so "whose box top equals my base" can never
+        // find it. Ask instead whether there is material directly under this base, and whose.
+        return restsOnMaterialBelow(box, shape, placed, shapeLookup, supportLookup)
     }
+
+    /**
+     * Whether something solid sits immediately beneath every part of this base.
+     *
+     * Walks the base layer a cell at a time and looks one cell down. A shaped supporter
+     * counts wherever its own material actually is, which is what makes nesting work; and if
+     * any of that material belongs to an item marked nothing-on-top, the placement is
+     * refused outright rather than partially allowed.
+     */
+    private fun restsOnMaterialBelow(
+        box: Box,
+        shape: ItemShape,
+        placed: List<Placement>,
+        shapeLookup: Map<String, ItemShape>,
+        supportLookup: Map<String, Boolean>,
+    ): Boolean {
+        val mask = shape as? ItemShape.VoxelMask
+        val res = mask?.resolutionMm
+            ?: (placed.firstNotNullOfOrNull { shapeLookup[it.specId] as? ItemShape.VoxelMask }
+                ?.resolutionMm ?: return false)
+
+        var anySupport = false
+        var x = box.minXMm
+        while (x < box.maxXMm) {
+            var y = box.minYMm
+            while (y < box.maxYMm) {
+                val occupiedHere = mask == null || mask.isOccupied(
+                    (x - box.minXMm) / res,
+                    (y - box.minYMm) / res,
+                    0,
+                )
+                if (occupiedHere) {
+                    val supporter = materialAt(x, y, box.minZMm - res, placed, shapeLookup, res)
+                        ?: return false
+                    if (supportLookup[supporter] == false) return false
+                    anySupport = true
+                }
+                y += res
+            }
+            x += res
+        }
+        return anySupport
+    }
+
+    /** Which placed item, if any, has material in the cell containing this point. */
+    private fun materialAt(
+        xMm: Int,
+        yMm: Int,
+        zMm: Int,
+        placed: List<Placement>,
+        shapeLookup: Map<String, ItemShape>,
+        res: Int,
+    ): String? = placed.firstOrNull { candidate ->
+        val b = candidate.box
+        if (xMm < b.minXMm || xMm >= b.maxXMm) return@firstOrNull false
+        if (yMm < b.minYMm || yMm >= b.maxYMm) return@firstOrNull false
+        if (zMm < b.minZMm || zMm >= b.maxZMm) return@firstOrNull false
+
+        when (val other = shapeLookup[candidate.specId]) {
+            is ItemShape.VoxelMask -> other.isOccupied(
+                (xMm - b.minXMm) / other.resolutionMm,
+                (yMm - b.minYMm) / other.resolutionMm,
+                (zMm - b.minZMm) / other.resolutionMm,
+            )
+            // No measured shape means it fills its box.
+            else -> true
+        }
+    }?.specId
 
     private fun expandCorners(
         existing: List<Position>,
         choice: Choice,
         volume: PackingVolume,
         placed: List<Placement>,
+        shape: ItemShape?,
+        shapeLookup: Map<String, ItemShape>,
     ): List<Position> {
         val bounds = volume.boundsMm
         val box = choice.box
@@ -378,22 +483,71 @@ object PackingEngine {
             Position(box.maxXMm, box.minYMm, box.minZMm),
             Position(box.minXMm, box.maxYMm, box.minZMm),
             Position(box.minXMm, box.minYMm, box.maxZMm),
-        )
+        ) + notchPositions(box, shape)
         return grown
             .distinct()
             .filter { corner ->
                 corner.xMm in bounds.minXMm until bounds.maxXMm &&
                     corner.yMm in bounds.minYMm until bounds.maxYMm &&
                     corner.zMm in bounds.minZMm until bounds.maxZMm &&
-                    // A point buried inside something already placed can never start a box.
+                    // A point buried in another item's *material* can never start a box.
+                    //
+                    // Material, not bounding box: a point inside an L's envelope but in its
+                    // hollow is precisely where something should be tried. Pruning by box
+                    // here would throw away every notch position the moment it was created.
                     placed.none { placement ->
                         val b = placement.box
-                        corner.xMm >= b.minXMm && corner.xMm < b.maxXMm &&
+                        val inside = corner.xMm >= b.minXMm && corner.xMm < b.maxXMm &&
                             corner.yMm >= b.minYMm && corner.yMm < b.maxYMm &&
                             corner.zMm >= b.minZMm && corner.zMm < b.maxZMm
+                        if (!inside) return@none false
+
+                        when (val other = shapeLookup[placement.specId]) {
+                            is ItemShape.VoxelMask -> other.isOccupied(
+                                (corner.xMm - b.minXMm) / other.resolutionMm,
+                                (corner.yMm - b.minYMm) / other.resolutionMm,
+                                (corner.zMm - b.minZMm) / other.resolutionMm,
+                            )
+                            else -> true
+                        }
                     }
             }
             .sortedWith(compareBy({ it.zMm }, { it.yMm }, { it.xMm }))
+    }
+
+    /**
+     * Positions inside a concave item's own bounding box.
+     *
+     * Without these, shape-aware collision is useless. The search only ever offers the three
+     * exposed corners of a placed box, so the hollow of an L — the very space its shape was
+     * kept in order to use — is never a position anything is tried at. Colliding shapes
+     * correctly and then never proposing the one place they nest is no better than packing
+     * boxes.
+     *
+     * Only produced for shapes that are genuinely not box-like, and only for the empty cells
+     * within that one item's bounds, so the candidate list stays small.
+     */
+    private fun notchPositions(box: Box, shape: ItemShape?): List<Position> {
+        val mask = shape as? ItemShape.VoxelMask ?: return emptyList()
+        if (mask.isBoxLike) return emptyList()
+
+        val res = mask.resolutionMm
+        val found = mutableListOf<Position>()
+        for (i in 0 until mask.countX) {
+            for (j in 0 until mask.countY) {
+                for (k in 0 until mask.countZ) {
+                    if (mask.isOccupied(i, j, k)) continue
+                    // An empty cell inside the shape's own envelope: somewhere another item
+                    // might tuck into.
+                    found += Position(
+                        xMm = box.minXMm + i * res,
+                        yMm = box.minYMm + j * res,
+                        zMm = box.minZMm + k * res,
+                    )
+                }
+            }
+        }
+        return found
     }
 
     /**
