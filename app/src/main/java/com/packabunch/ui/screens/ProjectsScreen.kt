@@ -17,6 +17,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +34,8 @@ import com.packabunch.ui.components.NavDestination
 import com.packabunch.ui.components.NavPill
 import com.packabunch.ui.components.NavPillClearance
 import com.packabunch.ui.components.PackAppBar
+import com.packabunch.ui.components.PackIconButton
+import com.packabunch.ui.components.PackIcons
 import com.packabunch.ui.components.PrimaryButton
 import com.packabunch.ui.components.ScreenScaffold
 import com.packabunch.ui.components.warmShadow
@@ -64,7 +70,16 @@ fun ProjectsScreen(
     onNewPack: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onDelete: (Project) -> Unit = {},
+    onRestore: (Project) -> Unit = {},
+    onSettings: () -> Unit = {},
 ) {
+    // The three data states live here together because they are one flow: open the menu,
+    // confirm the delete, then get a window to take it back.
+    var menuFor by remember { mutableStateOf<Project?>(null) }
+    var confirmFor by remember { mutableStateOf<Project?>(null) }
+    var justDeleted by remember { mutableStateOf<Project?>(null) }
+
     Box(modifier.fillMaxSize()) {
         ScreenScaffold {
             PackAppBar(title = "Projects", onBack = onBack)
@@ -97,6 +112,7 @@ fun ProjectsScreen(
                             project = project,
                             unit = unit,
                             onClick = { onOpen(project.id) },
+                            onMenu = { menuFor = project },
                             modifier = Modifier.entrance(entrance),
                         )
                     }
@@ -106,12 +122,57 @@ fun ProjectsScreen(
 
         NavPill(
             current = NavDestination.Projects,
-            onNavigate = {},
+            onNavigate = { destination ->
+                if (destination == NavDestination.Settings) onSettings()
+            },
             onNewPack = onNewPack,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 28.dp),
         )
+
+        DeletedProjectBar(
+            packName = justDeleted?.name.orEmpty(),
+            itemCount = justDeleted?.items?.size ?: 0,
+            visible = justDeleted != null,
+            onUndo = {
+                justDeleted?.let(onRestore)
+                justDeleted = null
+            },
+            onExpired = { justDeleted = null },
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
+        )
+
+        menuFor?.let { project ->
+            ProjectMenuSheet(
+                project = project,
+                unit = unit,
+                onRename = { menuFor = null },
+                onDuplicate = { menuFor = null },
+                onRemeasure = { menuFor = null },
+                onShare = { menuFor = null },
+                onDelete = {
+                    confirmFor = project
+                    menuFor = null
+                },
+                onDismiss = { menuFor = null },
+            )
+        }
+
+        confirmFor?.let { project ->
+            DeleteConfirmDialog(
+                packName = project.name,
+                itemCount = project.items.size,
+                photoCount = 0,
+                onConfirm = {
+                    onDelete(project)
+                    // Held so the undo bar has something to put back.
+                    justDeleted = project
+                    confirmFor = null
+                },
+                onCancel = { confirmFor = null },
+            )
+        }
     }
 }
 
@@ -120,6 +181,7 @@ private fun ProjectCard(
     project: Project,
     unit: LengthUnit,
     onClick: () -> Unit,
+    onMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(24.dp)
@@ -191,6 +253,15 @@ private fun ProjectCard(
                 )
             }
         }
+
+        PackIconButton(
+            icon = PackIcons.MoreVertical,
+            contentDescription = "More",
+            onClick = onMenu,
+            tint = Color(0xFF8A7565),
+            size = 40.dp,
+            iconSize = 19.dp,
+        )
     }
 }
 

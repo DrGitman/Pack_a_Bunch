@@ -268,6 +268,9 @@ fun PackNavHost(
                     navController.navigate(Routes.SPACE_TYPE)
                 },
                 onBack = { navController.popBackStack() },
+                onDelete = { viewModel.deleteProject(it.id) },
+                onRestore = { viewModel.restoreProject(it) },
+                onSettings = { navController.navigate(Routes.SETTINGS) },
             )
         }
 
