@@ -203,12 +203,14 @@ private fun DrawScope.quadOutline(a: Offset, b: Offset, c: Offset, d: Offset, co
 }
 
 // Crate shell, in the palette the artboards use for it.
-private val CrateFloor = Color(0xFFD9BE9E)
-private val CrateBackLeft = Color(0xFFE3CDB2)
-private val CrateBackRight = Color(0xFFEFDECA)
-private val CrateFrontLeft = Color(0xFFB4713F)
-private val CrateFrontRight = Color(0xFF99552C)
-private val CrateRim = Color(0xFF8E4E28)
+// One brown family, light to dark, in the manner of a dimensioned reference drawing.
+private val CrateFloor = Color(0xFFEADCCC)
+private val CrateBackLeft = Color(0xFFF2E7DA)
+private val CrateBackRight = Color(0xFFF7EFE6)
+private val CrateFrontLeft = Color(0xFFD9BE9E)
+private val CrateFrontRight = Color(0xFFC9A986)
+private val CrateRim = Color(0xFF7C4223)
+private val CrateEdge = Color(0xFF9A6A45)
 
 /**
  * The container itself. Drawn in two passes: the far walls and floor before the contents,
@@ -225,19 +227,30 @@ private fun DrawScope.drawCrateShell(view: CrateView, front: Boolean) {
     if (!front) {
         // Floor.
         quad(p(0f, 0f, 0f), p(w, 0f, 0f), p(w, d, 0f), p(0f, d, 0f), CrateFloor)
+        quadOutline(p(0f, 0f, 0f), p(w, 0f, 0f), p(w, d, 0f), p(0f, d, 0f), CrateEdge, 1.4f)
 
         // The two walls furthest from the camera, chosen by which way the crate is turned.
         quad(p(0f, d, 0f), p(w, d, 0f), p(w, d, h), p(0f, d, h), CrateBackRight)
         quad(p(w, 0f, 0f), p(w, d, 0f), p(w, d, h), p(w, 0f, h), CrateBackLeft)
+        quadOutline(p(0f, d, 0f), p(w, d, 0f), p(w, d, h), p(0f, d, h), CrateEdge, 1.4f)
+        quadOutline(p(w, 0f, 0f), p(w, d, 0f), p(w, d, h), p(w, 0f, h), CrateEdge, 1.4f)
     } else {
         // Near walls, drawn at partial opacity so the load stays visible through them.
         quad(
             p(0f, 0f, 0f), p(w, 0f, 0f), p(w, 0f, h), p(0f, 0f, h),
-            CrateFrontLeft.copy(alpha = 0.30f),
+            CrateFrontLeft.copy(alpha = 0.22f),
         )
         quad(
             p(0f, 0f, 0f), p(0f, d, 0f), p(0f, d, h), p(0f, 0f, h),
-            CrateFrontRight.copy(alpha = 0.30f),
+            CrateFrontRight.copy(alpha = 0.22f),
+        )
+        quadOutline(
+            p(0f, 0f, 0f), p(w, 0f, 0f), p(w, 0f, h), p(0f, 0f, h),
+            CrateEdge.copy(alpha = 0.55f), 1.4f,
+        )
+        quadOutline(
+            p(0f, 0f, 0f), p(0f, d, 0f), p(0f, d, h), p(0f, 0f, h),
+            CrateEdge.copy(alpha = 0.55f), 1.4f,
         )
 
         // The rim, at full strength — it is what makes the opening readable.
@@ -248,7 +261,7 @@ private fun DrawScope.drawCrateShell(view: CrateView, front: Boolean) {
         listOf(
             Triple(0f, 0f, 0f), Triple(w, 0f, 0f), Triple(0f, d, 0f), Triple(w, d, 0f),
         ).forEach { (x, y, _) ->
-            drawLine(CrateRim, p(x, y, 0f), p(x, y, h), strokeWidth = 1.6f)
+            drawLine(CrateRim, p(x, y, 0f), p(x, y, h), strokeWidth = 1.8f)
         }
     }
 }
@@ -277,13 +290,27 @@ private fun DrawScope.drawPlacement(
 
     fun p(x: Float, y: Float, z: Float) = view.project(x, y, z)
 
-    val top = base.lighten(0.22f).copy(alpha = alpha)
-    val left = base.copy(alpha = alpha)
-    val right = base.darken(0.18f).copy(alpha = alpha)
+    // Technical-drawing style: pale flat fills with a strong outline in the same hue, the
+    // way a dimensioned reference drawing reads. The three faces stay tonally separated so
+    // the form is legible, but the *outline* is what carries the shape — which is why this
+    // survives being shrunk to a project-card thumbnail where shading alone would mush.
+    val ink = base.darken(0.28f).copy(alpha = alpha)
+    val top = base.lighten(0.62f).copy(alpha = alpha)
+    val left = base.lighten(0.34f).copy(alpha = alpha)
+    val right = base.lighten(0.12f).copy(alpha = alpha)
 
-    quad(p(x0, y0, z1), p(x1, y0, z1), p(x1, y1, z1), p(x0, y1, z1), top)
-    quad(p(x0, y0, z0), p(x1, y0, z0), p(x1, y0, z1), p(x0, y0, z1), left)
-    quad(p(x0, y0, z0), p(x0, y1, z0), p(x0, y1, z1), p(x0, y0, z1), right)
+    val topFace = listOf(p(x0, y0, z1), p(x1, y0, z1), p(x1, y1, z1), p(x0, y1, z1))
+    val leftFace = listOf(p(x0, y0, z0), p(x1, y0, z0), p(x1, y0, z1), p(x0, y0, z1))
+    val rightFace = listOf(p(x0, y0, z0), p(x0, y1, z0), p(x0, y1, z1), p(x0, y0, z1))
+
+    quad(topFace[0], topFace[1], topFace[2], topFace[3], top)
+    quad(leftFace[0], leftFace[1], leftFace[2], leftFace[3], left)
+    quad(rightFace[0], rightFace[1], rightFace[2], rightFace[3], right)
+
+    val stroke = 2.2f
+    quadOutline(topFace[0], topFace[1], topFace[2], topFace[3], ink, stroke)
+    quadOutline(leftFace[0], leftFace[1], leftFace[2], leftFace[3], ink, stroke)
+    quadOutline(rightFace[0], rightFace[1], rightFace[2], rightFace[3], ink, stroke)
 
     if (dimmed || progress < 0.85f) return
 
@@ -303,6 +330,12 @@ private fun DrawScope.drawPlacement(
     if (radius * 2 > minOf(abs(p(x1, y0, z1).x - p(x0, y0, z1).x), 40f) * 1.6f) return
 
     drawCircle(Color.White.copy(alpha = alpha), radius, centre)
+    drawCircle(
+        color = base.darken(0.28f).copy(alpha = alpha),
+        radius = radius,
+        center = centre,
+        style = Stroke(width = 1.8f),
+    )
     drawText(
         textLayoutResult = measured,
         topLeft = Offset(

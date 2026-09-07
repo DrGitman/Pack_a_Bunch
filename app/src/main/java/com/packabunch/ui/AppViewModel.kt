@@ -21,6 +21,7 @@ import com.packabunch.packing.TierLimits
 import com.packabunch.ui.format.LengthUnit
 import com.packabunch.ui.screens.LibraryItem
 import com.packabunch.ui.screens.NotificationPreferences
+import com.packabunch.ui.screens.PackingHabit
 import com.packabunch.ui.screens.SpaceKind
 import com.packabunch.packing.ScannedSpace
 import kotlinx.coroutines.Dispatchers
@@ -77,6 +78,8 @@ class AppViewModel(
     fun setUnit(unit: LengthUnit) = _settings.update { it.copy(unit = unit) }
 
     fun setTier(tier: Tier) = _settings.update { it.copy(tier = tier) }
+
+    fun setPackingHabit(habit: PackingHabit) = _settings.update { it.copy(packingHabit = habit) }
 
     fun setNotificationPreferences(preferences: NotificationPreferences) =
         _settings.update { it.copy(notifications = preferences) }
@@ -363,6 +366,8 @@ data class AppSettings(
     val tier: Tier = Tier.FREE,
     val scansToday: Int = 0,
     val notifications: NotificationPreferences = NotificationPreferences(),
+    /** Only ever changes which space presets are suggested first. */
+    val packingHabit: PackingHabit? = null,
 )
 
 /** Everything the create-a-pack flow is holding, across its several screens. */

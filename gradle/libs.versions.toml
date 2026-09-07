@@ -18,6 +18,10 @@ room = "2.8.4"
 datastore = "1.1.7"
 
 arcore = "1.56.0"
+camerax = "1.6.2"
+mlkitLabeling = "17.0.9"
+mlkitText = "16.0.1"
+mlkitBarcode = "17.3.0"
 
 junit = "4.13.2"
 kotlinTest = "2.2.20"
@@ -49,6 +53,17 @@ datastore-preferences = { module = "androidx.datastore:datastore-preferences", v
 
 # AR Optional: the app stays installable, and every AR path has a typed path beside it.
 arcore = { module = "com.google.ar:core", version.ref = "arcore" }
+
+camerax-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
+camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }
+camerax-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "camerax" }
+camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
+
+# All three run on-device. Nothing is uploaded, which is what lets the app keep saying
+# photos never leave the phone.
+mlkit-image-labeling = { module = "com.google.mlkit:image-labeling", version.ref = "mlkitLabeling" }
+mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
+mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlinTest" }

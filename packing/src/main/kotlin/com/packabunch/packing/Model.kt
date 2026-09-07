@@ -1,12 +1,70 @@
 package com.packabunch.packing
 
-/** Where a stored length came from. It travels with the number and is shown beside it. */
+/**
+ * Where a stored length came from. It travels with the number and is shown beside it.
+ *
+ * Three sources, in descending order of how much they can be trusted, and the distinction
+ * is the whole reason provenance exists. A number is not just a number: "I measured this
+ * with a tape" and "a catalogue says this model is usually about this big" are different
+ * claims, and the second must never be displayed as though it were the first.
+ */
 enum class MeasurementSource {
-    /** The user typed it, from a tape measure or a label. */
+    /** The user typed it, from a tape measure or a label. The strongest thing we have. */
     TYPED_IN,
 
     /** Derived from an AR hit test the user then confirmed. Never a guess, never scored. */
     CAMERA_ESTIMATE,
+
+    /**
+     * A looked-up figure for this *kind* of thing, not this thing.
+     *
+     * A catalogue can say what a Samsung A13 or an IKEA Samla usually measures. It cannot
+     * know whether the one in front of you has a case on it, a lid, or a dented corner. So
+     * this is a **starting point that must be checked**, it is labelled that way wherever it
+     * appears, and it carries [SuggestedDimensions.sourceNote] so the user can judge it:
+     * "published internal size" earns trust in a way "found online" does not.
+     *
+     * It is never silently promoted. Editing the value makes it [TYPED_IN], because at that
+     * point it is the user's number.
+     */
+    SUGGESTED,
+}
+
+/**
+ * A catalogue's answer about a kind of object.
+ *
+ * Deliberately a **range**, not a figure. The spread inside a category is usually wider
+ * than the tolerance packing needs, and collapsing it to a single number throws away
+ * exactly the information that would tell you whether to go and measure.
+ */
+data class SuggestedDimensions(
+    val dimensions: Dimensions,
+    /** How far either way the real thing is likely to be, in mm. Zero means an exact spec. */
+    val toleranceMm: Int,
+    /** Shown to the user. "IKEA SAMLA 22L — published internal size", not "found online". */
+    val sourceNote: String,
+    val confidence: SuggestionConfidence,
+) {
+    /**
+     * Whether the uncertainty actually changes the answer.
+     *
+     * This is the rule that decides if the user is interrupted. 30 cm going into 58 cm with
+     * ±4 cm of doubt does not need confirming; 57.5 cm going into 58 cm with the same doubt
+     * very much does. Tolerance is judged against the fit margin, never in the abstract.
+     */
+    fun needsConfirming(clearanceMm: Int): Boolean = toleranceMm >= clearanceMm
+}
+
+/** How the suggestion was arrived at, which decides how much weight it may be given. */
+enum class SuggestionConfidence {
+    /** Barcode scan to an exact SKU. A specific product, with published measurements. */
+    EXACT_PRODUCT,
+
+    /** Brand and model read from the object, matched to a catalogue entry. */
+    MATCHED_MODEL,
+
+    /** Visual category only. A prior with a wide range — never close to a measurement. */
+    CATEGORY_ONLY,
 }
 
 /**

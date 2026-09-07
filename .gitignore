@@ -16,3 +16,5 @@ local.properties
 keystore.properties
 /app/release/
 play-service-account*.json
+build/
+/captures

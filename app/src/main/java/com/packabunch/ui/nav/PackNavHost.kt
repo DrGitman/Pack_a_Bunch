@@ -47,6 +47,12 @@ import com.packabunch.ui.screens.OnboardingScreen
 import com.packabunch.ui.screens.PlanIrregularScreen
 import com.packabunch.ui.screens.ProfileScreen
 import com.packabunch.ui.screens.SignInScreen
+import com.packabunch.ui.screens.DoesntFitScreen
+import com.packabunch.ui.screens.NoArrangementScreen
+import com.packabunch.ui.screens.NotificationsScreen
+import com.packabunch.ui.screens.OnbSetupScreen
+import com.packabunch.ui.screens.PlanComparisonScreen
+import com.packabunch.ui.format.formatDimensions
 import com.packabunch.ui.screens.PlanResultScreen
 import com.packabunch.ui.screens.ProjectsScreen
 import com.packabunch.ui.screens.WelcomeScreen
@@ -84,6 +90,12 @@ object Routes {
     const val PROFILE = "profile"                  // Profile.dc.html
     const val ACCOUNT_DELETE = "accountDelete"     // AccountDelete.dc.html
     const val PLAN_IRREGULAR = "planIrregular"     // PlanIrregular.dc.html
+    const val NO_ARRANGEMENT = "noArrangement"     // NoArrangement.dc.html
+    const val DOESNT_FIT = "doesntFit"             // DoesntFit.dc.html
+    const val PLAN_COMPARISON = "planComparison"   // PlanComparison.dc.html
+    const val NOTIFICATIONS = "notifications"      // Notifications.dc.html
+    const val ONB_SETUP = "onbSetup"               // OnbSetup.dc.html
+    const val ITEM_PHOTO = "itemPhoto"             // ItemPhoto.dc.html
 }
 
 /**
@@ -170,7 +182,39 @@ fun PackNavHost(
         }
 
         composable(Routes.ONBOARDING) {
-            OnboardingScreen(onFinished = { navController.navigate(Routes.SIGN_IN) })
+            OnboardingScreen(onFinished = { navController.navigate(Routes.ONB_SETUP) })
+        }
+
+        composable(Routes.ONB_SETUP) {
+            OnbSetupScreen(
+                unit = settings.unit,
+                habit = settings.packingHabit,
+                onUnitChange = viewModel::setUnit,
+                onHabitChange = viewModel::setPackingHabit,
+                onContinue = { navController.navigate(Routes.SIGN_IN) },
+                onSkip = { navController.navigate(Routes.SIGN_IN) },
+            )
+        }
+
+        composable(Routes.PLAN_COMPARISON) {
+            PlanComparisonScreen(
+                // Null until billing is wired, which disables the button rather than
+                // showing an invented price.
+                price = null,
+                onSubscribe = { navController.navigate(Routes.UPGRADE) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.NOTIFICATIONS) {
+            NotificationsScreen(
+                // Empty until something has actually happened. No seeded fake messages.
+                notifications = emptyList(),
+                onMarkAllRead = {},
+                onOpen = {},
+                onChooseWhatShows = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
+                onBack = { navController.popBackStack() },
+            )
         }
 
         composable(Routes.SIGN_IN) {
@@ -412,6 +456,29 @@ fun PackNavHost(
             enterTransition = { resultEnter() },
             popExitTransition = { resultExit() },
         ) {
+            // Nothing placed at all is not a result screen with zeros in it — it is a
+            // different screen with a different job: explaining that this search failed,
+            // not that the items cannot fit.
+            if (editor.plan?.placements?.isEmpty() == true && editor.items.isNotEmpty()) {
+                NoArrangementScreen(
+                    spaceName = editor.name.ifEmpty { "Your space" },
+                    spaceSummary = editor.space
+                        ?.let { formatDimensions(it.dimensions, settings.unit) }
+                        .orEmpty(),
+                    uprightItemCount = editor.items.count { it.keepUpright },
+                    edgeGapMm = editor.space?.edgeGapMm ?: 0,
+                    awkwardItemName = editor.plan?.unplaced?.firstOrNull()?.name,
+                    unit = settings.unit,
+                    onAllowTurning = { navController.popBackStack() },
+                    onShrinkGap = { navController.popBackStack() },
+                    onRemoveAwkward = { navController.popBackStack() },
+                    onBackToItems = { navController.popBackStack() },
+                    onChangeSpace = { navController.popBackStack(Routes.CREATE_SPACE, false) },
+                    onBack = { navController.popBackStack() },
+                )
+                return@composable
+            }
+
             PlanResultScreen(
                 state = editor,
                 unit = settings.unit,
@@ -469,6 +536,7 @@ fun PackNavHost(
                 onStepChange = viewModel::setGuideStep,
                 onMarkPacked = viewModel::markPacked,
                 onFinished = { navController.navigate(Routes.PACKING_DONE) },
+                onDoesntFit = { navController.navigate(Routes.DOESNT_FIT) },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -528,6 +596,7 @@ fun PackNavHost(
                 onRestore = {},
                 onTerms = {},
                 onPrivacy = {},
+                onCompare = { navController.navigate(Routes.PLAN_COMPARISON) },
                 onBack = { navController.popBackStack() },
             )
         }

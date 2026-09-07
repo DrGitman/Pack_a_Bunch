@@ -61,6 +61,7 @@ fun UpgradeScreen(
     onRestore: () -> Unit,
     onTerms: () -> Unit,
     onPrivacy: () -> Unit,
+    onCompare: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -198,6 +199,10 @@ fun UpgradeScreen(
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                PackTextButton(text = "Compare the two plans", onClick = onCompare)
+            }
 
             Row(
                 Modifier.fillMaxWidth(),

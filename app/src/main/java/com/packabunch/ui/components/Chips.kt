@@ -115,6 +115,10 @@ fun ProvenanceBadge(
             Triple("CAMERA ESTIMATE", CameraEstimateText, CameraEstimateTint)
         MeasurementSource.TYPED_IN ->
             Triple("TYPED IN", TypedInText, TypedInTint)
+        // The wording is an instruction, not a label. A looked-up figure describes the
+        // kind of thing, not the one in front of you, and the badge has to say so.
+        MeasurementSource.SUGGESTED ->
+            Triple("SUGGESTED — CHECK IT", Color(0xFF6E4708), Color(0xFFFAEEDA))
     }
 
     Text(
