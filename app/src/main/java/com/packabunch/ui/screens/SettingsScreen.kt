@@ -65,6 +65,7 @@ fun SettingsScreen(
     onNavigate: (NavDestination) -> Unit,
     onNewPack: () -> Unit,
     onUpgrade: () -> Unit,
+    onAccount: () -> Unit,
     onManageSubscription: () -> Unit,
     onRestorePurchases: () -> Unit,
     onNotifications: () -> Unit,
@@ -92,6 +93,11 @@ fun SettingsScreen(
                     savedPackCount = savedPackCount,
                     onUpgrade = onUpgrade,
                 )
+
+                Spacer(Modifier.height(Spacing.lg))
+                SectionHeading("Account")
+                Spacer(Modifier.height(10.dp))
+                SettingRow(PackIcons.Person, "Your account", onClick = onAccount)
 
                 Spacer(Modifier.height(Spacing.lg))
                 SectionHeading("Measuring")

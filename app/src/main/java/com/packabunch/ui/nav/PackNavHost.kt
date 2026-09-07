@@ -39,6 +39,14 @@ import com.packabunch.ui.screens.SpaceScanReviewScreen
 import com.packabunch.ui.screens.SpaceScanScreen
 import com.packabunch.ui.screens.SpaceTypeScreen
 import com.packabunch.packing.ScanCompleteness
+import com.packabunch.ui.screens.AccountDeleteScreen
+import com.packabunch.ui.screens.CreateAccountScreen
+import com.packabunch.ui.screens.ForgotPasswordScreen
+import com.packabunch.ui.screens.LogInScreen
+import com.packabunch.ui.screens.OnboardingScreen
+import com.packabunch.ui.screens.PlanIrregularScreen
+import com.packabunch.ui.screens.ProfileScreen
+import com.packabunch.ui.screens.SignInScreen
 import com.packabunch.ui.screens.PlanResultScreen
 import com.packabunch.ui.screens.ProjectsScreen
 import com.packabunch.ui.screens.WelcomeScreen
@@ -68,6 +76,14 @@ object Routes {
     const val SPACE_SCAN_REVIEW = "spaceScanReview" // SpaceScanReview.dc.html
     const val SPACE_OBSTRUCTIONS = "spaceObstructions" // SpaceObstructions.dc.html
     const val SCAN_INCOMPLETE = "scanIncomplete"   // ScanIncomplete.dc.html
+    const val ONBOARDING = "onboarding"            // OnbMeasure/OnbPlan/OnbPack/Onboarding
+    const val SIGN_IN = "signIn"                   // SignIn.dc.html
+    const val LOG_IN = "logIn"                     // LogIn.dc.html
+    const val CREATE_ACCOUNT = "createAccount"     // CreateAccount.dc.html
+    const val FORGOT_PASSWORD = "forgotPassword"   // ForgotPassword.dc.html
+    const val PROFILE = "profile"                  // Profile.dc.html
+    const val ACCOUNT_DELETE = "accountDelete"     // AccountDelete.dc.html
+    const val PLAN_IRREGULAR = "planIrregular"     // PlanIrregular.dc.html
 }
 
 /**
@@ -150,6 +166,92 @@ fun PackNavHost(
                     navController.navigate(Routes.ITEMS)
                 },
                 onSeeProjects = { navController.navigate(Routes.PROJECTS) },
+            )
+        }
+
+        composable(Routes.ONBOARDING) {
+            OnboardingScreen(onFinished = { navController.navigate(Routes.SIGN_IN) })
+        }
+
+        composable(Routes.SIGN_IN) {
+            SignInScreen(
+                onContinueWithGoogle = {},
+                onContinueWithEmail = { navController.navigate(Routes.CREATE_ACCOUNT) },
+                onLogIn = { navController.navigate(Routes.LOG_IN) },
+                // Skippable while the accounts question is unresolved. Nothing in the app
+                // blocks on being signed in, so forcing it here would be a wall with
+                // nothing behind it.
+                onSkip = { navController.popBackStack(Routes.WELCOME, inclusive = false) },
+            )
+        }
+
+        composable(Routes.LOG_IN) {
+            LogInScreen(
+                localPackCount = projects.size,
+                onLogIn = { _, _ -> navController.popBackStack(Routes.WELCOME, inclusive = false) },
+                onGoogle = {},
+                onForgot = { navController.navigate(Routes.FORGOT_PASSWORD) },
+                onCreateAccount = { navController.navigate(Routes.CREATE_ACCOUNT) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.CREATE_ACCOUNT) {
+            CreateAccountScreen(
+                onCreate = { _, _, _, _ ->
+                    navController.popBackStack(Routes.WELCOME, inclusive = false)
+                },
+                onLogIn = { navController.navigate(Routes.LOG_IN) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.FORGOT_PASSWORD) {
+            ForgotPasswordScreen(
+                onSend = {},
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.PROFILE) {
+            ProfileScreen(
+                email = null,
+                tier = settings.tier,
+                savedPackCount = projects.size,
+                itemsMeasured = viewModel.libraryItems(projects).size,
+                // Says what is true today, not what the design assumed.
+                backupEnabled = false,
+                onChangeEmail = {},
+                onChangePassword = {},
+                onManageSubscription = {},
+                onSignOut = { navController.popBackStack(Routes.WELCOME, inclusive = false) },
+                onDeleteAccount = { navController.navigate(Routes.ACCOUNT_DELETE) },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.ACCOUNT_DELETE) {
+            AccountDeleteScreen(
+                email = "you@example.com",
+                hasActiveSubscription = settings.tier == com.packabunch.packing.Tier.PLUS,
+                onConfirmDelete = {
+                    viewModel.deleteAllLocalData()
+                    navController.popBackStack(Routes.WELCOME, inclusive = false)
+                },
+                onManageSubscription = {},
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.PLAN_IRREGULAR) {
+            PlanIrregularScreen(
+                state = editor,
+                onStartLoading = {
+                    viewModel.setGuideStep(0)
+                    navController.navigate(Routes.PACKING_GUIDE)
+                },
+                onFixOpening = {},
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -291,7 +393,12 @@ fun PackNavHost(
                 onDuplicateItem = viewModel::duplicateItem,
                 onPlan = {
                     viewModel.solve()
-                    navController.navigate(Routes.PLAN_RESULT)
+                    // A scanned space gets the irregular result screen: litres rather than
+                    // three dimensions, and the opening called out.
+                    navController.navigate(
+                        if (editor.space?.isScanned == true) Routes.PLAN_IRREGULAR
+                        else Routes.PLAN_RESULT,
+                    )
                 },
                 onBack = { navController.popBackStack() },
             )
@@ -395,6 +502,7 @@ fun PackNavHost(
                     navController.navigate(Routes.SPACE_TYPE)
                 },
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
+                onAccount = { navController.navigate(Routes.PROFILE) },
                 onManageSubscription = {},
                 onRestorePurchases = {},
                 onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
