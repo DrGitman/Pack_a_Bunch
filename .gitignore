@@ -18,3 +18,4 @@ keystore.properties
 play-service-account*.json
 build/
 /captures
+docs/
