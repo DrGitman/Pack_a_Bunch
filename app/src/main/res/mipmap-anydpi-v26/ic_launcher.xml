@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  The official mark. Background is a flat brand-brown layer rather than the pre-composed
-  tile from logos/ — the launcher applies its own mask, and a tile that already has rounded
-  corners gets clipped twice.
+  Use the supplied logo tile unchanged. A matching background fills any transparent
+  corners when Android applies the launcher's adaptive mask.
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/logo_brown" />
-    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <foreground android:drawable="@drawable/launcher_logo" />
     <monochrome android:drawable="@mipmap/ic_launcher_monochrome" />
 </adaptive-icon>

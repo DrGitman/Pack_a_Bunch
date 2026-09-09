@@ -93,10 +93,14 @@ fun CreateSpaceScreen(
     val complete = widthMm != null && depthMm != null && heightMm != null
 
     fun push() {
-        if (widthMm != null && depthMm != null && heightMm != null) {
+        val w = parseLengthToMm(width, unit)
+        val d = parseLengthToMm(depth, unit)
+        val h = parseLengthToMm(height, unit)
+        if (w != null && d != null && h != null) {
             onDimensionsChange(
-                Dimensions(widthMm, depthMm, heightMm),
-                MeasurementSource.TYPED_IN,
+                Dimensions(w, d, h),
+                if (Dimensions(w, d, h) == state.space?.dimensions)
+                    state.space.measurementSource else MeasurementSource.TYPED_IN,
             )
         }
     }
@@ -190,7 +194,12 @@ fun CreateSpaceScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.5f.sp,
                         )
-                        UnitToggle(unit = unit, onUnitChange = onUnitChange, compact = true)
+                        UnitToggle(unit = unit, onUnitChange = { next ->
+                            width = parseLengthToMm(width, unit)?.let { formatLength(it, next) } ?: width
+                            depth = parseLengthToMm(depth, unit)?.let { formatLength(it, next) } ?: depth
+                            height = parseLengthToMm(height, unit)?.let { formatLength(it, next) } ?: height
+                            onUnitChange(next)
+                        }, compact = true)
                     }
 
                     Spacer(Modifier.height(14.dp))

@@ -12,6 +12,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
@@ -68,6 +72,7 @@ object Routes {
     const val PROJECTS = "projects"        // Projects.dc.html
     const val CREATE_SPACE = "createSpace" // CreateSpace.dc.html
     const val MEASURE = "measure"          // Measure.dc.html + its recovery states
+    const val MEASURE_REVIEW = "measureReview"
     const val ITEMS = "items"              // Items.dc.html
     const val PLAN_RESULT = "planResult"   // PlanResult.dc.html
     const val PACKING_GUIDE = "packingGuide" // PackingGuide.dc.html
@@ -157,10 +162,38 @@ fun PackNavHost(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val editor by viewModel.editor.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var notice by remember { mutableStateOf<String?>(null) }
+    notice?.let { message ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { notice = null },
+            title = { androidx.compose.material3.Text("Local preview") },
+            text = { androidx.compose.material3.Text(message) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { notice = null }) {
+                androidx.compose.material3.Text("OK")
+            } },
+        )
+    }
+    var editItemId by rememberSaveable { mutableStateOf<String?>(null) }
+    val startRoute = remember { if (viewModel.setupCompleteAtLaunch) Routes.PROJECTS else Routes.ONBOARDING }
+    fun home() = navController.navigate(Routes.PROJECTS) {
+        popUpTo(navController.graph.id) { inclusive = true }
+        launchSingleTop = true
+    }
+    fun items() = navController.navigate(Routes.ITEMS) {
+        popUpTo(Routes.ITEMS) { inclusive = true }
+        launchSingleTop = true
+    }
+    fun finishSetup() {
+        viewModel.completeSetup()
+        navController.navigate(Routes.WELCOME) {
+            popUpTo(navController.graph.id) { inclusive = true }
+        }
+    }
 
     NavHost(
         navController = navController,
-        startDestination = Routes.WELCOME,
+        startDestination = startRoute,
         modifier = modifier,
         enterTransition = { enterForward() },
         exitTransition = { exitForward() },
@@ -174,10 +207,9 @@ fun PackNavHost(
                     navController.navigate(Routes.SPACE_TYPE)
                 },
                 onTrySample = {
-                    viewModel.openPack("sample")
-                    navController.navigate(Routes.ITEMS)
+                    viewModel.openPack("sample") { navController.navigate(Routes.ITEMS) }
                 },
-                onSeeProjects = { navController.navigate(Routes.PROJECTS) },
+                onSeeProjects = { home() },
             )
         }
 
@@ -191,8 +223,8 @@ fun PackNavHost(
                 habit = settings.packingHabit,
                 onUnitChange = viewModel::setUnit,
                 onHabitChange = viewModel::setPackingHabit,
-                onContinue = { navController.navigate(Routes.SIGN_IN) },
-                onSkip = { navController.navigate(Routes.SIGN_IN) },
+                onContinue = { finishSetup() },
+                onSkip = { finishSetup() },
             )
         }
 
@@ -304,8 +336,7 @@ fun PackNavHost(
                 projects = projects,
                 unit = settings.unit,
                 onOpen = { id ->
-                    viewModel.openPack(id)
-                    navController.navigate(Routes.ITEMS)
+                    viewModel.openPack(id) { navController.navigate(Routes.ITEMS) }
                 },
                 onNewPack = {
                     viewModel.startNewPack()
@@ -315,6 +346,24 @@ fun PackNavHost(
                 onDelete = { viewModel.deleteProject(it.id) },
                 onRestore = { viewModel.restoreProject(it) },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
+                onRename = viewModel::renameProject,
+                onDuplicate = viewModel::duplicateProject,
+                onRemeasure = { project ->
+                    viewModel.openPack(project.id) { navController.navigate(Routes.MEASURE_REVIEW) }
+                },
+                onShare = { project ->
+                    val summary = buildString {
+                        appendLine(project.name)
+                        appendLine(formatDimensions(project.space.dimensions, settings.unit))
+                        appendLine(if (project.space.measurementSource == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE) "Camera estimate" else "Typed in")
+                        project.items.forEachIndexed { index, item ->
+                            appendLine("${index + 1}. ${item.name} × ${item.quantity}: ${formatDimensions(item.dimensions, settings.unit)} — " +
+                                if (item.measurementSource == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE) "Camera estimate" else "Typed in")
+                        }
+                    }
+                    context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND)
+                        .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, summary), "Share pack"))
+                },
             )
         }
 
@@ -423,7 +472,7 @@ fun PackNavHost(
                     viewModel.setSpaceDimensions(dimensions, source)
                     // Straight back to the space screen, where every value is editable and
                     // carries its provenance. A camera estimate is never stored unreviewed.
-                    navController.popBackStack()
+                    navController.navigate(Routes.MEASURE_REVIEW)
                 },
                 onTypeInstead = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
@@ -448,6 +497,57 @@ fun PackNavHost(
                     )
                 },
                 onBack = { navController.popBackStack() },
+                initialEditItemId = editItemId,
+                onEditConsumed = { editItemId = null },
+                onLibrary = { navController.navigate(Routes.ITEM_LIBRARY) },
+            )
+        }
+
+        composable(Routes.MEASURE_REVIEW) {
+            editor.space?.let { space ->
+                com.packabunch.ui.screens.MeasureReviewScreen(
+                    dimensions = space.dimensions,
+                    sources = com.packabunch.ui.screens.Axis3.entries.associateWith { space.measurementSource },
+                    edgeGapMm = space.edgeGapMm,
+                    unit = settings.unit,
+                    onUnitChange = viewModel::setUnit,
+                    onConfirm = { dimensions, sources, gap ->
+                        viewModel.setSpaceDimensions(dimensions,
+                            if (sources.values.all { it == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE })
+                                com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE
+                            else com.packabunch.packing.MeasurementSource.TYPED_IN)
+                        viewModel.setEdgeGap(gap)
+                        items()
+                    },
+                    onMeasureAgain = { navController.navigate(Routes.MEASURE) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+
+        composable(Routes.DOESNT_FIT) {
+            val placements = editor.plan?.placements?.sortedBy { it.sequenceIndex }.orEmpty()
+            val current = placements.getOrNull(editor.guideStep)
+            val item = editor.items.firstOrNull { it.id == current?.specId }
+            DoesntFitScreen(
+                itemName = item?.name ?: "This item",
+                itemSummary = item?.let { formatDimensions(it.dimensions, settings.unit) }.orEmpty(),
+                stepNumber = editor.guideStep + 1,
+                totalSteps = placements.size,
+                piecesAlreadyIn = editor.packedInstanceIds.size,
+                onItemBigger = { editItemId = item?.id; items() },
+                onSpaceSmaller = { navController.navigate(Routes.MEASURE_REVIEW) },
+                onObstruction = {
+                    navController.navigate(if (editor.space?.scan != null) Routes.SPACE_OBSTRUCTIONS else Routes.MEASURE_REVIEW)
+                },
+                onReplan = { items() },
+                onSkipAndCarryOn = {
+                    if (editor.guideStep + 1 < placements.size) {
+                        viewModel.setGuideStep(editor.guideStep + 1)
+                        navController.popBackStack()
+                    } else items()
+                },
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -470,10 +570,10 @@ fun PackNavHost(
                     awkwardItemName = editor.plan?.unplaced?.firstOrNull()?.name,
                     unit = settings.unit,
                     onAllowTurning = { navController.popBackStack() },
-                    onShrinkGap = { navController.popBackStack() },
+                    onShrinkGap = { navController.navigate(Routes.MEASURE_REVIEW) },
                     onRemoveAwkward = { navController.popBackStack() },
                     onBackToItems = { navController.popBackStack() },
-                    onChangeSpace = { navController.popBackStack(Routes.CREATE_SPACE, false) },
+                    onChangeSpace = { navController.navigate(Routes.MEASURE_REVIEW) },
                     onBack = { navController.popBackStack() },
                 )
                 return@composable
@@ -511,7 +611,10 @@ fun PackNavHost(
                 unlocked = viewModel.limits.itemLibrary,
                 unit = settings.unit,
                 price = null,
-                onUse = viewModel::upsertItem,
+                onUse = { item ->
+                    viewModel.upsertItem(item.copy(id = java.util.UUID.randomUUID().toString()))
+                    navController.popBackStack()
+                },
                 onMeasureNew = { navController.popBackStack() },
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
                 onBack = { navController.popBackStack() },
@@ -550,9 +653,11 @@ fun PackNavHost(
                 limits = viewModel.limits,
                 savedPackCount = projects.size,
                 onDone = {
-                    navController.popBackStack(Routes.WELCOME, inclusive = false)
+                    home()
                 },
-                onSeePlan = { navController.popBackStack(Routes.PLAN_RESULT, inclusive = false) },
+                onSeePlan = {
+                    navController.popBackStack(if (editor.space?.isScanned == true) Routes.PLAN_IRREGULAR else Routes.PLAN_RESULT, false)
+                },
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
                 onFitAnswer = viewModel::recordDidItFit,
             )
@@ -565,7 +670,7 @@ fun PackNavHost(
                 onUnitChange = viewModel::setUnit,
                 onNavigate = { destination ->
                     if (destination == NavDestination.Projects) {
-                        navController.navigate(Routes.PROJECTS) { launchSingleTop = true }
+                        home()
                     }
                 },
                 onNewPack = {
@@ -573,14 +678,14 @@ fun PackNavHost(
                     navController.navigate(Routes.SPACE_TYPE)
                 },
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
-                onAccount = { navController.navigate(Routes.PROFILE) },
-                onManageSubscription = {},
-                onRestorePurchases = {},
+                onAccount = { notice = "Your packs are saved on this device. Accounts and cloud backup are not connected in this build." },
+                onManageSubscription = { notice = "Google Play Billing is not connected in this build." },
+                onRestorePurchases = { notice = "Purchase restoration is not available until Google Play Billing is connected." },
                 onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
                 onDeleteAllData = viewModel::deleteAllLocalData,
-                onPrivacy = {},
-                onTerms = {},
-                onSupport = {},
+                onPrivacy = { notice = "A published privacy policy has not been configured. This preview stores packs locally." },
+                onTerms = { notice = "Published terms have not been configured for this preview." },
+                onSupport = { notice = "A support address has not been configured for this preview." },
                 onBack = { navController.popBackStack() },
             )
         }

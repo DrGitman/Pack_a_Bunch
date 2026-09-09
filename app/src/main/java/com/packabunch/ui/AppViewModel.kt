@@ -43,12 +43,22 @@ import kotlinx.coroutines.withContext
  */
 class AppViewModel(
     private val repository: ProjectRepository,
+    private val preferences: android.content.SharedPreferences,
 ) : ViewModel() {
 
     val projects: StateFlow<List<Project>> = repository.projects
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    private val _settings = MutableStateFlow(AppSettings())
+    private val _settings = MutableStateFlow(AppSettings(
+        unit = LengthUnit.entries.firstOrNull { it.name == preferences.getString("unit", null) }
+            ?: LengthUnit.CENTIMETRES,
+        packingHabit = PackingHabit.entries.firstOrNull { it.name == preferences.getString("habit", null) },
+    ))
+    val setupCompleteAtLaunch = preferences.getBoolean("setupComplete", false)
+
+    fun completeSetup() {
+        preferences.edit().putBoolean("setupComplete", true).apply()
+    }
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     private val _editor = MutableStateFlow(PackEditorState())
@@ -75,11 +85,17 @@ class AppViewModel(
 
     // -- settings -------------------------------------------------------------------------
 
-    fun setUnit(unit: LengthUnit) = _settings.update { it.copy(unit = unit) }
+    fun setUnit(unit: LengthUnit) {
+        preferences.edit().putString("unit", unit.name).apply()
+        _settings.update { it.copy(unit = unit) }
+    }
 
     fun setTier(tier: Tier) = _settings.update { it.copy(tier = tier) }
 
-    fun setPackingHabit(habit: PackingHabit) = _settings.update { it.copy(packingHabit = habit) }
+    fun setPackingHabit(habit: PackingHabit) {
+        preferences.edit().putString("habit", habit.name).apply()
+        _settings.update { it.copy(packingHabit = habit) }
+    }
 
     fun setNotificationPreferences(preferences: NotificationPreferences) =
         _settings.update { it.copy(notifications = preferences) }
@@ -130,7 +146,7 @@ class AppViewModel(
      * The engine is deterministic, so what comes back is the same arrangement that was
      * saved — no drift, and nothing to migrate when the schema changes.
      */
-    fun openPack(id: String) {
+    fun openPack(id: String, onOpened: () -> Unit = {}) {
         viewModelScope.launch {
             val project = repository.solvedProject(id) ?: return@launch
             _editor.value = PackEditorState(
@@ -142,6 +158,7 @@ class AppViewModel(
                 packedInstanceIds = project.packedInstanceIds,
                 isNew = false,
             )
+            onOpened()
         }
     }
 
@@ -315,6 +332,20 @@ class AppViewModel(
         viewModelScope.launch { repository.restore(project) }
     }
 
+    fun renameProject(project: Project, name: String) {
+        viewModelScope.launch { repository.upsert(project.copy(name = name, space = project.space.copy(name = name))) }
+    }
+
+    fun duplicateProject(project: Project) {
+        val id = java.util.UUID.randomUUID().toString()
+        viewModelScope.launch {
+            repository.upsert(project.copy(id = id, name = "${project.name} copy",
+                space = project.space.copy(id = "$id-space", name = "${project.name} copy"),
+                items = project.items.map { it.copy(id = java.util.UUID.randomUUID().toString()) },
+                plan = null, packedInstanceIds = emptySet()))
+        }
+    }
+
     // -- the packing guide ---------------------------------------------------------------------
 
     fun markPacked(instanceId: String, packed: Boolean) {
@@ -357,7 +388,8 @@ class AppViewModel(
     class Factory(private val context: Context) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            AppViewModel(ProjectRepository.create(context)) as T
+            AppViewModel(ProjectRepository.create(context),
+                context.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)) as T
     }
 }
 

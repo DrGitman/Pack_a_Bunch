@@ -83,9 +83,19 @@ fun ItemsScreen(
     onPlan: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    initialEditItemId: String? = null,
+    onEditConsumed: () -> Unit = {},
+    onLibrary: () -> Unit = {},
 ) {
     var editing by remember { mutableStateOf<ItemSpec?>(null) }
     var editorOpen by remember { mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(initialEditItemId) {
+        if (initialEditItemId != null) {
+            editing = state.items.firstOrNull { it.id == initialEditItemId }
+            editorOpen = editing != null
+            onEditConsumed()
+        }
+    }
 
     val pieces = state.pieceCount
     val atLimit = !limits.allowsPieces(pieces + 1)
@@ -103,6 +113,7 @@ fun ItemsScreen(
             )
 
             Spacer(Modifier.height(Spacing.md))
+            com.packabunch.ui.components.PackTextButton(text = "Item library", onClick = onLibrary)
 
             if (state.space != null) {
                 Column(Modifier.padding(horizontal = Spacing.gutter)) {

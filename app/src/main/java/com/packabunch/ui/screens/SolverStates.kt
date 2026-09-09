@@ -336,8 +336,8 @@ fun DoesntFitScreen(
                 FixRow(
                     icon = PackIcons.Rotate,
                     title = "It fits, just not like that",
-                    detail = "We'll look for a different arrangement with everything you've " +
-                        "already got in.",
+                    detail = "Review the item's turning and stacking settings, then plan again. " +
+                        "A new plan may move pieces you have already packed.",
                     onClick = onReplan,
                 )
             }

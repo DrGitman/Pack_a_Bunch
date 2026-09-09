@@ -73,12 +73,30 @@ fun ProjectsScreen(
     onDelete: (Project) -> Unit = {},
     onRestore: (Project) -> Unit = {},
     onSettings: () -> Unit = {},
+    onRename: (Project, String) -> Unit = { _, _ -> },
+    onDuplicate: (Project) -> Unit = {},
+    onRemeasure: (Project) -> Unit = {},
+    onShare: (Project) -> Unit = {},
 ) {
     // The three data states live here together because they are one flow: open the menu,
     // confirm the delete, then get a window to take it back.
     var menuFor by remember { mutableStateOf<Project?>(null) }
     var confirmFor by remember { mutableStateOf<Project?>(null) }
     var justDeleted by remember { mutableStateOf<Project?>(null) }
+    var renameFor by remember { mutableStateOf<Project?>(null) }
+    var newName by remember { mutableStateOf("") }
+
+    renameFor?.let { project ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { renameFor = null },
+            title = { Text("Rename pack") },
+            text = { androidx.compose.material3.OutlinedTextField(value = newName,
+                onValueChange = { newName = it }, label = { Text("Pack name") }, singleLine = true) },
+            confirmButton = { androidx.compose.material3.TextButton(enabled = newName.isNotBlank(),
+                onClick = { onRename(project, newName.trim()); renameFor = null }) { Text("Save") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { renameFor = null }) { Text("Cancel") } },
+        )
+    }
 
     Box(modifier.fillMaxSize()) {
         ScreenScaffold {
@@ -147,10 +165,10 @@ fun ProjectsScreen(
             ProjectMenuSheet(
                 project = project,
                 unit = unit,
-                onRename = { menuFor = null },
-                onDuplicate = { menuFor = null },
-                onRemeasure = { menuFor = null },
-                onShare = { menuFor = null },
+                onRename = { newName = project.name; renameFor = project; menuFor = null },
+                onDuplicate = { onDuplicate(project); menuFor = null },
+                onRemeasure = { onRemeasure(project); menuFor = null },
+                onShare = { onShare(project); menuFor = null },
                 onDelete = {
                     confirmFor = project
                     menuFor = null

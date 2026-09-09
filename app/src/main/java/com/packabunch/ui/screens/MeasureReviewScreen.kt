@@ -107,7 +107,12 @@ fun MeasureReviewScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 15.5f.sp,
                         )
-                        UnitToggle(unit = unit, onUnitChange = onUnitChange, compact = true)
+                    UnitToggle(unit = unit, onUnitChange = { next ->
+                        width = parseLengthToMm(width, unit)?.let { formatLength(it, next) } ?: width
+                        depth = parseLengthToMm(depth, unit)?.let { formatLength(it, next) } ?: depth
+                        height = parseLengthToMm(height, unit)?.let { formatLength(it, next) } ?: height
+                        onUnitChange(next)
+                    }, compact = true)
                     }
 
                     Spacer(Modifier.height(14.dp))
