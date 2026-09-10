@@ -59,9 +59,9 @@ class ScanAccumulator(
      * sideways, which is why it lives in one function.
      */
     private fun worldToCell(xM: Float, yM: Float, zM: Float): IntArray {
-        val i = ((xM - originXM) / resolutionM).toInt()
-        val j = ((-(zM - originZM)) / resolutionM).toInt() // world -Z is grid +Y (forward)
-        val k = ((yM - originYM) / resolutionM).toInt()
+        val i = kotlin.math.floor((xM - originXM) / resolutionM).toInt()
+        val j = kotlin.math.floor((-(zM - originZM)) / resolutionM).toInt() // world -Z is grid +Y (forward)
+        val k = kotlin.math.floor((yM - originYM) / resolutionM).toInt()
         return intArrayOf(i, j, k)
     }
 

@@ -5,23 +5,37 @@ import com.packabunch.packing.*
 data class SurfacePoint(val x: Float, val y: Float, val z: Float)
 data class SurfaceFace(val points: List<SurfacePoint>, val side: Int)
 
-/** Only exposed faces, not six cubes per solid voxel. Coordinates remain metric. */
+/** Greedy meshing joins coplanar voxel faces into clean panels, preserving every boundary. */
 fun voxelSurface(nx: Int, ny: Int, nz: Int, resolution: Int,
     occupied: (Int, Int, Int) -> Boolean): List<SurfaceFace> = buildList {
-    val directions = arrayOf(intArrayOf(-1,0,0), intArrayOf(1,0,0), intArrayOf(0,-1,0),
-        intArrayOf(0,1,0), intArrayOf(0,0,-1), intArrayOf(0,0,1))
-    for (x in 0 until nx) for (y in 0 until ny) for (z in 0 until nz) {
-        if (!occupied(x,y,z)) continue
-        val a=x*resolution.toFloat(); val b=y*resolution.toFloat(); val c=z*resolution.toFloat()
-        val r=resolution.toFloat()
-        val corners=listOf(SurfacePoint(a,b,c), SurfacePoint(a+r,b,c), SurfacePoint(a+r,b+r,c), SurfacePoint(a,b+r,c),
-            SurfacePoint(a,b,c+r), SurfacePoint(a+r,b,c+r), SurfacePoint(a+r,b+r,c+r), SurfacePoint(a,b+r,c+r))
-        val faces=arrayOf(intArrayOf(0,3,7,4),intArrayOf(1,2,6,5),intArrayOf(0,1,5,4),
-            intArrayOf(3,2,6,7),intArrayOf(0,1,2,3),intArrayOf(4,5,6,7))
-        directions.forEachIndexed { side, d ->
-            val i=x+d[0]; val j=y+d[1]; val k=z+d[2]
-            if (i !in 0 until nx || j !in 0 until ny || k !in 0 until nz || !occupied(i,j,k))
-                add(SurfaceFace(faces[side].map { corners[it] },side))
+    val sizes=intArrayOf(nx,ny,nz)
+    for(side in 0..5) {
+        val axis=side/2; val positive=side%2==1
+        val u=(axis+1)%3; val v=(axis+2)%3
+        for(layer in 0 until sizes[axis]) {
+            val visible=BooleanArray(sizes[u]*sizes[v])
+            fun at(a:Int,b:Int)=a*sizes[v]+b
+            for(a in 0 until sizes[u]) for(b in 0 until sizes[v]) {
+                val p=IntArray(3); p[axis]=layer; p[u]=a; p[v]=b
+                if(!occupied(p[0],p[1],p[2])) continue
+                p[axis]+=if(positive)1 else -1
+                visible[at(a,b)]=p[axis] !in 0 until sizes[axis] || !occupied(p[0],p[1],p[2])
+            }
+            for(a in 0 until sizes[u]) for(b in 0 until sizes[v]) {
+                if(!visible[at(a,b)]) continue
+                var width=1
+                while(a+width<sizes[u] && visible[at(a+width,b)]) width++
+                var height=1
+                while(b+height<sizes[v] && (a until a+width).all { visible[at(it,b+height)] }) height++
+                for(i in a until a+width) for(j in b until b+height) visible[at(i,j)]=false
+                fun point(i:Int,j:Int):SurfacePoint {
+                    val p=FloatArray(3)
+                    p[axis]=(layer+if(positive)1 else 0)*resolution.toFloat()
+                    p[u]=i*resolution.toFloat(); p[v]=j*resolution.toFloat()
+                    return SurfacePoint(p[0],p[1],p[2])
+                }
+                add(SurfaceFace(listOf(point(a,b),point(a+width,b),point(a+width,b+height),point(a,b+height)),side))
+            }
         }
     }
 }

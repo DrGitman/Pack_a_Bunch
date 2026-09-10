@@ -118,9 +118,9 @@ fun SweepItemsScreen(
         ) {
             Text(
                 text = when {
-                    !isTracking -> "Hold still for a moment"
+                    !isTracking -> "Move slowly over the floor or table to find the surface"
                     objects.isEmpty() -> "Point at your things and walk round them"
-                    settled == objects.size -> "That's everything measured"
+                    settled == objects.size -> "Visible items ready to review"
                     else -> "Keep moving — the ones still waiting say what they need"
                 },
                 color = TextPrimary,

@@ -28,7 +28,12 @@ class GeometryRoundTripTest {
     }
     @Test fun `surface removes shared interior faces and preserves concavity`() {
         val faces=voxelSurface(2,2,1,20) { x,y,_ -> !(x==1 && y==1) }
-        assertEquals(14,faces.size)
+        assertTrue(faces.size < 14)
+        val area=faces.sumOf { face ->
+            fun distance(a:SurfacePoint,b:SurfacePoint)=kotlin.math.sqrt(((a.x-b.x)*(a.x-b.x)+(a.y-b.y)*(a.y-b.y)+(a.z-b.z)*(a.z-b.z)).toDouble())
+            distance(face.points[0],face.points[1])*distance(face.points[1],face.points[2])
+        }
+        assertEquals(14.0*400,area,0.001)
         assertFalse(faces.any { f -> f.points.all { it.x > 20 && it.y > 20 } })
     }
     @Test fun `all six placement orientations map surfaces inside oriented bounds`() {

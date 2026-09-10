@@ -99,13 +99,13 @@ fun SpaceTypeScreen(
             KindCard(
                 icon = PackIcons.Camera,
                 title = "Any shape",
-                badge = if (depthCapable) "NEW" else "NOT ON THIS PHONE",
+                badge = if (depthCapable) "DEPTH AVAILABLE" else "CHECK SUPPORT",
                 body = "A car boot, a cupboard with shelves, an awkward corner. Sweep the " +
                     "camera round it and we map what's actually there.",
                 tags = listOf("Wheel arches", "Sloping backs", "Shelves"),
                 selected = selected == SpaceKind.ANY_SHAPE,
-                enabled = depthCapable,
-                onClick = { if (depthCapable) onSelect(SpaceKind.ANY_SHAPE) },
+                enabled = true,
+                onClick = { onSelect(SpaceKind.ANY_SHAPE) },
             )
         }
 
@@ -114,8 +114,8 @@ fun SpaceTypeScreen(
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             if (!depthCapable) {
                 Note(
-                    text = "This phone can't sense depth, so mapping an irregular space " +
-                        "isn't available on it. Box-shaped works on every phone and is exact.",
+                    text = "We'll check depth support after camera permission and AR services " +
+                        "are ready. Typed measurements remain available if scanning isn't supported.",
                     tone = NoteTone.Caution,
                     icon = PackIcons.Info,
                 )

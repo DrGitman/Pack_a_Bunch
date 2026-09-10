@@ -383,7 +383,7 @@ private fun Color.darken(amount: Float) = Color(
 /** Painter ordering with pale app-colour fills and dimension-drawing outlines. */
 private fun DrawScope.drawSurface(view: CrateView, faces: List<SurfaceFace>, base: Color, alpha: Float) {
     fun depth(face: SurfaceFace): Float = face.points.sumOf { p ->
-        (-(p.x * cos(view.yaw) - p.y * sin(view.yaw) + p.x * sin(view.yaw) + p.y * cos(view.yaw)) - p.z * 0.001f).toDouble()
+        (p.x * cos(view.yaw) - p.y * sin(view.yaw) + p.x * sin(view.yaw) + p.y * cos(view.yaw) + p.z).toDouble()
     }.toFloat()
     faces.sortedBy { depth(it) }.forEach { face ->
         val p = face.points.map { view.project(it.x,it.y,it.z) }

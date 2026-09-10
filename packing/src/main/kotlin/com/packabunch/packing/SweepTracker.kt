@@ -137,7 +137,8 @@ class SweepTracker(
                 // The larger reading wins. A sweep only ever reveals more of an object, so a
                 // smaller measurement means part of it was hidden that time — never that it
                 // shrank. Taking the maximum also errs the safe way: too big beats too small.
-                latest = if (candidate.dimensions.volumeMm3 > latest.dimensions.volumeMm3) {
+                latest = if (candidate.dimensions.volumeMm3 > latest.dimensions.volumeMm3 ||
+                    candidate.dimensions == latest.dimensions && candidate.cellCount >= latest.cellCount) {
                     candidate
                 } else {
                     latest
