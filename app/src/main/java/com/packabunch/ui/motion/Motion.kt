@@ -8,7 +8,10 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.runtime.Composable
@@ -31,8 +34,8 @@ import androidx.compose.ui.unit.dp
  * What is left is motion that does a job: telling you a control registered your finger,
  * showing where a sheet came from, and letting a number settle so you notice it changed.
  *
- * One rule that is not negotiable: nothing animates while the camera is scanning, and
- * haptics fire on a captured point or a completed packing step, never continuously.
+ * Keep decorative motion out of the camera preview. Haptics acknowledge explicit actions,
+ * including button activation, captured points and completed packing steps.
  */
 object Motion {
 
@@ -82,10 +85,12 @@ object Motion {
 fun Modifier.pressScale(
     pressedScale: Float = 0.97f,
     enabled: Boolean = true,
+    interactionSource: MutableInteractionSource? = null,
 ): Modifier = composed {
     var pressed by remember { mutableStateOf(false) }
+    val sourcePressed = interactionSource?.collectIsPressedAsState()?.value ?: pressed
     val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) pressedScale else 1f,
+        targetValue = if (sourcePressed && enabled) pressedScale else 1f,
         animationSpec = Motion.pressSpring(),
         label = "pressScale",
     )
@@ -95,13 +100,12 @@ fun Modifier.pressScale(
             scaleX = scale
             scaleY = scale
         }
-        .pointerInput(enabled) {
-            if (!enabled) return@pointerInput
+        .pointerInput(enabled, interactionSource) {
+            if (!enabled || interactionSource != null) return@pointerInput
             awaitEachGesture {
                 awaitFirstDown(requireUnconsumed = false)
                 pressed = true
-                waitForUpOrCancellation()
-                pressed = false
+                try { waitForUpOrCancellation() } finally { pressed = false }
             }
         }
 }
@@ -138,4 +142,26 @@ fun Modifier.entrance(state: EntranceState): Modifier = composed {
         alpha = state.progress
         translationY = state.riseFrom.toPx() * (1f - state.progress)
     }
+}
+
+/** One small shake on a new validation error, never on every keystroke or initial display. */
+fun Modifier.validationShake(isError: Boolean): Modifier = composed {
+    val offset = remember { Animatable(0f) }
+    var previousError by remember { mutableStateOf(isError) }
+    LaunchedEffect(isError) {
+        val newlyInvalid = isError && !previousError
+        previousError = isError
+        if (newlyInvalid) {
+            offset.animateTo(0f, keyframes {
+                durationMillis = Motion.MEDIUM_MS
+                0f at 0
+                6f at 50
+                -6f at 100
+                3f at 150
+                -3f at 200
+                0f at 250
+            })
+        } else offset.snapTo(0f)
+    }
+    graphicsLayer { translationX = offset.value.dp.toPx() }
 }

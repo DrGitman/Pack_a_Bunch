@@ -163,6 +163,7 @@ fun PackNavHost(
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val editor by viewModel.editor.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
+    val projectsLoading by viewModel.projectsLoading.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     var notice by remember { mutableStateOf<String?>(null) }
     notice?.let { message ->
@@ -334,6 +335,7 @@ fun PackNavHost(
 
         composable(Routes.PROJECTS) {
             ProjectsScreen(
+                loading = projectsLoading,
                 projects = projects,
                 unit = settings.unit,
                 onOpen = { id ->

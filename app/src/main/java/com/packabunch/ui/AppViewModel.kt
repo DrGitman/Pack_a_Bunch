@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -48,7 +49,10 @@ class AppViewModel(
     private val preferences: android.content.SharedPreferences,
 ) : ViewModel() {
 
+    private val _projectsLoading = MutableStateFlow(true)
+    val projectsLoading = _projectsLoading.asStateFlow()
     val projects: StateFlow<List<Project>> = repository.projects
+        .onEach { _projectsLoading.value = false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _settings = MutableStateFlow(AppSettings(
@@ -380,6 +384,7 @@ class AppViewModel(
                 items = project.items.map { it.copy(id = java.util.UUID.randomUUID().toString()) },
                 plan = null, packedInstanceIds = emptySet()))
         }
+        autosave()
     }
 
     // -- the packing guide ---------------------------------------------------------------------

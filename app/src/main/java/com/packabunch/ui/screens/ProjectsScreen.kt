@@ -70,6 +70,7 @@ fun ProjectsScreen(
     onNewPack: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    loading: Boolean = false,
     onDelete: (Project) -> Unit = {},
     onRestore: (Project) -> Unit = {},
     onSettings: () -> Unit = {},
@@ -103,7 +104,7 @@ fun ProjectsScreen(
             PackAppBar(title = "Projects", onBack = onBack)
 
             Text(
-                text = if (projects.size == 1) "1 pack saved on this device"
+                text = if (loading) "Loading saved packs…" else if (projects.size == 1) "1 pack saved on this device"
                 else "${projects.size} packs saved on this device",
                 color = TextTertiary,
                 fontFamily = UiFamily,
@@ -111,7 +112,9 @@ fun ProjectsScreen(
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = 4.dp),
             )
 
-            if (projects.isEmpty()) {
+            if (loading) {
+                com.packabunch.ui.components.PackListSkeleton(Modifier.weight(1f))
+            } else if (projects.isEmpty()) {
                 EmptyState(onNewPack = onNewPack, modifier = Modifier.weight(1f))
             } else {
                 LazyColumn(
@@ -125,13 +128,12 @@ fun ProjectsScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     itemsIndexed(projects, key = { _, p -> p.id }) { index, project ->
-                        val entrance = rememberStaggeredEntrance(index)
                         ProjectCard(
                             project = project,
                             unit = unit,
                             onClick = { onOpen(project.id) },
                             onMenu = { menuFor = project },
-                            modifier = Modifier.entrance(entrance),
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
@@ -325,3 +327,4 @@ private fun ProjectsPreview() {
         )
     }
 }
+

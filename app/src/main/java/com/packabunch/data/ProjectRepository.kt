@@ -22,10 +22,8 @@ import kotlinx.coroutines.withContext
 /**
  * Where packs live. Backed by Room, so they survive the app being killed.
  *
- * The arrangement itself is not stored — see [com.packabunch.data.db.PlanSummaryEntity].
- * The engine is deterministic, so inputs plus a revision fingerprint are enough to
- * reproduce a plan exactly, and [solvedProject] is how a saved pack gets its placements
- * back when it is opened.
+ * Placements and geometry are stored with their input revision and validated on load.
+ * Legacy packs without placements are solved once and upgraded on opening.
  */
 class ProjectRepository(private val dao: ProjectDao) {
 
@@ -37,10 +35,8 @@ class ProjectRepository(private val dao: ProjectDao) {
     }
 
     /**
-     * A saved project with its placements recomputed.
-     *
-     * Reading a project back gives metrics but no positions. This re-runs the search, which
-     * returns the same arrangement it did when it was saved — that is what determinism buys.
+     * Restore a validated arrangement, or solve and persist a legacy/stale pack.
+     * A new arrangement clears guide ticks, which belonged to the previous placements.
      */
     suspend fun solvedProject(id: String): Project? = withContext(Dispatchers.Default) {
         val stored = project(id) ?: return@withContext null

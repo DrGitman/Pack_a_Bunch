@@ -154,12 +154,11 @@ fun ItemsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 itemsIndexed(state.items, key = { _, item -> item.id }) { index, item ->
-                    val entrance = rememberStaggeredEntrance(index)
                     ItemRow(
                         index = index,
                         item = item,
                         unit = unit,
-                        modifier = Modifier.entrance(entrance),
+                        modifier = Modifier.animateItem(),
                         onQuantityChange = { onUpsertItem(item.copy(quantity = it)) },
                         onClick = { editing = item; editorOpen = true },
                     )
@@ -318,3 +317,4 @@ private fun ItemsPreview() {
         )
     }
 }
+

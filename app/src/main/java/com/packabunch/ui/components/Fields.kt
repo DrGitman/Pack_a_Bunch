@@ -1,4 +1,5 @@
 package com.packabunch.ui.components
+import com.packabunch.ui.motion.validationShake
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.animateColorAsState
@@ -290,6 +291,7 @@ fun DimensionField(
 
     Row(
         modifier = modifier
+            .validationShake(error)
             .fillMaxWidth()
             .background(background, RoundedCornerShape(14.dp))
             .border(BorderStroke(1.5.dp, borderColor), RoundedCornerShape(14.dp))
@@ -334,6 +336,7 @@ fun StackedDimensionField(
 ) {
     Column(
         modifier = modifier
+            .validationShake(error)
             .background(SurfaceField, RoundedCornerShape(16.dp))
             .border(
                 BorderStroke(1.5.dp, if (error) ErrorRed else Outline),

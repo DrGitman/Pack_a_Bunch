@@ -71,7 +71,7 @@ data class ItemEntity(
 )
 
 /**
- * Enough of a finished plan to draw a project card, and no more.
+ * Plan metrics plus versioned placement details, restored only after validation.
  *
  * [inputRevision] is the whole point. It fingerprints the space and items this was solved
  * from, so if either has been edited since, the summary is stale and is thrown away rather

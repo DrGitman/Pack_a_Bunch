@@ -70,9 +70,8 @@ fun StoredProject.toProject(): Project {
 /**
  * Metrics and provenance without placements.
  *
- * Enough to draw a card; deliberately not enough to draw an arrangement. Anything that
- * needs positions has to re-solve, which is cheap because the engine is deterministic and
- * gives back exactly what was stored here.
+ * The versioned details payload supplies placements and unplaced reasons before validation.
+ * Legacy rows can retain their metrics until the repository upgrades them on opening.
  */
 private fun PlanSummaryEntity.toPlanShell(project: Project): PackingPlan = PackingPlan(
     spaceId = project.space.id,

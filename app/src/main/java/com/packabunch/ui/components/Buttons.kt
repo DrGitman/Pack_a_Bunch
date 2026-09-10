@@ -18,6 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,6 +55,8 @@ fun PrimaryButton(
     icon: ImageVector? = null,
     height: Dp = 56.dp,
 ) {
+    val interaction = remembered()
+    val view = LocalView.current
     val shape = RoundedCornerShape(height / 2)
     val background = if (enabled) Primary else Color(0xFFDFD3C6)
     val content = if (enabled) Color.White else Color(0xFFA2907F)
@@ -61,14 +65,19 @@ fun PrimaryButton(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
-            .pressScale(enabled = enabled)
+            .pressScale(pressedScale = 0.95f, enabled = enabled, interactionSource = interaction)
             .then(if (enabled) Modifier.warmShadow(10.dp, shape) else Modifier)
             .background(background, shape)
+            .clip(shape)
             .clickable(
                 enabled = enabled,
-                interactionSource = remembered(),
+                interactionSource = interaction,
+                role = Role.Button,
                 indication = ripple(color = Color.White),
-                onClick = onClick,
+                onClick = {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    onClick()
+                },
             ),
         horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -102,20 +111,27 @@ fun SecondaryButton(
     contentColor: Color = PrimaryDark,
     iconTint: Color = Primary,
 ) {
+    val interaction = remembered()
+    val view = LocalView.current
     val shape = RoundedCornerShape(height / 2)
 
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
-            .pressScale(pressedScale = 0.98f, enabled = enabled)
+            .pressScale(pressedScale = 0.95f, enabled = enabled, interactionSource = interaction)
             .background(Color.White, shape)
             .border(BorderStroke(1.5.dp, OutlineStrong), shape)
+            .clip(shape)
             .clickable(
                 enabled = enabled,
-                interactionSource = remembered(),
+                interactionSource = interaction,
+                role = Role.Button,
                 indication = ripple(color = Primary),
-                onClick = onClick,
+                onClick = {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    onClick()
+                },
             ),
         horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -141,16 +157,22 @@ fun PackTextButton(
     color: Color = PrimaryDark,
     enabled: Boolean = true,
 ) {
+    val interaction = remembered()
+    val view = LocalView.current
     Box(
         modifier = modifier
             .height(48.dp)
-            .pressScale(pressedScale = 0.96f, enabled = enabled)
+            .pressScale(pressedScale = 0.95f, enabled = enabled, interactionSource = interaction)
             .clip(RoundedCornerShape(24.dp))
             .clickable(
                 enabled = enabled,
-                interactionSource = remembered(),
+                interactionSource = interaction,
+                role = Role.Button,
                 indication = ripple(color = color),
-                onClick = onClick,
+                onClick = {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    onClick()
+                },
             )
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.Center,
@@ -178,17 +200,23 @@ fun PackIconButton(
     background: Color = Color.Transparent,
     enabled: Boolean = true,
 ) {
+    val interaction = remembered()
+    val view = LocalView.current
     Box(
         modifier = modifier
             .size(size)
-            .pressScale(pressedScale = 0.92f, enabled = enabled)
+            .pressScale(pressedScale = 0.95f, enabled = enabled, interactionSource = interaction)
             .background(background, RoundedCornerShape(size / 2))
             .clip(RoundedCornerShape(size / 2))
             .clickable(
                 enabled = enabled,
-                interactionSource = remembered(),
+                interactionSource = interaction,
+                role = Role.Button,
                 indication = ripple(bounded = true, color = tint),
-                onClick = onClick,
+                onClick = {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    onClick()
+                },
             ),
         contentAlignment = Alignment.Center,
     ) {
@@ -198,3 +226,4 @@ fun PackIconButton(
 
 @Composable
 private fun remembered(): MutableInteractionSource = remember { MutableInteractionSource() }
+
