@@ -121,6 +121,7 @@ fun PlanIrregularScreen(
                     if (plan != null && space != null) {
                         if (topDown && layers.isNotEmpty()) {
                             LayerView(
+                                items = state.items,
                                 space = space,
                                 layer = layers.first(),
                                 modifier = Modifier.fillMaxWidth().height(300.dp),

@@ -133,7 +133,18 @@ class ArScanController(private val context: Context, private val trackItems: Boo
     /** The finished map, or null if nothing was ever observed. */
     fun buildScannedSpace(): ScannedSpace? {
         val grid: VoxelGrid = finishedGrid ?: return null
-        return ScannedSpace(baseGrid = grid)
+        if (grid.countZ <= 1) return null
+        // The detected support occupies layer zero. Start usable space above that layer;
+        // leaving the solid floor at solver z=0 would prevent every floor placement.
+        val nz = grid.countZ - 1
+        val cells = ByteArray(grid.countX * grid.countY * nz) { n ->
+            val x = n / (grid.countY * nz)
+            val y = n / nz % grid.countY
+            val z = n % nz + 1
+            grid.cellAt(x, y, z).ordinal.toByte()
+        }
+        return ScannedSpace(baseGrid = VoxelGrid(0, 0, 0, grid.resolutionMm,
+            grid.countX, grid.countY, nz, cells))
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
@@ -209,8 +220,8 @@ class ArScanController(private val context: Context, private val trackItems: Boo
                     val focal = intrinsics.focalLength
                     val principal = intrinsics.principalPoint
                     val imageSize = intrinsics.imageDimensions
-                    val sx = depth.width.toFloat() / imageSize[0]
-                    val sy = depth.height.toFloat() / imageSize[1]
+                    val projection = DepthProjection.scaled(focal[0], focal[1], principal[0], principal[1],
+                        imageSize[0], imageSize[1], depth.width, depth.height)
                     val plane = depth.planes[0]
                     val buffer = plane.buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
                     val world = FloatArray(3)
@@ -218,9 +229,7 @@ class ArScanController(private val context: Context, private val trackItems: Boo
                         val mm = buffer.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
                         if (mm !in 150..5000) continue
                         // Image +Y is down; ARCore camera +Y is up and forward is -Z.
-                        val metres = mm / 1000f
-                        val local = floatArrayOf((u - principal[0] * sx) * metres / (focal[0] * sx),
-                            -(v - principal[1] * sy) * metres / (focal[1] * sy), -metres)
+                        val local = projection.point(u, v, mm)
                         pose.transformPoint(local, 0, world, 0)
                         builder.observe(pose.tx(), pose.ty(), pose.tz(), world[0], world[1], world[2], 1f)
                         added++

@@ -63,8 +63,13 @@ fun LayerView(
     modifier: Modifier = Modifier,
     colorFor: (Placement) -> Color,
     selectedInstanceId: String? = null,
+    items: List<com.packabunch.packing.ItemSpec> = emptyList(),
 ) {
     val measurer = rememberTextMeasurer()
+    val surfaces = androidx.compose.runtime.remember(items) { items.associate { item ->
+        val mask = item.visualShape ?: (item.shape as? com.packabunch.packing.ItemShape.VoxelMask)
+        item.id to mask?.let { voxelSurface(it.countX,it.countY,it.countZ,it.resolutionMm,it::isOccupied) }
+    } }
 
     Canvas(modifier) {
         val bounds = space.volume().boundsMm
@@ -115,6 +120,19 @@ fun LayerView(
             val base = colorFor(placement)
             val dimmed = selectedInstanceId != null && placement.instanceId != selectedInstanceId
 
+            val surface = surfaces[placement.specId]
+            if (surface != null) surface.forEach { face ->
+                val points = face.points.map { it.placed(placement) }
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    points.forEachIndexed { i,p ->
+                        val px = originX + (p.x - bounds.minXMm) * scale
+                        val py = originY + (p.y - bounds.minYMm) * scale
+                        if (i == 0) moveTo(px,py) else lineTo(px,py)
+                    }
+                    close()
+                }
+                drawPath(path,base.copy(alpha=if(dimmed)0.30f else 0.92f))
+            } else {
             drawRect(
                 color = base.copy(alpha = if (dimmed) 0.30f else 0.92f),
                 topLeft = Offset(left, top),
@@ -126,11 +144,12 @@ fun LayerView(
                 size = Size(w, d),
                 style = Stroke(width = 2f),
             )
+            }
 
             if (dimmed) return@forEach
 
             // The step number, centred, but only when the rectangle can hold it legibly.
-            val label = (placement.sequenceIndex + 1).toString()
+            val label = (items.indexOfFirst { it.id == placement.specId }.takeIf { it >= 0 }?.plus(1) ?: placement.sequenceIndex + 1).toString()
             val laid = measurer.measure(
                 text = label,
                 style = TextStyle(

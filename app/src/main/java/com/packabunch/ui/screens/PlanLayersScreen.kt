@@ -101,6 +101,7 @@ fun PlanLayersScreen(
                 ) {
                     if (space != null && layer != null) {
                         LayerView(
+                            items = state.items,
                             space = space,
                             layer = layer,
                             modifier = Modifier.fillMaxWidth().height(320.dp),
@@ -142,7 +143,7 @@ fun PlanLayersScreen(
                     val spec = state.items.getOrNull(index)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ItemNumberTile(
-                            number = placement.sequenceIndex + 1,
+                            number = index + 1,
                             color = itemColor(index.coerceAtLeast(0)),
                             size = 26.dp,
                             cornerRadius = 9.dp,
