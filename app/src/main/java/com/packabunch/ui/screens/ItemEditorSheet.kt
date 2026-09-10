@@ -313,6 +313,10 @@ fun ItemEditorSheet(
                                 quantity = quantity,
                                 keepUpright = keepUpright,
                                 maySupportItems = !nothingOnTop,
+                                measurementSource = if (existing?.dimensions == Dimensions(widthMm ?: 0, depthMm ?: 0, heightMm ?: 0))
+                                    existing.measurementSource else com.packabunch.packing.MeasurementSource.TYPED_IN,
+                                shape = existing?.shape?.takeIf { existing.dimensions == Dimensions(widthMm ?: 0, depthMm ?: 0, heightMm ?: 0) },
+                                visualShape = existing?.visualShape?.takeIf { existing.dimensions == Dimensions(widthMm ?: 0, depthMm ?: 0, heightMm ?: 0) },
                             ),
                         )
                     },

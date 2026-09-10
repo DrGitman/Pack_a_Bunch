@@ -47,10 +47,17 @@ data class ArScanState(
  * mid-scan would silently smear earlier observations across the grid, which is the kind of
  * bug that produces a confident, wrong map.
  */
-class ArScanController(private val context: Context) : GLSurfaceView.Renderer {
+class ArScanController(private val context: Context, private val trackItems: Boolean = false) : GLSurfaceView.Renderer {
 
     private val _state = MutableStateFlow(ArScanState())
     val state: StateFlow<ArScanState> = _state.asStateFlow()
+    private val tracker = com.packabunch.packing.SweepTracker()
+    private val _objects = MutableStateFlow<List<com.packabunch.packing.SweptObject>>(emptyList())
+    val objects = _objects.asStateFlow()
+    private var lastDepthTimestamp = 0L
+    private var lastProcessedTimestamp = 0L
+    private var lastSegmentationTimestamp = 0L
+    @Volatile private var finishedGrid: VoxelGrid? = null
 
     private var session: Session? = null
     private val background = CameraBackgroundRenderer()
@@ -77,6 +84,7 @@ class ArScanController(private val context: Context) : GLSurfaceView.Renderer {
                 session = Session(context).apply {
                     val supportsDepth = isDepthModeSupported(Config.DepthMode.AUTOMATIC)
                     depthAvailable = supportsDepth
+                    require(supportsDepth) { "Depth scanning is not supported on this phone. Use typed measurements instead." }
                     configure(
                         Config(this).apply {
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
@@ -107,18 +115,24 @@ class ArScanController(private val context: Context) : GLSurfaceView.Renderer {
         session?.close()
         session = null
         accumulator = null
+        tracker.clear()
+        _objects.value = emptyList()
+        finishedGrid = null
     }
 
     /** Throws the map away and starts again, keeping the session alive. */
     fun restart() {
         accumulator = null
+        tracker.clear()
+        _objects.value = emptyList()
+        finishedGrid = null
         startedAtMillis = System.currentTimeMillis()
         _state.value = ArScanState(status = _state.value.status)
     }
 
     /** The finished map, or null if nothing was ever observed. */
     fun buildScannedSpace(): ScannedSpace? {
-        val grid: VoxelGrid = accumulator?.toVoxelGrid() ?: return null
+        val grid: VoxelGrid = finishedGrid ?: return null
         return ScannedSpace(baseGrid = grid)
     }
 
@@ -167,32 +181,64 @@ class ArScanController(private val context: Context) : GLSurfaceView.Renderer {
             }
 
             val pose = camera.pose
+            // Work at at most 10 Hz; do not count repeated frames as new observations.
+            if (frame.timestamp - lastProcessedTimestamp < 100_000_000L) return
+            lastProcessedTimestamp = frame.timestamp
+            val floor = active.getAllTrackables(com.google.ar.core.Plane::class.java)
+                .filter { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null &&
+                    it.type == com.google.ar.core.Plane.Type.HORIZONTAL_UPWARD_FACING }
+                .maxByOrNull { it.extentX * it.extentZ }
+            if (accumulator == null && floor == null) {
+                _state.value = _state.value.copy(status = TrackingStatus.INITIALISING)
+                return
+            }
             val builder = accumulator ?: ScanAccumulator(
                 // Origin is placed a little behind and below the camera's first tracked
                 // position, so the space in front of the phone falls inside the grid.
                 originXM = pose.tx() - 1.2f,
-                originYM = pose.ty() - 1.2f,
+                originYM = requireNotNull(floor).centerPose.ty(),
                 originZM = pose.tz() + 1.2f,
             ).also { accumulator = it }
 
             var added = 0L
-            frame.acquirePointCloud().use { cloud ->
-                val points = cloud.points
-                // Packed as x, y, z, confidence — four floats per point.
-                var offset = 0
-                while (offset + 3 < points.limit()) {
-                    val x = points.get(offset)
-                    val y = points.get(offset + 1)
-                    val z = points.get(offset + 2)
-                    val confidence = points.get(offset + 3)
-                    builder.observe(
-                        cameraXM = pose.tx(), cameraYM = pose.ty(), cameraZM = pose.tz(),
-                        pointXM = x, pointYM = y, pointZM = z,
-                        confidence = confidence,
-                    )
-                    added++
-                    offset += 4
+            try {
+                frame.acquireDepthImage16Bits().use { depth ->
+                    if (depth.timestamp == lastDepthTimestamp) return
+                    lastDepthTimestamp = depth.timestamp
+                    val intrinsics = camera.imageIntrinsics
+                    val focal = intrinsics.focalLength
+                    val principal = intrinsics.principalPoint
+                    val imageSize = intrinsics.imageDimensions
+                    val sx = depth.width.toFloat() / imageSize[0]
+                    val sy = depth.height.toFloat() / imageSize[1]
+                    val plane = depth.planes[0]
+                    val buffer = plane.buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                    val world = FloatArray(3)
+                    for (v in 0 until depth.height step 3) for (u in 0 until depth.width step 3) {
+                        val mm = buffer.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
+                        if (mm !in 150..5000) continue
+                        // Image +Y is down; ARCore camera +Y is up and forward is -Z.
+                        val metres = mm / 1000f
+                        val local = floatArrayOf((u - principal[0] * sx) * metres / (focal[0] * sx),
+                            -(v - principal[1] * sy) * metres / (focal[1] * sy), -metres)
+                        pose.transformPoint(local, 0, world, 0)
+                        builder.observe(pose.tx(), pose.ty(), pose.tz(), world[0], world[1], world[2], 1f)
+                        added++
+                    }
                 }
+            } catch (_: com.google.ar.core.exceptions.NotYetAvailableException) {
+                return // No depth yet is not an empty scene or a completed measurement.
+            }
+            if (frame.timestamp - lastSegmentationTimestamp >= 500_000_000L) {
+                val grid = builder.toVoxelGrid()
+                finishedGrid = grid
+                if (trackItems) {
+                    val direction = Math.toDegrees(kotlin.math.atan2(
+                        -pose.zAxis[0].toDouble(), -pose.zAxis[2].toDouble())).toInt()
+                    tracker.update(com.packabunch.packing.ObjectSegmentation.detect(grid, supportPlaneCellK = 0), direction)
+                    _objects.value = tracker.objects()
+                }
+                lastSegmentationTimestamp = frame.timestamp
             }
 
             _state.value = _state.value.copy(

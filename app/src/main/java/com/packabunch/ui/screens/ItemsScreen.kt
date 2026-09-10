@@ -86,6 +86,7 @@ fun ItemsScreen(
     initialEditItemId: String? = null,
     onEditConsumed: () -> Unit = {},
     onLibrary: () -> Unit = {},
+    onScan: () -> Unit = {},
 ) {
     var editing by remember { mutableStateOf<ItemSpec?>(null) }
     var editorOpen by remember { mutableStateOf(false) }
@@ -113,6 +114,7 @@ fun ItemsScreen(
             )
 
             Spacer(Modifier.height(Spacing.md))
+            PrimaryButton(text = "Scan items together", onClick = onScan)
             com.packabunch.ui.components.PackTextButton(text = "Item library", onClick = onLibrary)
 
             if (state.space != null) {

@@ -227,6 +227,7 @@ object ObjectSegmentation {
             // A grid cell is the finest distinction the scan can draw, so nothing is known
             // better than that. Reported rather than hidden.
             toleranceMm = res,
+            observedShape = ItemShape.VoxelMask.fromCells(cells, res),
         )
     }
 }
@@ -249,6 +250,7 @@ data class DetectedObject(
     /** False when the blob floats — usually a sign two things merged, or scan noise. */
     val restsOnSupport: Boolean,
     val toleranceMm: Int,
+    val observedShape: ItemShape.VoxelMask? = null,
 ) {
     /**
      * Whether this looks like one object rather than several that touched.

@@ -24,6 +24,7 @@ fun StoredProject.toProject(): Project {
         dimensions = Dimensions(project.widthMm, project.depthMm, project.heightMm),
         edgeGapMm = project.edgeGapMm,
         measurementSource = project.measurementSource.toMeasurementSource(),
+        scan = GeometryCodec.scan(project.scanGeometry),
     )
 
     val specs = items
@@ -37,6 +38,8 @@ fun StoredProject.toProject(): Project {
                 keepUpright = row.keepUpright,
                 maySupportItems = row.maySupportItems,
                 measurementSource = row.measurementSource.toMeasurementSource(),
+                shape = GeometryCodec.shape(row.shapeGeometry),
+                visualShape = GeometryCodec.shape(row.visualGeometry),
             )
         }
 
@@ -94,6 +97,7 @@ fun Project.toEntity(): ProjectEntity = ProjectEntity(
     measurementSource = space.measurementSource.name,
     updatedAtMillis = updatedAtMillis,
     packedInstanceIds = packedInstanceIds.joinToString(","),
+    scanGeometry = GeometryCodec.scan(space.scan),
 )
 
 fun Project.toItemEntities(): List<ItemEntity> = items.mapIndexed { index, spec ->
@@ -110,6 +114,8 @@ fun Project.toItemEntities(): List<ItemEntity> = items.mapIndexed { index, spec 
         measurementSource = spec.measurementSource.name,
         photoPath = null,
         position = index,
+        shapeGeometry = GeometryCodec.shape(spec.shape),
+        visualGeometry = GeometryCodec.shape(spec.visualShape),
     )
 }
 

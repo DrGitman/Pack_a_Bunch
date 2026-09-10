@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [ProjectEntity::class, ItemEntity::class, PlanSummaryEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 abstract class PackDatabase : RoomDatabase() {
@@ -27,6 +27,13 @@ abstract class PackDatabase : RoomDatabase() {
             PackDatabase::class.java,
             "pack-a-bunch.db",
         )
+            .addMigrations(object : androidx.room.migration.Migration(1, 2) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE projects ADD COLUMN scanGeometry BLOB")
+                    db.execSQL("ALTER TABLE items ADD COLUMN shapeGeometry BLOB")
+                    db.execSQL("ALTER TABLE items ADD COLUMN visualGeometry BLOB")
+                }
+            })
             // No fallbackToDestructiveMigration. Losing somebody's packs on an update is
             // not an acceptable failure mode, and a real migration must be written for
             // every schema change. Bumping the version without one should fail loudly here

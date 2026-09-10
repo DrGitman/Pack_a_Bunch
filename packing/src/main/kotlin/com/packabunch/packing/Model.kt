@@ -149,6 +149,8 @@ data class ItemSpec(
      * kettle's handle or an L-shaped thing stops reserving the air around it.
      */
     val shape: ItemShape? = null,
+    /** Observed surface for display; unseen interior is not evidence of empty collision space. */
+    val visualShape: ItemShape.VoxelMask? = null,
 ) {
     val allowedOrientations: List<Orientation> get() = Orientation.allowedFor(keepUpright)
 

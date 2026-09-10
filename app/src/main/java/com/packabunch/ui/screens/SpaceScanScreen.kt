@@ -76,6 +76,12 @@ fun SpaceScanScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    DepthCaptureGate(onTypeInstead, onBack) { SpaceScanSurface(onScanned, onTypeInstead, onBack, modifier) }
+}
+
+@Composable
+private fun SpaceScanSurface(onScanned: (ScannedSpace) -> Unit, onTypeInstead: () -> Unit,
+    onBack: () -> Unit, modifier: Modifier) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val controller = remember { ArScanController(context) }

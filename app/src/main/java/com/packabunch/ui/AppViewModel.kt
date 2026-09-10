@@ -1,6 +1,8 @@
 package com.packabunch.ui
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -74,7 +76,7 @@ class AppViewModel(
      * Set once from the AR availability check. Defaults to false, so the "any shape" route
      * is offered only when it has been confirmed — never assumed and then failed at.
      */
-    var depthCapable: Boolean = false
+    var depthCapable: Boolean by androidx.compose.runtime.mutableStateOf(false)
         private set
 
     fun setDepthCapable(capable: Boolean) {
@@ -349,6 +351,21 @@ class AppViewModel(
 
     fun restoreProject(project: Project) {
         viewModelScope.launch { repository.restore(project) }
+    }
+
+    fun importSweptItems(objects: List<com.packabunch.packing.SweptObject>): Boolean {
+        val measured = objects.filter { it.settled && it.detected.observedShape != null }
+        if (!limits.allowsPieces(_editor.value.pieceCount + measured.size)) return false
+        val initialCount = _editor.value.items.size
+        val additions = measured.mapIndexed { index, obj ->
+            val surface = requireNotNull(obj.detected.observedShape)
+            ItemSpec(id = java.util.UUID.randomUUID().toString(), name = "Scanned item ${initialCount + index + 1}",
+                dimensions = surface.boundsMm, measurementSource = MeasurementSource.CAMERA_ESTIMATE,
+                maySupportItems = false, visualShape = surface)
+        }
+        _editor.update { it.copy(items = it.items + additions, plan = null) }
+        autosave()
+        return true
     }
 
     fun renameProject(project: Project, name: String) {

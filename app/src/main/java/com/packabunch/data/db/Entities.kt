@@ -37,6 +37,7 @@ data class ProjectEntity(
     val updatedAtMillis: Long,
     /** Comma-separated instance ids the user has ticked off in the guide. */
     val packedInstanceIds: String,
+    val scanGeometry: ByteArray? = null,
 )
 
 @Entity(
@@ -65,6 +66,8 @@ data class ItemEntity(
     val photoPath: String?,
     /** Preserves the order the user added them in, which is also their number on screen. */
     val position: Int,
+    val shapeGeometry: ByteArray? = null,
+    val visualGeometry: ByteArray? = null,
 )
 
 /**

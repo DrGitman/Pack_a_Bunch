@@ -68,6 +68,7 @@ import com.packabunch.ui.screens.WelcomeScreen
  * screen is one grep away.
  */
 object Routes {
+    const val SWEEP_ITEMS = "sweepItems"
     const val WELCOME = "welcome"          // Main.dc.html
     const val PROJECTS = "projects"        // Projects.dc.html
     const val CREATE_SPACE = "createSpace" // CreateSpace.dc.html
@@ -502,7 +503,18 @@ fun PackNavHost(
                 initialEditItemId = editItemId,
                 onEditConsumed = { editItemId = null },
                 onLibrary = { navController.navigate(Routes.ITEM_LIBRARY) },
+                onScan = { navController.navigate(Routes.SWEEP_ITEMS) },
             )
+        }
+
+        composable(Routes.SWEEP_ITEMS) {
+            com.packabunch.ui.screens.LiveSweepScreen(settings.unit,
+                onDone = { scanned ->
+                    if (viewModel.importSweptItems(scanned)) navController.popBackStack()
+                    else notice = "These items exceed this pack's piece limit. Review the current items first."
+                },
+                onManual = { navController.popBackStack() },
+                onBack = { navController.popBackStack() })
         }
 
         composable(Routes.MEASURE_REVIEW) {
