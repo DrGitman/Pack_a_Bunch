@@ -27,12 +27,14 @@ fun MiniCratePreview(
     placements: List<Placement>,
     modifier: Modifier = Modifier,
     specOrder: List<String> = emptyList(),
+    items: List<com.packabunch.packing.ItemSpec> = emptyList(),
 ) {
     Box(
         modifier = modifier.background(BrandTint, RoundedCornerShape(18.dp)),
     ) {
         if (placements.isNotEmpty()) {
             IsometricCrate(
+                items = items,
                 space = space,
                 placements = placements,
                 modifier = Modifier.fillMaxSize(),

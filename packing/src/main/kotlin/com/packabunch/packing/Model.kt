@@ -306,6 +306,21 @@ data class PackingRequest(
             append(space.dimensions.depthMm).append(',')
             append(space.dimensions.heightMm).append(',')
             append(space.edgeGapMm).append('|')
+            space.scan?.let { scan ->
+                val grid = scan.baseGrid
+                append("scan:").append(grid.originXMm).append(',').append(grid.originYMm).append(',').append(grid.originZMm)
+                append(',').append(grid.resolutionMm).append(',').append(grid.countX).append(',').append(grid.countY).append(',').append(grid.countZ).append(':')
+                for (x in 0 until grid.countX) for (y in 0 until grid.countY) for (z in 0 until grid.countZ)
+                    append(grid.cellAt(x,y,z).ordinal)
+                append(':').append(scan.unknownIsSolid)
+                scan.opening?.let { append(":opening:").append(it.widthMm).append(',').append(it.heightMm) }
+                scan.obstructions.sortedBy { it.id }.forEach { o ->
+                    append(":obstruction:").append(o.id.length).append(':').append(o.id)
+                    append(':').append(o.includedInPack).append(':').append(o.kind.name).append(':')
+                    o.cellIndices.sorted().forEach { append(it).append(',') }
+                }
+                append('|')
+            }
             items.sortedBy { it.id }.forEach { item ->
                 append(item.id).append(':')
                 append(item.dimensions.widthMm).append(',')
@@ -314,6 +329,12 @@ data class PackingRequest(
                 append(item.quantity).append(',')
                 append(if (item.keepUpright) '1' else '0')
                 append(if (item.maySupportItems) '1' else '0')
+                (item.shape as? ItemShape.VoxelMask)?.let { mask ->
+                    append(":mask:").append(mask.resolutionMm).append(',').append(mask.countX).append(',')
+                        .append(mask.countY).append(',').append(mask.countZ).append(':')
+                    for (x in 0 until mask.countX) for (y in 0 until mask.countY) for (z in 0 until mask.countZ)
+                        append(if (mask.isOccupied(x,y,z)) '1' else '0')
+                }
                 append(';')
             }
         }

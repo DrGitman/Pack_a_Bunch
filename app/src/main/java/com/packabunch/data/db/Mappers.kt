@@ -58,7 +58,13 @@ fun StoredProject.toProject(): Project {
     // A summary solved from different inputs describes a different pack. Drop it rather
     // than let a project card show a fill figure for items that have since changed.
     val usable = summary?.takeIf { it.inputRevision == restored.request.revision() }
-    return restored.copy(plan = usable?.toPlanShell(restored))
+    val shell = usable?.toPlanShell(restored)
+    val details = usable?.planDetails
+    val plan = if (shell != null && details != null) {
+        runCatching { GeometryCodec.restorePlan(details,shell) }.getOrNull()
+            ?.takeIf { com.packabunch.packing.PlanValidator.validate(restored.request,it).isValid }
+    } else shell
+    return restored.copy(plan = plan)
 }
 
 /**
@@ -132,6 +138,7 @@ fun Project.toSummaryEntity(): PlanSummaryEntity? {
         placedVolumeMm3 = solved.metrics.placedVolumeMm3,
         usableVolumeMm3 = solved.metrics.usableVolumeMm3,
         occupiedBoundsVolumeMm3 = solved.metrics.occupiedBoundsVolumeMm3,
+        planDetails = GeometryCodec.plan(solved),
     )
 }
 

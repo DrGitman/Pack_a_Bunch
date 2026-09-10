@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [ProjectEntity::class, ItemEntity::class, PlanSummaryEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class PackDatabase : RoomDatabase() {
@@ -32,6 +32,11 @@ abstract class PackDatabase : RoomDatabase() {
                     db.execSQL("ALTER TABLE projects ADD COLUMN scanGeometry BLOB")
                     db.execSQL("ALTER TABLE items ADD COLUMN shapeGeometry BLOB")
                     db.execSQL("ALTER TABLE items ADD COLUMN visualGeometry BLOB")
+                }
+            })
+            .addMigrations(object : androidx.room.migration.Migration(2, 3) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE plan_summaries ADD COLUMN planDetails BLOB")
                 }
             })
             // No fallbackToDestructiveMigration. Losing somebody's packs on an update is

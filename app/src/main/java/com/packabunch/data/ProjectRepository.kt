@@ -44,10 +44,12 @@ class ProjectRepository(private val dao: ProjectDao) {
      */
     suspend fun solvedProject(id: String): Project? = withContext(Dispatchers.Default) {
         val stored = project(id) ?: return@withContext null
+        val exact = stored.currentPlan
+        if (exact != null && com.packabunch.packing.PlanValidator.validate(stored.request,exact).isValid) return@withContext stored
         if (stored.items.isEmpty()) return@withContext stored
 
         when (val result = PackingEngine.solve(stored.request, SolveBudget(timeBudgetMillis = 2_000))) {
-            is SolveResult.Solved -> stored.copy(plan = result.plan)
+            is SolveResult.Solved -> stored.copy(plan = result.plan, packedInstanceIds = emptySet()).also { upsert(it) }
             is SolveResult.InvalidInput -> stored.copy(plan = null)
         }
     }

@@ -7,6 +7,27 @@ import java.util.zip.GZIPOutputStream
 
 /** Versioned local geometry payloads. Corruption fails visibly rather than becoming a box. */
 object GeometryCodec {
+    fun plan(plan: PackingPlan): ByteArray = encode {
+        writeInt(plan.placements.size)
+        plan.placements.forEach { p ->
+            writeUTF(p.instanceId); writeUTF(p.specId)
+            writeInt(p.xMm); writeInt(p.yMm); writeInt(p.zMm)
+            writeInt(p.orientedWidthMm); writeInt(p.orientedDepthMm); writeInt(p.orientedHeightMm)
+            writeUTF(p.orientation.name); writeInt(p.sequenceIndex)
+        }
+        writeInt(plan.unplaced.size)
+        plan.unplaced.forEach { p -> writeUTF(p.instanceId); writeUTF(p.specId); writeUTF(p.name); writeUTF(p.reason.name) }
+    }
+    fun restorePlan(bytes: ByteArray, shell: PackingPlan): PackingPlan = decode(bytes) {
+        val placements = List(readInt().also { require(it in 0..10_000) }) {
+            Placement(readUTF(),readUTF(),readInt(),readInt(),readInt(),readInt(),readInt(),readInt(),
+                Orientation.valueOf(readUTF()),readInt())
+        }
+        val unplaced = List(readInt().also { require(it in 0..10_000) }) {
+            UnplacedInstance(readUTF(),readUTF(),readUTF(),UnplacedReason.valueOf(readUTF()))
+        }
+        shell.copy(placements=placements,unplaced=unplaced)
+    }
     private fun encode(block: DataOutputStream.() -> Unit): ByteArray {
         val bytes = ByteArrayOutputStream()
         DataOutputStream(GZIPOutputStream(bytes)).use { it.writeInt(1); it.block() }

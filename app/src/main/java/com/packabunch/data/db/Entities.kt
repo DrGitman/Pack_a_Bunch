@@ -99,4 +99,5 @@ data class PlanSummaryEntity(
     val placedVolumeMm3: Long,
     val usableVolumeMm3: Long,
     val occupiedBoundsVolumeMm3: Long,
+    val planDetails: ByteArray? = null,
 )

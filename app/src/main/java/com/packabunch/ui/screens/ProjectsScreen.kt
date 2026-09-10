@@ -216,6 +216,8 @@ private fun ProjectCard(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         MiniCratePreview(
+            items = project.items,
+            specOrder = project.items.map { it.id },
             space = project.space,
             placements = plan?.placements.orEmpty(),
             modifier = Modifier.size(76.dp),
