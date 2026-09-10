@@ -39,7 +39,7 @@ import com.packabunch.ui.components.Stepper
 import com.packabunch.ui.components.SwitchRow
 import com.packabunch.ui.components.UnitToggle
 import com.packabunch.ui.format.LengthUnit
-import com.packabunch.ui.format.formatLength
+import com.packabunch.ui.format.formatEditableLength as formatLength
 import com.packabunch.ui.format.parseLengthToMm
 import com.packabunch.ui.theme.ItemTints
 import com.packabunch.ui.theme.Primary

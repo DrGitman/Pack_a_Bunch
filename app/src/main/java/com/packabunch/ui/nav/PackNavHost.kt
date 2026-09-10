@@ -323,7 +323,7 @@ fun PackNavHost(
             PlanIrregularScreen(
                 state = editor,
                 onStartLoading = {
-                    viewModel.setGuideStep(0)
+                    viewModel.resumeGuide()
                     navController.navigate(Routes.PACKING_GUIDE)
                 },
                 onFixOpening = {},
@@ -390,7 +390,7 @@ fun PackNavHost(
                     if (editor.spaceKind == SpaceKind.ANY_SHAPE) {
                         navController.navigate(Routes.SPACE_SCAN)
                     } else {
-                        navController.navigate(Routes.CREATE_SPACE)
+                        navController.navigate(Routes.MEASURE)
                     }
                 },
                 onBack = { navController.popBackStack() },
@@ -474,7 +474,9 @@ fun PackNavHost(
                     // carries its provenance. A camera estimate is never stored unreviewed.
                     navController.navigate(Routes.MEASURE_REVIEW)
                 },
-                onTypeInstead = { navController.popBackStack() },
+                onTypeInstead = { navController.navigate(Routes.CREATE_SPACE) {
+                    popUpTo(Routes.MEASURE) { inclusive = true }
+                } },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -583,7 +585,7 @@ fun PackNavHost(
                 state = editor,
                 unit = settings.unit,
                 onStartPacking = {
-                    viewModel.setGuideStep(0)
+                    viewModel.resumeGuide()
                     navController.navigate(Routes.PACKING_GUIDE)
                 },
                 onEditItems = { navController.popBackStack() },
@@ -598,7 +600,7 @@ fun PackNavHost(
                 unit = settings.unit,
                 onShowOverview = { navController.popBackStack() },
                 onStartPacking = {
-                    viewModel.setGuideStep(0)
+                    viewModel.resumeGuide()
                     navController.navigate(Routes.PACKING_GUIDE)
                 },
                 onBack = { navController.popBackStack() },
@@ -624,9 +626,12 @@ fun PackNavHost(
         composable(Routes.NOTIFICATION_SETTINGS) {
             NotificationSettingsScreen(
                 preferences = settings.notifications,
-                systemNotificationsAllowed = true,
+                systemNotificationsAllowed = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled(),
                 onPreferencesChange = viewModel::setNotificationPreferences,
-                onOpenSystemSettings = {},
+                onOpenSystemSettings = {
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName))
+                },
                 onTurnEverythingOff = viewModel::turnAllNotificationsOff,
                 onBack = { navController.popBackStack() },
             )
@@ -698,9 +703,9 @@ fun PackNavHost(
                 period = "a month",
                 purchaseEnabled = false,
                 onSubscribe = {},
-                onRestore = {},
-                onTerms = {},
-                onPrivacy = {},
+                onRestore = { notice = "Google Play Billing is not connected in this build." },
+                onTerms = { notice = "Published terms have not been configured for this preview." },
+                onPrivacy = { notice = "A published privacy policy has not been configured for this preview." },
                 onCompare = { navController.navigate(Routes.PLAN_COMPARISON) },
                 onBack = { navController.popBackStack() },
             )

@@ -41,7 +41,7 @@ import com.packabunch.ui.components.StepLabel
 import com.packabunch.ui.components.StepProgress
 import com.packabunch.ui.components.UnitToggle
 import com.packabunch.ui.format.LengthUnit
-import com.packabunch.ui.format.formatLength
+import com.packabunch.ui.format.formatEditableLength as formatLength
 import com.packabunch.ui.format.parseLengthToMm
 import com.packabunch.ui.render.CrateDiagram
 import com.packabunch.ui.theme.BrandTint

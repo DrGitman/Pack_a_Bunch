@@ -62,6 +62,8 @@ class AppViewModel(
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
     private val _editor = MutableStateFlow(PackEditorState())
+    private var openGeneration = 0
+    private var solveGeneration = 0
     val editor: StateFlow<PackEditorState> = _editor.asStateFlow()
 
     val limits: TierLimits get() = TierLimits.forTier(_settings.value.tier)
@@ -133,6 +135,8 @@ class AppViewModel(
     // -- editing a pack -------------------------------------------------------------------
 
     fun startNewPack() {
+        openGeneration++
+        solveGeneration++
         _editor.value = PackEditorState(
             projectId = "pack-${System.currentTimeMillis()}",
             isNew = true,
@@ -147,8 +151,11 @@ class AppViewModel(
      * saved — no drift, and nothing to migrate when the schema changes.
      */
     fun openPack(id: String, onOpened: () -> Unit = {}) {
+        val generation = ++openGeneration
+        solveGeneration++
         viewModelScope.launch {
             val project = repository.solvedProject(id) ?: return@launch
+            if (generation != openGeneration) return@launch
             _editor.value = PackEditorState(
                 projectId = project.id,
                 name = project.name,
@@ -199,7 +206,10 @@ class AppViewModel(
         }
     }
 
-    fun setSpaceName(name: String) = _editor.update { it.copy(name = name) }
+    fun setSpaceName(name: String) {
+        _editor.update { it.copy(name = name, space = it.space?.copy(name = name)) }
+        autosave()
+    }
 
     fun setSpaceDimensions(dimensions: Dimensions, source: MeasurementSource) {
         _editor.update { state ->
@@ -274,6 +284,7 @@ class AppViewModel(
      * two on a large pack, and the UI thread is not where that belongs.
      */
     fun solve() {
+        val generation = ++solveGeneration
         val state = _editor.value
         val space = state.space ?: return
         val request = PackingRequest(space, state.items)
@@ -284,12 +295,20 @@ class AppViewModel(
             val result = withContext(Dispatchers.Default) {
                 PackingEngine.solve(request, SolveBudget(timeBudgetMillis = 2_000))
             }
+            if (generation != solveGeneration) return@launch
+            val current = _editor.value
+            if (current.projectId != state.projectId || current.space == null ||
+                PackingRequest(current.space, current.items).revision() != request.revision()) {
+                _editor.update { it.copy(solving = false) }
+                return@launch
+            }
             when (result) {
                 is SolveResult.InvalidInput -> _editor.update {
                     it.copy(solving = false, inputProblems = result.problems)
                 }
                 is SolveResult.Solved -> {
-                    _editor.update { it.copy(solving = false, plan = result.plan) }
+                    _editor.update { it.copy(solving = false, plan = result.plan,
+                        packedInstanceIds = emptySet(), guideStep = 0) }
                     save()
                 }
             }
@@ -359,6 +378,10 @@ class AppViewModel(
     }
 
     fun setGuideStep(step: Int) = _editor.update { it.copy(guideStep = step) }
+
+    fun resumeGuide() = _editor.update {
+        it.copy(guideStep = com.packabunch.ui.nav.nextPackingStep(it.plan?.placements.orEmpty(), it.packedInstanceIds))
+    }
 
     /**
      * "Did it actually go in?"

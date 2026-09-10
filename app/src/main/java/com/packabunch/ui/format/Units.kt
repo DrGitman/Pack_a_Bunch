@@ -34,6 +34,12 @@ fun formatLength(mm: Int, unit: LengthUnit): String {
 fun formatLengthWithUnit(mm: Int, unit: LengthUnit): String =
     "${formatLength(mm, unit)} ${unit.shortLabel}"
 
+/** Editable fields must round-trip every stored millimetre, including inch values. */
+fun formatEditableLength(mm: Int, unit: LengthUnit): String =
+    java.math.BigDecimal.valueOf(mm / unit.perUnitMm)
+        .setScale(if (unit == LengthUnit.INCHES) 2 else 1, java.math.RoundingMode.HALF_UP)
+        .stripTrailingZeros().toPlainString()
+
 /** The "58.4 × 39.6 × 35.0 cm" line. Multiplication sign, not the letter x. */
 fun formatDimensions(dimensions: Dimensions, unit: LengthUnit): String = buildString {
     append(formatLength(dimensions.widthMm, unit))
