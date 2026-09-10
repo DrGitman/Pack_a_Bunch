@@ -373,7 +373,7 @@ fun PackNavHost(
             // this is the first moment the answer changes anything on screen.
             val context = androidx.compose.ui.platform.LocalContext.current
             androidx.compose.runtime.LaunchedEffect(Unit) {
-                viewModel.setDepthCapable(
+                viewModel.updateDepthCapable(
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         com.packabunch.ar.ArAvailability.supportsDepth(context)
                     },

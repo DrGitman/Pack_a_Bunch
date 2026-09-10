@@ -109,6 +109,7 @@ fun PackingGuideScreen(
                 ) {
                     if (space != null && plan != null) {
                         IsometricCrate(
+                            items = state.items,
                             space = space,
                             placements = plan.placements,
                             selectedInstanceId = current?.instanceId,
@@ -274,3 +275,4 @@ private fun ordinal(n: Int): String = when (n) {
     3 -> "3rd"
     else -> "${n}th"
 }
+

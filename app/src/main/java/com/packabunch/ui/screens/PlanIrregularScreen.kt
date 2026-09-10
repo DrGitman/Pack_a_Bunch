@@ -130,6 +130,7 @@ fun PlanIrregularScreen(
                             )
                         } else {
                             IsometricCrate(
+                            items = state.items,
                                 space = space,
                                 placements = plan.placements,
                                 modifier = Modifier.fillMaxWidth().height(300.dp),
@@ -267,3 +268,4 @@ private fun ViewChip(text: String, selected: Boolean, onClick: () -> Unit) {
         )
     }
 }
+

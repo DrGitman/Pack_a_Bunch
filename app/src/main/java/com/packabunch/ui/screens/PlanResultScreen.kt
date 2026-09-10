@@ -104,6 +104,7 @@ fun PlanResultScreen(
                 ) {
                     if (plan != null && space != null) {
                         IsometricCrate(
+                            items = state.items,
                             space = space,
                             placements = plan.placements,
                             modifier = Modifier.fillMaxWidth().height(300.dp),
@@ -336,3 +337,4 @@ private fun explanation(reason: UnplacedReason, plan: PackingPlan): String = whe
         "The search ran out of time before reaching it, using \"${plan.strategy}\". " +
             "Fewer pieces would let it finish."
 }
+

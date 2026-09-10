@@ -62,7 +62,17 @@ fun IsometricCrate(
     itemColorFor: (Placement) -> Color,
     interactive: Boolean = true,
     animateEntrance: Boolean = true,
+    items: List<com.packabunch.packing.ItemSpec> = emptyList(),
 ) {
+    val surfaces = remember(items) { items.associate { item ->
+        val mask = item.visualShape ?: (item.shape as? com.packabunch.packing.ItemShape.VoxelMask)
+        item.id to mask?.let { voxelSurface(it.countX, it.countY, it.countZ, it.resolutionMm, it::isOccupied) }
+    } }
+    val scannedSurface = remember(space.scan) { space.scan?.effectiveGrid?.let { grid ->
+        voxelSurface(grid.countX, grid.countY, grid.countZ, grid.resolutionMm) { x,y,z ->
+            grid.cellAt(x,y,z) == com.packabunch.packing.Cell.SOLID
+        }.map { face -> face.copy(points = face.points.map { p -> SurfacePoint(p.x+grid.originXMm, p.y+grid.originYMm, p.z+grid.originZMm) }) }
+    } }
     var yaw by remember { mutableFloatStateOf(0f) }
     val scope = rememberCoroutineScope()
     val settle = remember { Animatable(if (animateEntrance) 0f else 1f) }
@@ -87,7 +97,8 @@ fun IsometricCrate(
     ) {
         val view = CrateView(space, size, yaw)
 
-        drawCrateShell(view, front = false)
+        if (scannedSurface == null) drawCrateShell(view, front = false)
+        else drawSurface(view, scannedSurface, CrateBackLeft, 0.65f)
 
         val ordered = placements
             .sortedBy { it.sequenceIndex }
@@ -99,17 +110,26 @@ fun IsometricCrate(
             val itemProgress = staggered(settle.value, order, placements.size)
             if (itemProgress <= 0f) return@forEach
 
-            drawPlacement(
+            val surface = surfaces[placement.specId]
+            if (surface != null) {
+                drawSurface(view, surface.map { face -> face.copy(points = face.points.map { it.placed(placement) }) },
+                    itemColorFor(placement), itemProgress * if (selectedInstanceId != null && placement.instanceId != selectedInstanceId) 0.34f else 1f)
+                val index = items.indexOfFirst { it.id == placement.specId } + 1
+                val point = view.project(placement.xMm + placement.orientedWidthMm / 2f,
+                    placement.yMm + placement.orientedDepthMm / 2f, placement.zMm + placement.orientedHeightMm.toFloat())
+                drawText(textMeasurer = textMeasurer, text = "$index", topLeft = point, style = TextStyle(color = CrateRim, fontSize = 13.sp))
+            } else drawPlacement(
                 view = view,
                 placement = placement,
                 base = itemColorFor(placement),
                 progress = itemProgress,
                 dimmed = selectedInstanceId != null && placement.instanceId != selectedInstanceId,
                 textMeasurer = textMeasurer,
+                itemNumber = items.indexOfFirst { it.id == placement.specId }.takeIf { it >= 0 }?.plus(1) ?: placement.sequenceIndex + 1,
             )
         }
 
-        drawCrateShell(view, front = true)
+        if (scannedSurface == null) drawCrateShell(view, front = true)
     }
 }
 
@@ -274,6 +294,7 @@ private fun DrawScope.drawPlacement(
     progress: Float,
     dimmed: Boolean,
     textMeasurer: TextMeasurer,
+    itemNumber: Int,
 ) {
     val box = placement.box
 
@@ -316,7 +337,7 @@ private fun DrawScope.drawPlacement(
 
     // Number badge on the top face. Colour is never the only signal — the number goes with it.
     val centre = p((x0 + x1) / 2f, (y0 + y1) / 2f, z1)
-    val label = (placement.sequenceIndex + 1).toString()
+    val label = itemNumber.toString()
     val measured = textMeasurer.measure(
         text = label,
         style = TextStyle(
@@ -358,3 +379,16 @@ private fun Color.darken(amount: Float) = Color(
     blue = blue * (1f - amount),
     alpha = alpha,
 )
+
+/** Painter ordering with pale app-colour fills and dimension-drawing outlines. */
+private fun DrawScope.drawSurface(view: CrateView, faces: List<SurfaceFace>, base: Color, alpha: Float) {
+    fun depth(face: SurfaceFace): Float = face.points.sumOf { p ->
+        (-(p.x * cos(view.yaw) - p.y * sin(view.yaw) + p.x * sin(view.yaw) + p.y * cos(view.yaw)) - p.z * 0.001f).toDouble()
+    }.toFloat()
+    faces.sortedBy { depth(it) }.forEach { face ->
+        val p = face.points.map { view.project(it.x,it.y,it.z) }
+        val fill = base.lighten(if (face.side == 5) 0.62f else if (face.side < 2) 0.34f else 0.12f).copy(alpha=alpha)
+        quad(p[0],p[1],p[2],p[3],fill)
+        quadOutline(p[0],p[1],p[2],p[3],base.darken(0.28f).copy(alpha=alpha*0.4f),0.7f)
+    }
+}

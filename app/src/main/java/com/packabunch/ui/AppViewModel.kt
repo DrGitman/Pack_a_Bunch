@@ -79,7 +79,7 @@ class AppViewModel(
     var depthCapable: Boolean by androidx.compose.runtime.mutableStateOf(false)
         private set
 
-    fun setDepthCapable(capable: Boolean) {
+    fun updateDepthCapable(capable: Boolean) {
         depthCapable = capable
     }
 
