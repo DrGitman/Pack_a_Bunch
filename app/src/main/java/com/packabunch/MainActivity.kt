@@ -19,13 +19,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             PackABunchTheme {
-                val appViewModel: AppViewModel = viewModel(
-                    factory = AppViewModel.Factory(applicationContext),
-                )
-                PackNavHost(
-                    viewModel = appViewModel,
-                    modifier = Modifier.fillMaxSize().background(Ground),
-                )
+                com.packabunch.auth.RequiredAccount { account, signOut ->
+                    val appViewModel: AppViewModel = viewModel(
+                        key = "packs-" + account.userId,
+                        factory = AppViewModel.Factory(applicationContext, account.userId!!),
+                    )
+                    PackNavHost(
+                        viewModel = appViewModel,
+                        account = account,
+                        onSignOut = signOut,
+                        modifier = Modifier.fillMaxSize().background(Ground),
+                    )
+                }
             }
         }
     }

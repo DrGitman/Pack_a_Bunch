@@ -1,250 +1,113 @@
 package com.packabunch.ui.screens
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.packabunch.ui.components.PackIcons
-import com.packabunch.ui.components.PackTextButton
-import com.packabunch.ui.components.PrimaryButton
-import com.packabunch.ui.components.ScreenScaffold
-import com.packabunch.ui.motion.Motion
-import com.packabunch.ui.render.CrateDiagram
-import com.packabunch.ui.theme.BrandTint
-import com.packabunch.ui.theme.CautionTint
-import com.packabunch.ui.theme.Outline
-import com.packabunch.ui.theme.Primary
-import com.packabunch.ui.theme.Spacing
-import com.packabunch.ui.theme.TextPrimary
-import com.packabunch.ui.theme.TextSecondary
-import com.packabunch.ui.theme.TextTertiary
-import com.packabunch.ui.theme.UiFamily
+import com.packabunch.R
+import com.packabunch.ui.components.*
+import com.packabunch.ui.theme.*
 import kotlinx.coroutines.launch
 
-/**
- * First run — `OnbMeasure`, `OnbPlan`, `OnbPack`, and `Onboarding` (the limits slide).
- *
- * Four slides, and the fourth is the one that matters. It ships as a *slide*, not a dialog
- * and not a link in a settings page, because what the app cannot do is as much a part of
- * knowing what it is as what it can. Somebody who finds out about soft bags on slide four
- * has lost ten seconds; somebody who finds out at the kerb has lost their afternoon.
- *
- * Skippable throughout. A person who wants to get on with it should be able to.
- */
-private data class Slide(
-    val icon: ImageVector,
-    val title: String,
-    val body: String,
-    val isLimits: Boolean = false,
-    val limits: List<String> = emptyList(),
-)
-
-private val SLIDES = listOf(
-    Slide(
-        icon = PackIcons.Ruler,
-        title = "Measure the space",
-        body = "Type the inside measurements, or sweep the camera round it. Typing works " +
-            "on every phone and is always there.",
-    ),
-    Slide(
-        icon = PackIcons.Cube,
-        title = "Add what's going in",
-        body = "Name, size at its widest points, how many. We work out an arrangement that " +
-            "actually fits — and tell you plainly about anything that doesn't.",
-    ),
-    Slide(
-        icon = PackIcons.Check,
-        title = "Follow the order",
-        body = "One piece at a time, bottom up, described against the container's own front, " +
-            "back, left and right. Never against where you happen to be standing.",
-    ),
-    Slide(
-        icon = PackIcons.Info,
-        title = "What it can't do",
-        body = "Worth knowing before you start:",
-        isLimits = true,
-        limits = listOf(
-            "Soft things. A duvet or a bin bag squashes, and no geometry handles that.",
-            "Odd shapes. Everything is treated as the box it would fit inside, so a lamp " +
-                "takes more room on screen than in life.",
-            "Weight. We can't tell what will take load, so nothing is stacked on anything " +
-                "you've marked fragile.",
-        ),
-    ),
+private data class IntroSlide(val art: Int, val step: String, val title: String, val body: String, val foot: String)
+private val introSlides = listOf(
+    IntroSlide(R.drawable.onbmeasure, "STEP ONE", "Measure the space",
+        "Point the camera at the inside of a crate, box or car boot — or just type the numbers off a tape measure. Both give you the same plan.",
+        "Camera measuring works on some phones. Typing always works."),
+    IntroSlide(R.drawable.onbplan, "STEP TWO", "See what actually fits",
+        "Add your things with their width, depth and height. You get an arrangement that respects turning, stacking and what mustn’t be squashed.", "Up to 20 pieces per pack."),
+    IntroSlide(R.drawable.onbpack, "STEP THREE", "Follow it, one piece at a time",
+        "Numbered steps in an order that keeps everything supported: which item, which way round, which corner it goes in.",
+        "Mark each piece as it goes in. Your place is saved."),
 )
 
 @Composable
-fun OnboardingScreen(
-    onFinished: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val pagerState = rememberPagerState(pageCount = { SLIDES.size })
+fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
+    val pager = rememberPagerState(pageCount = { 4 })
     val scope = rememberCoroutineScope()
-    val last = pagerState.currentPage == SLIDES.lastIndex
-
     ScreenScaffold(modifier) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter, vertical = 6.dp),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            if (!last) PackTextButton(text = "Skip", onClick = onFinished, color = TextTertiary)
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(34.dp).background(Primary, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
+                Icon(PackIcons.Cube, null, Modifier.size(19.dp), tint = OnPrimary)
+            }
+            Text("Pack a Bunch", Modifier.weight(1f), color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 15.5.sp)
+            PackTextButton("Skip", onFinished, color = TextTertiary)
         }
-
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.weight(1f),
-        ) { page ->
-            SlideContent(SLIDES[page])
-        }
-
-        Row(
-            Modifier.fillMaxWidth().padding(vertical = Spacing.base),
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            repeat(SLIDES.size) { index ->
-                val active = index == pagerState.currentPage
-                val width by animateDpAsState(
-                    targetValue = if (active) 22.dp else 7.dp,
-                    animationSpec = Motion.standardTween(),
-                    label = "dotWidth",
-                )
-                val colour by animateColorAsState(
-                    targetValue = if (active) Primary else Outline,
-                    animationSpec = Motion.standardTween(),
-                    label = "dotColour",
-                )
-                Box(
-                    Modifier
-                        .padding(horizontal = 3.dp)
-                        .size(width = width, height = 7.dp)
-                        .background(colour, RoundedCornerShape(999.dp)),
-                )
+        HorizontalPager(pager, Modifier.weight(1f)) { page ->
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+                Spacer(Modifier.height(26.dp))
+                if (page < 3) {
+                    val slide = introSlides[page]
+                    Box(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(30.dp)).padding(18.dp)) {
+                        Box(Modifier.fillMaxWidth().height(300.dp).background(BrandTint, RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) {
+                            Image(painterResource(slide.art), null, Modifier.fillMaxWidth().height(290.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(30.dp))
+                    Text(slide.step, color = Primary, fontFamily = UiFamily, fontSize = 12.5.sp,
+                        fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Text(slide.title, color = TextPrimary, fontFamily = UiFamily, fontSize = 31.sp,
+                        lineHeight = 38.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
+                    Spacer(Modifier.height(12.dp))
+                    Text(slide.body, color = TextSecondary, fontFamily = UiFamily, fontSize = 15.sp, lineHeight = 23.sp)
+                } else {
+                    Text("What this does,\nand what it doesn't", color = TextPrimary, fontFamily = UiFamily,
+                        fontWeight = FontWeight.ExtraBold, fontSize = 29.sp, lineHeight = 36.sp, letterSpacing = (-.9).sp)
+                    Spacer(Modifier.height(11.dp))
+                    Text("Thirty seconds now saves a wrong assumption later.", color = TextSecondary, fontFamily = UiFamily, fontSize = 15.sp, lineHeight = 23.sp)
+                    Spacer(Modifier.height(24.dp))
+                    LimitCard("Boxy spaces, open at the top", "Crates, storage boxes, drawers, a car boot. You measure the space inside and keep the opening clear.")
+                    Spacer(Modifier.height(11.dp))
+                    LimitCard("Firm things, up to 20 pieces", "Every item gets a width, depth and height — measured with the camera or typed in. Then you get an order to pack them in.")
+                    Spacer(Modifier.height(11.dp))
+                    LimitCard("Not yet: soft or heavy", "Backpacks, duvets, and whether a stack will take the weight. Scanned shapes are approximate. Where we can't tell, we say so instead of guessing.", true)
+                }
+                Spacer(Modifier.height(20.dp))
             }
         }
-
-        Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            PrimaryButton(
-                text = if (last) "Get started" else "Next",
-                onClick = {
-                    if (last) {
-                        onFinished()
-                    } else {
-                        scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                    }
-                },
-            )
+        Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+            repeat(4) { index -> Box(Modifier.size(if (index == pager.currentPage) 26.dp else 8.dp, 8.dp)
+                .background(if (index == pager.currentPage) Primary else OutlineStrong, RoundedCornerShape(99.dp))) }
         }
-
-        Spacer(Modifier.height(Spacing.base))
+        Column(Modifier.padding(horizontal = 20.dp)) {
+            Text(if (pager.currentPage < 3) introSlides[pager.currentPage].foot else "Better to know now than half way through a move.",
+                Modifier.fillMaxWidth().padding(bottom = 14.dp), color = TextTertiary, fontFamily = UiFamily,
+                fontSize = 12.5.sp, textAlign = TextAlign.Center)
+            PrimaryButton(if (pager.currentPage == 3) "Got it" else "Next", {
+                if (pager.currentPage == 3) onFinished() else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
+            })
+        }
+        Spacer(Modifier.height(12.dp))
     }
 }
 
 @Composable
-private fun SlideContent(slide: Slide) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(horizontal = Spacing.gutter),
-        verticalArrangement = Arrangement.Center,
-    ) {
-        if (slide.isLimits) {
-            Box(
-                Modifier.size(64.dp).background(CautionTint, RoundedCornerShape(20.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    slide.icon,
-                    contentDescription = null,
-                    tint = Color(0xFFB4761A),
-                    modifier = Modifier.size(30.dp),
-                )
-            }
-        } else {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(200.dp)
-                    .background(BrandTint, RoundedCornerShape(28.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                CrateDiagram(Modifier.size(160.dp, 140.dp))
-            }
+private fun LimitCard(title: String, detail: String, caution: Boolean = false) {
+    Row(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(24.dp)).padding(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+        Box(Modifier.size(44.dp).background(if (caution) ErrorTint else SuccessTint, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
+            Icon(if (caution) PackIcons.Close else PackIcons.Check, null, Modifier.size(22.dp), tint = if (caution) ErrorRed else Success)
         }
-
-        Spacer(Modifier.height(Spacing.xl))
-
-        Text(
-            text = slide.title,
-            color = TextPrimary,
-            fontFamily = UiFamily,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 29.sp,
-            lineHeight = 36.sp,
-            letterSpacing = (-0.9).sp,
-        )
-
-        Spacer(Modifier.height(10.dp))
-
-        Text(
-            text = slide.body,
-            color = TextSecondary,
-            fontFamily = UiFamily,
-            fontSize = 15.sp,
-            lineHeight = 23.sp,
-        )
-
-        if (slide.limits.isNotEmpty()) {
-            Spacer(Modifier.height(Spacing.base))
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                slide.limits.forEach { limit ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .background(Color.White, RoundedCornerShape(18.dp))
-                            .padding(14.dp),
-                        horizontalArrangement = Arrangement.spacedBy(11.dp),
-                    ) {
-                        Icon(
-                            PackIcons.Close,
-                            contentDescription = null,
-                            tint = Color(0xFFB09A85),
-                            modifier = Modifier.size(17.dp),
-                        )
-                        Text(
-                            text = limit,
-                            color = TextSecondary,
-                            fontFamily = UiFamily,
-                            fontSize = 13.5f.sp,
-                            lineHeight = 20.sp,
-                        )
-                    }
-                }
-            }
+        Column(Modifier.weight(1f)) {
+            Text(title, color = TextPrimary, fontFamily = UiFamily, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(5.dp))
+            Text(detail, color = TextSecondary, fontFamily = UiFamily, fontSize = 14.sp, lineHeight = 21.sp)
         }
     }
 }

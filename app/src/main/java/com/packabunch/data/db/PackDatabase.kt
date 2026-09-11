@@ -17,15 +17,26 @@ abstract class PackDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var instance: PackDatabase? = null
+        private val accountInstances = mutableMapOf<String, PackDatabase>()
+
+        fun forAccount(context: Context, userId: String): PackDatabase = synchronized(this) {
+            val safeId = java.util.UUID.fromString(userId).toString()
+            val prefs = context.getSharedPreferences("local_pack_ownership", Context.MODE_PRIVATE)
+            val firstOwner = prefs.getString("legacy_owner", null)
+            if (firstOwner == null) check(prefs.edit().putString("legacy_owner", safeId).commit())
+            // Preserve pre-account packs for the first authenticated owner; never expose them to another account.
+            if (firstOwner == null || firstOwner == safeId) get(context)
+            else accountInstances.getOrPut(safeId) { build(context, "packs-$safeId.db") }
+        }
 
         fun get(context: Context): PackDatabase = instance ?: synchronized(this) {
             instance ?: build(context).also { instance = it }
         }
 
-        private fun build(context: Context): PackDatabase = Room.databaseBuilder(
+        private fun build(context: Context, name: String = "pack-a-bunch.db"): PackDatabase = Room.databaseBuilder(
             context.applicationContext,
             PackDatabase::class.java,
-            "pack-a-bunch.db",
+            name,
         )
             .addMigrations(object : androidx.room.migration.Migration(1, 2) {
                 override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {

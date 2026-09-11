@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,11 +7,22 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+val cloudProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun cloudSetting(name: String, fallback: String = ""): String =
+    cloudProperties.getProperty(name, fallback).replace("\\", "\\\\").replace("\"", "\\\"")
+
 android {
     namespace = "com.packabunch"
     compileSdk = 36
 
     defaultConfig {
+        buildConfigField("String", "SUPABASE_URL", "\"" + cloudSetting("SUPABASE_URL") + "\"")
+        buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + cloudSetting("SUPABASE_PUBLISHABLE_KEY") + "\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"" + cloudSetting("GOOGLE_WEB_CLIENT_ID",
+            "770623136334-f2fctsb1odt44d4e6ijmflpv7r38jg75.apps.googleusercontent.com") + "\"")
         // TODO: confirm before the first Play upload — the application id is permanent.
         applicationId = "com.packabunch"
         minSdk = 26
@@ -54,6 +67,7 @@ android {
     }
 
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 
@@ -65,6 +79,9 @@ android {
 }
 
 dependencies {
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
     implementation(project(":packing"))
 
     implementation(libs.androidx.core.ktx)

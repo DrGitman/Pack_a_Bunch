@@ -224,6 +224,7 @@ fun LabelledTextField(
     modifier: Modifier = Modifier,
     placeholder: String = "",
     focused: Boolean = false,
+    password: Boolean = false,
 ) {
     Column(
         modifier = modifier
@@ -250,6 +251,9 @@ fun LabelledTextField(
             ),
             cursorBrush = SolidColor(Primary),
             singleLine = true,
+            visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation()
+                else androidx.compose.ui.text.input.VisualTransformation.None,
+            keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else KeyboardType.Text),
             modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
             decorationBox = { inner ->
                 if (value.isEmpty() && placeholder.isNotEmpty()) {

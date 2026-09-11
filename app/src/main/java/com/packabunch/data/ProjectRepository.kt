@@ -80,6 +80,8 @@ class ProjectRepository(private val dao: ProjectDao) {
     companion object {
         fun create(context: Context): ProjectRepository =
             ProjectRepository(PackDatabase.get(context).projectDao())
+        fun create(context: Context, userId: String): ProjectRepository =
+            ProjectRepository(PackDatabase.forAccount(context, userId).projectDao())
 
         /**
          * The sample pack offered on first run. Real measurements of a real crate, so the

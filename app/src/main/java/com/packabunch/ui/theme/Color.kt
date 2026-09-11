@@ -21,6 +21,10 @@ val OnPrimary       = Color(0xFFFFFFFF)
 val Chrome          = Color(0xFF3F2718)
 val ChromeAlt       = Color(0xFF4A2E1F)
 val Accent          = Color(0xFFE08A46)
+// Authentication artboards: dark-card copy and warm body ink.
+val HeroEyebrow     = Color(0xFFE8A76B)
+val HeroBody        = Color(0xFFC9B29E)
+val BodyInk         = Color(0xFF5C4A3A)
 
 val TextPrimary     = Color(0xFF2B1D14)
 val TextSecondary   = Color(0xFF7C6857)

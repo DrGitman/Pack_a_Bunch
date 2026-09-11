@@ -157,6 +157,8 @@ private fun resultExit(): ExitTransition =
 @Composable
 fun PackNavHost(
     viewModel: AppViewModel,
+    account: com.packabunch.auth.SupabaseAccount,
+    onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -177,7 +179,8 @@ fun PackNavHost(
         )
     }
     var editItemId by rememberSaveable { mutableStateOf<String?>(null) }
-    val startRoute = remember { if (viewModel.setupCompleteAtLaunch) Routes.PROJECTS else Routes.ONBOARDING }
+    val startRoute = remember { if (viewModel.setupCompleteAtLaunch) Routes.PROJECTS else Routes.WELCOME }
+    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.completeSetup() }
     fun home() = navController.navigate(Routes.PROJECTS) {
         popUpTo(navController.graph.id) { inclusive = true }
         launchSingleTop = true
@@ -252,48 +255,13 @@ fun PackNavHost(
         }
 
         composable(Routes.SIGN_IN) {
-            SignInScreen(
-                onContinueWithGoogle = {},
-                onContinueWithEmail = { navController.navigate(Routes.CREATE_ACCOUNT) },
-                onLogIn = { navController.navigate(Routes.LOG_IN) },
-                // Skippable while the accounts question is unresolved. Nothing in the app
-                // blocks on being signed in, so forcing it here would be a wall with
-                // nothing behind it.
-                onSkip = { navController.popBackStack(Routes.WELCOME, inclusive = false) },
-            )
-        }
-
-        composable(Routes.LOG_IN) {
-            LogInScreen(
-                localPackCount = projects.size,
-                onLogIn = { _, _ -> navController.popBackStack(Routes.WELCOME, inclusive = false) },
-                onGoogle = {},
-                onForgot = { navController.navigate(Routes.FORGOT_PASSWORD) },
-                onCreateAccount = { navController.navigate(Routes.CREATE_ACCOUNT) },
-                onBack = { navController.popBackStack() },
-            )
-        }
-
-        composable(Routes.CREATE_ACCOUNT) {
-            CreateAccountScreen(
-                onCreate = { _, _, _, _ ->
-                    navController.popBackStack(Routes.WELCOME, inclusive = false)
-                },
-                onLogIn = { navController.navigate(Routes.LOG_IN) },
-                onBack = { navController.popBackStack() },
-            )
-        }
-
-        composable(Routes.FORGOT_PASSWORD) {
-            ForgotPasswordScreen(
-                onSend = {},
-                onBack = { navController.popBackStack() },
-            )
+            com.packabunch.ui.screens.GoogleAccountScreen(account = account,
+                onSignOut = onSignOut, onBack = { navController.popBackStack() })
         }
 
         composable(Routes.PROFILE) {
             ProfileScreen(
-                email = null,
+                email = account.email,
                 tier = settings.tier,
                 savedPackCount = projects.size,
                 itemsMeasured = viewModel.libraryItems(projects).size,
@@ -302,7 +270,7 @@ fun PackNavHost(
                 onChangeEmail = {},
                 onChangePassword = {},
                 onManageSubscription = {},
-                onSignOut = { navController.popBackStack(Routes.WELCOME, inclusive = false) },
+                onSignOut = onSignOut,
                 onDeleteAccount = { navController.navigate(Routes.ACCOUNT_DELETE) },
                 onBack = { navController.popBackStack() },
             )
@@ -697,7 +665,7 @@ fun PackNavHost(
                     navController.navigate(Routes.SPACE_TYPE)
                 },
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
-                onAccount = { notice = "Your packs are saved on this device. Accounts and cloud backup are not connected in this build." },
+                onAccount = { navController.navigate(Routes.SIGN_IN) },
                 onManageSubscription = { notice = "Google Play Billing is not connected in this build." },
                 onRestorePurchases = { notice = "Purchase restoration is not available until Google Play Billing is connected." },
                 onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
@@ -737,3 +705,4 @@ val sheetExit: ExitTransition = slideOutVertically(
     animationSpec = tween(Motion.SHORT_MS, easing = Motion.Exit),
     targetOffsetY = { it },
 ) + fadeOut(tween(Motion.SHORT_MS))
+

@@ -430,11 +430,11 @@ class AppViewModel(
         }
     }
 
-    class Factory(private val context: Context) : ViewModelProvider.Factory {
+    class Factory(private val context: Context, private val userId: String) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            AppViewModel(ProjectRepository.create(context),
-                context.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)) as T
+            AppViewModel(ProjectRepository.create(context, userId),
+                context.getSharedPreferences("app_preferences_$userId", Context.MODE_PRIVATE)) as T
     }
 }
 

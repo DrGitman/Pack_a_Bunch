@@ -105,8 +105,17 @@ fun OnbSetupScreen(
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             SectionHeading("Measure in")
             Spacer(Modifier.height(10.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Start) {
-                UnitToggle(unit = unit, onUnitChange = onUnitChange)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LengthUnit.entries.forEach { candidate ->
+                    Column(Modifier.weight(1f).background(Color.White, RoundedCornerShape(22.dp))
+                        .border(if (unit == candidate) 2.dp else 1.dp, if (unit == candidate) Primary else Outline, RoundedCornerShape(22.dp))
+                        .clickable { onUnitChange(candidate) }.padding(horizontal = 14.dp, vertical = 18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(candidate.shortLabel, color = TextPrimary, fontSize = 24.sp, fontFamily = com.packabunch.ui.theme.NumericFamily)
+                        Spacer(Modifier.height(6.dp))
+                        Text(if (candidate == LengthUnit.CENTIMETRES) "Centimetres" else "Inches", color = TextSecondary, fontFamily = UiFamily, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    }
+                }
             }
         }
 
@@ -145,14 +154,14 @@ fun OnbSetupScreen(
 
 @Composable
 private fun HabitRow(habit: PackingHabit, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(22.dp)
     val border by animateColorAsState(
         targetValue = if (selected) Primary else Outline,
         animationSpec = Motion.standardTween(Motion.SHORT_MS),
         label = "habitBorder",
     )
     val background by animateColorAsState(
-        targetValue = if (selected) BrandTint else Color.White,
+        targetValue = Color.White,
         animationSpec = Motion.standardTween(Motion.SHORT_MS),
         label = "habitBackground",
     )
@@ -164,11 +173,13 @@ private fun HabitRow(habit: PackingHabit, selected: Boolean, onClick: () -> Unit
             .background(background, shape)
             .border(if (selected) 2.dp else 1.dp, border, shape)
             .clickable(onClick = onClick)
-            .padding(14.dp),
+            .padding(15.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
     ) {
-        Icon(habit.icon, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+        Box(Modifier.size(44.dp).background(BrandTint, RoundedCornerShape(15.dp)), contentAlignment = Alignment.Center) {
+            Icon(habit.icon, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(
                 text = habit.label,
@@ -276,7 +287,7 @@ private fun NotificationKind(title: String, detail: String) {
         Modifier
             .fillMaxWidth()
             .background(Color.White, RoundedCornerShape(18.dp))
-            .padding(14.dp),
+            .padding(15.dp),
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
         Icon(
@@ -303,3 +314,5 @@ private fun NotificationKind(title: String, detail: String) {
         }
     }
 }
+
+
