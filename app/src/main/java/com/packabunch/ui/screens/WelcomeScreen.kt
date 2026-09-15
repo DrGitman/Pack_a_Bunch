@@ -1,5 +1,9 @@
 package com.packabunch.ui.screens
 
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import com.packabunch.R
+import com.packabunch.ui.theme.Surface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,8 +57,8 @@ fun WelcomeScreen(
     onSeeProjects: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ScreenScaffold(modifier) {
-        Spacer(Modifier.height(Spacing.md))
+    ArtboardPage(modifier) {
+        Spacer(Modifier.height(8.dp))
 
         Row(
             modifier = Modifier
@@ -63,17 +67,29 @@ fun WelcomeScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            BrandTile(size = 44.dp, cornerRadius = 14.dp)
+            Box(Modifier.size(38.dp).background(Primary, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(PackIcons.Cube, null, Modifier.size(21.dp), tint = com.packabunch.ui.theme.OnPrimary) }
             Text(
                 text = "Pack a Bunch",
                 color = TextPrimary,
                 fontFamily = UiFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
+                fontSize = 17.sp,
             )
         }
 
-        Spacer(Modifier.weight(1f))
+        Box(Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp).fillMaxWidth()
+            .background(Surface, RoundedCornerShape(28.dp)).padding(18.dp)) {
+            Box(Modifier.fillMaxWidth().height(262.dp).background(BrandTint, RoundedCornerShape(20.dp))) {
+                Image(painterResource(R.drawable.main), null, Modifier.fillMaxWidth().height(262.dp))
+                Text("Example pack", Modifier.align(Alignment.TopStart).padding(14.dp)
+                    .background(Surface, RoundedCornerShape(99.dp)).padding(horizontal = 12.dp, vertical = 7.dp),
+                    fontFamily = UiFamily, fontSize = 12.sp, color = TextPrimary)
+                Text("3 of 3 placed", Modifier.align(Alignment.BottomEnd).padding(14.dp)
+                    .background(com.packabunch.ui.theme.ChromeAlt, RoundedCornerShape(99.dp)).padding(horizontal = 12.dp, vertical = 7.dp),
+                    fontFamily = UiFamily, fontSize = 12.sp, color = com.packabunch.ui.theme.Ground)
+            }
+        }
+        Spacer(Modifier.height(26.dp))
 
         Column(
             modifier = Modifier
@@ -93,7 +109,7 @@ fun WelcomeScreen(
                 )
                 Text(
                     text = "See where it goes.",
-                    color = Primary,
+                    color = TextPrimary,
                     fontFamily = UiFamily,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 33.sp,
@@ -102,7 +118,7 @@ fun WelcomeScreen(
                 )
             }
 
-            Spacer(Modifier.height(Spacing.base))
+            Spacer(Modifier.height(12.dp))
 
             val blurb = rememberStaggeredEntrance(index = 1)
             Text(
@@ -115,7 +131,7 @@ fun WelcomeScreen(
                 modifier = Modifier.entrance(blurb),
             )
 
-            Spacer(Modifier.height(Spacing.xl))
+            Spacer(Modifier.height(20.dp))
 
             val steps = rememberStaggeredEntrance(index = 2)
             Row(
@@ -151,15 +167,15 @@ fun WelcomeScreen(
 private fun StepChip(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
     Column(
         modifier = modifier
-            .background(BrandTint, RoundedCornerShape(18.dp))
+            .background(Surface, RoundedCornerShape(18.dp))
             .padding(vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(22.dp))
         Text(
             text = label,
-            color = TextTertiary,
+            color = TextPrimary,
             fontFamily = UiFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 12.5f.sp,
@@ -176,3 +192,5 @@ private fun WelcomePreview() {
         }
     }
 }
+
+

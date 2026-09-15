@@ -70,7 +70,7 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
         }
         when (page) {
             "intro" -> OnboardingScreen(onFinished = { page = "setup" })
-            "setup" -> OnbSetupScreen(unit = unit, habit = habit,
+            "setup" -> OnbSetupScreen(unit = unit, habit = habit, onBack = { page = "intro" },
                 onUnitChange = { unit = it }, onHabitChange = { habit = it },
                 onContinue = {
                     onboarding.edit().putBoolean("complete", true).putString("unit", unit.name).putString("habit", habit?.name).apply()

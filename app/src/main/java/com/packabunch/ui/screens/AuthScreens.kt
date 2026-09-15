@@ -26,7 +26,7 @@ import com.packabunch.ui.theme.*
 
 /** Native, functional forms laid out from the four authentication HTML artboards. */
 @Composable
-private fun AuthPage(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+internal fun ArtboardPage(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     ScreenScaffold(modifier.imePadding()) {
         BoxWithConstraints(Modifier.weight(1f)) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
@@ -74,7 +74,7 @@ private fun TrustCard(title: String? = null, rows: List<String>, modifier: Modif
 @Composable
 fun SignInScreen(onContinueWithGoogle: () -> Unit, onContinueWithEmail: () -> Unit,
     onLogIn: () -> Unit, modifier: Modifier = Modifier) {
-    AuthPage(modifier) {
+    ArtboardPage(modifier) {
         Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(34.dp).background(Primary, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
@@ -156,7 +156,7 @@ fun LogInScreen(localPackCount: Int, onLogIn: (String, String) -> Unit, onGoogle
     onForgot: () -> Unit, onCreateAccount: () -> Unit, onBack: () -> Unit, modifier: Modifier = Modifier) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    AuthPage(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar("Log in", onBack)
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp)) {
             Text("Welcome back", color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold,
@@ -199,7 +199,7 @@ fun CreateAccountScreen(onCreate: (String, String, Boolean, Boolean) -> Unit, on
     onBack: () -> Unit, modifier: Modifier = Modifier) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    AuthPage(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar("Create an account", onBack)
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp)) {
             AuthText("Only an email and a password. No phone number, no name required.")
@@ -226,7 +226,7 @@ fun CreateAccountScreen(onCreate: (String, String, Boolean, Boolean) -> Unit, on
 fun ForgotPasswordScreen(sent: Boolean = false, onSend: (String) -> Unit, onBack: () -> Unit,
     modifier: Modifier = Modifier) {
     var email by remember { mutableStateOf("") }
-    AuthPage(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar("Reset password", onBack)
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(88.dp).background(ItemTints.first(), RoundedCornerShape(30.dp)), contentAlignment = Alignment.Center) {
@@ -251,3 +251,4 @@ fun ForgotPasswordScreen(sent: Boolean = false, onSend: (String) -> Unit, onBack
         }
     }
 }
+

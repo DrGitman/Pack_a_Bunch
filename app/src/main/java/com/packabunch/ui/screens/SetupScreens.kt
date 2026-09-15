@@ -70,27 +70,31 @@ fun OnbSetupScreen(
     onContinue: () -> Unit,
     onSkip: () -> Unit,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
 ) {
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = Spacing.gutter, vertical = 6.dp),
             horizontalArrangement = Arrangement.End,
         ) {
+            if (onBack != null) com.packabunch.ui.components.PackIconButton(PackIcons.Back, "Back", onBack)
+            Spacer(Modifier.weight(1f))
             PackTextButton(text = "Skip", onClick = onSkip, color = TextTertiary)
         }
 
-        Column(Modifier.padding(horizontal = Spacing.gutter)) {
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp)) {
             Text(
                 text = "TWO QUICK ONES",
-                color = TextTertiary,
+                color = Primary,
                 fontFamily = UiFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.5f.sp,
-                letterSpacing = 0.9.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 12.5f.sp,
+                letterSpacing = 1.2.sp,
             )
-            Spacer(Modifier.height(8.dp))
-            ScreenHeading("Set it up the way you measure")
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
+            Text("Set it up the way you measure", color = TextPrimary, fontFamily = UiFamily,
+                fontSize = 30.sp, lineHeight = 37.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
+            Spacer(Modifier.height(11.dp))
             Text(
                 text = "Both of these are in Settings later, so nothing here is a commitment.",
                 color = TextSecondary,
@@ -222,7 +226,7 @@ fun NotificationRationaleScreen(
     onNotNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         Spacer(Modifier.height(Spacing.xxl))
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
@@ -314,5 +318,6 @@ private fun NotificationKind(title: String, detail: String) {
         }
     }
 }
+
 
 
