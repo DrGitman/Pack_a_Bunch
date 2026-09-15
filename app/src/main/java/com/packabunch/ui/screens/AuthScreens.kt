@@ -46,14 +46,20 @@ private fun AuthText(text: String, size: Float = 15f, line: Int = 23,
 
 @Composable
 private fun GoogleButton(onClick: () -> Unit) {
-    Box(contentAlignment = Alignment.Center) {
-        SecondaryButton("Continue with Google", onClick, height = 56.dp,
-            contentColor = TextPrimary, icon = PackIcons.Google, iconTint = Color.Transparent)
-        // Keep the exact four-colour vector from the supplied artboard; don't tint the G.
-        Row(horizontalArrangement = Arrangement.spacedBy(11.dp), verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(R.drawable.auth_google), null, Modifier.size(21.dp))
-            AuthText("Continue with Google", 15.5f, color = Color.Transparent, weight = FontWeight.Bold)
-        }
+    val interactions = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val view = androidx.compose.ui.platform.LocalView.current
+    Row(Modifier.fillMaxWidth().height(56.dp)
+        .background(Surface, RoundedCornerShape(28.dp))
+        .border(1.5.dp, OutlineStrong, RoundedCornerShape(28.dp))
+        .clip(RoundedCornerShape(28.dp))
+        .clickable(interactionSource = interactions, indication = ripple(color = Primary),
+            role = androidx.compose.ui.semantics.Role.Button) {
+            view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+            onClick()
+        }, horizontalArrangement = Arrangement.spacedBy(11.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically) {
+        Image(painterResource(R.drawable.auth_google), null, Modifier.size(21.dp))
+        AuthText("Continue with Google", 15.5f, color = TextPrimary, weight = FontWeight.Bold)
     }
 }
 

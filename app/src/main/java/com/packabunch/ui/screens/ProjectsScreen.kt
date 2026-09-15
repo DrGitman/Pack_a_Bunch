@@ -86,6 +86,18 @@ fun ProjectsScreen(
     var justDeleted by remember { mutableStateOf<Project?>(null) }
     var renameFor by remember { mutableStateOf<Project?>(null) }
     var newName by remember { mutableStateOf("") }
+    var searchOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var filter by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("All") }
+    var alphabetical by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    var sortOpen by remember { mutableStateOf(false) }
+    val visibleProjects = projects.filter { project ->
+        val plan = project.currentPlan
+        val packed = plan != null && plan.placements.isNotEmpty() &&
+            plan.metrics.unplacedInstanceCount == 0 && plan.placements.all { it.instanceId in project.packedInstanceIds }
+        project.name.contains(query, ignoreCase = true) &&
+            (filter == "All" || (filter == "Packed" && packed) || (filter == "In progress" && !packed))
+    }.let { if (alphabetical) it.sortedBy { p -> p.name.lowercase() } else it.sortedByDescending { p -> p.updatedAtMillis } }
 
     renameFor?.let { project ->
         androidx.compose.material3.AlertDialog(
@@ -101,7 +113,21 @@ fun ProjectsScreen(
 
     Box(modifier.fillMaxSize()) {
         ScreenScaffold {
-            PackAppBar(title = "Projects", onBack = onBack)
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Projects", Modifier.weight(1f), color = TextPrimary, fontFamily = UiFamily,
+                    fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.7).sp)
+                PackIconButton(PackIcons.Search, "Search packs", { searchOpen = !searchOpen; if (!searchOpen) query = "" },
+                    modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)))
+                Box {
+                    PackIconButton(PackIcons.Settings, "Sort packs", { sortOpen = true },
+                        modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)))
+                    androidx.compose.material3.DropdownMenu(sortOpen, { sortOpen = false }) {
+                        androidx.compose.material3.DropdownMenuItem(text = { Text("Recently edited") }, onClick = { alphabetical = false; sortOpen = false })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text("Name A–Z") }, onClick = { alphabetical = true; sortOpen = false })
+                    }
+                }
+            }
 
             Text(
                 text = if (loading) "Loading saved packs…" else if (projects.size == 1) "1 pack saved on this device"
@@ -112,10 +138,27 @@ fun ProjectsScreen(
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = 4.dp),
             )
 
+            if (searchOpen) androidx.compose.material3.OutlinedTextField(query, { query = it },
+                Modifier.fillMaxWidth().padding(horizontal = 20.dp), label = { Text("Search packs") }, singleLine = true)
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("All", "In progress", "Packed").forEach { candidate ->
+                    androidx.compose.material3.FilterChip(selected = filter == candidate,
+                        onClick = { filter = candidate }, label = { Text(candidate, fontFamily = UiFamily, fontSize = 13.sp) },
+                        shape = RoundedCornerShape(99.dp), colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                            containerColor = Color.White, selectedContainerColor = com.packabunch.ui.theme.ChromeAlt,
+                            selectedLabelColor = com.packabunch.ui.theme.Ground))
+                }
+            }
+
             if (loading) {
                 com.packabunch.ui.components.PackListSkeleton(Modifier.weight(1f))
             } else if (projects.isEmpty()) {
                 EmptyState(onNewPack = onNewPack, modifier = Modifier.weight(1f))
+            } else if (visibleProjects.isEmpty()) {
+                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text("No packs match this search or filter.", color = TextSecondary, fontFamily = UiFamily)
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
@@ -127,7 +170,7 @@ fun ProjectsScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    itemsIndexed(projects, key = { _, p -> p.id }) { index, project ->
+                    itemsIndexed(visibleProjects, key = { _, p -> p.id }) { index, project ->
                         ProjectCard(
                             project = project,
                             unit = unit,
@@ -222,7 +265,7 @@ private fun ProjectCard(
             specOrder = project.items.map { it.id },
             space = project.space,
             placements = plan?.placements.orEmpty(),
-            modifier = Modifier.size(76.dp),
+            modifier = Modifier.size(68.dp),
         )
 
         Column(Modifier.weight(1f)) {

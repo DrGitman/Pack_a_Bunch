@@ -20,10 +20,10 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
     var checking by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var page by rememberSaveable { mutableStateOf(if (onboarding.getBoolean("complete", false)) "signIn" else "intro") }
-    var unit by remember { mutableStateOf(com.packabunch.ui.format.LengthUnit.entries.firstOrNull {
+    var unit by rememberSaveable { mutableStateOf(com.packabunch.ui.format.LengthUnit.entries.firstOrNull {
         it.name == onboarding.getString("unit", null)
     } ?: com.packabunch.ui.format.LengthUnit.CENTIMETRES) }
-    var habit by remember { mutableStateOf(PackingHabit.entries.firstOrNull { it.name == onboarding.getString("habit", null) }) }
+    var habit by rememberSaveable { mutableStateOf(PackingHabit.entries.firstOrNull { it.name == onboarding.getString("habit", null) }) }
     var message by remember { mutableStateOf<String?>(null) }
     var recoverySent by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -66,7 +66,7 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
         }
     } else {
         BackHandler(enabled = page != "signIn" && page != "intro") {
-            if (!busy) page = if (page == "setup") "intro" else "signIn"
+            if (!busy) page = when (page) { "setup" -> "intro"; "forgot" -> "login"; else -> "signIn" }
         }
         when (page) {
             "intro" -> OnboardingScreen(onFinished = { page = "setup" })
