@@ -79,8 +79,13 @@ purging and account deletion require an explicit retention/deletion workflow.
    **Never run the auth fixture in Supabase.**
 5. Repeat access tests with two real Supabase test accounts before enabling uploads.
 
-The migration has not been applied to hosted Supabase by this agent. The publishable key
-is intentionally unable to perform database administration.
+The initial migration was applied through the authenticated Supabase SQL Editor on
+2026-09-16 to project gxvstomdawaaqezokhfp. The public schema was empty beforehand.
+Post-deployment inspection returned all 11 tables, RLS enabled on each, one ownership
+policy per table, and no anonymous SELECT privilege. SQL Editor execution does not add
+a Supabase CLI migration-history record; do not blindly reapply the initial migration.
+App-to-cloud sync and two-account end-to-end tests are still outstanding. The publishable
+key is intentionally unable to perform database administration.
 
 ## Google OAuth: exact project setup
 

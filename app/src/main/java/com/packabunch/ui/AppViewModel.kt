@@ -59,6 +59,8 @@ class AppViewModel(
         unit = LengthUnit.entries.firstOrNull { it.name == preferences.getString("unit", null) }
             ?: LengthUnit.CENTIMETRES,
         packingHabit = PackingHabit.entries.firstOrNull { it.name == preferences.getString("habit", null) },
+        cameraMeasuring = preferences.getBoolean("cameraMeasuring", true),
+        defaultEdgeGapMm = preferences.getInt("defaultEdgeGapMm", 5).coerceIn(0, 50),
     ))
     val setupCompleteAtLaunch = preferences.getBoolean("setupComplete", false)
 
@@ -87,10 +89,6 @@ class AppViewModel(
         depthCapable = capable
     }
 
-    init {
-        viewModelScope.launch { repository.seedIfEmpty() }
-    }
-
     // -- settings -------------------------------------------------------------------------
 
     fun setUnit(unit: LengthUnit) {
@@ -99,6 +97,17 @@ class AppViewModel(
     }
 
     fun setTier(tier: Tier) = _settings.update { it.copy(tier = tier) }
+
+    fun setCameraMeasuring(enabled: Boolean) {
+        preferences.edit().putBoolean("cameraMeasuring", enabled).apply()
+        _settings.update { it.copy(cameraMeasuring = enabled) }
+    }
+
+    fun setDefaultEdgeGap(mm: Int) {
+        require(mm in 0..50)
+        preferences.edit().putInt("defaultEdgeGapMm", mm).apply()
+        _settings.update { it.copy(defaultEdgeGapMm = mm) }
+    }
 
     fun setPackingHabit(habit: PackingHabit) {
         preferences.edit().putString("habit", habit.name).apply()
@@ -149,17 +158,14 @@ class AppViewModel(
         )
     }
 
-    /**
-     * Opens a saved pack and puts its arrangement back.
-     *
-     * The placements are recomputed rather than loaded, because they were never stored.
-     * The engine is deterministic, so what comes back is the same arrangement that was
-     * saved — no drift, and nothing to migrate when the schema changes.
-     */
+    /** Restore a validated saved arrangement. Recreate the sample only when requested. */
     fun openPack(id: String, onOpened: () -> Unit = {}) {
         val generation = ++openGeneration
         solveGeneration++
         viewModelScope.launch {
+            if (id == "sample" && repository.project(id) == null) {
+                repository.upsert(ProjectRepository.sampleProject())
+            }
             val project = repository.solvedProject(id) ?: return@launch
             if (generation != openGeneration) return@launch
             _editor.value = PackEditorState(
@@ -194,6 +200,7 @@ class AppViewModel(
                     dimensions = Dimensions(bounds.widthMm, bounds.depthMm, bounds.heightMm),
                     measurementSource = MeasurementSource.CAMERA_ESTIMATE,
                     scan = scan,
+                    edgeGapMm = _settings.value.defaultEdgeGapMm,
                 ),
                 plan = null,
             )
@@ -245,6 +252,7 @@ class AppViewModel(
         id = "${state.projectId}-space",
         name = state.name,
         dimensions = Dimensions(0, 0, 0),
+        edgeGapMm = _settings.value.defaultEdgeGapMm,
     )
 
     fun upsertItem(item: ItemSpec) {
@@ -439,6 +447,8 @@ class AppViewModel(
 }
 
 data class AppSettings(
+    val cameraMeasuring: Boolean = true,
+    val defaultEdgeGapMm: Int = 5,
     val unit: LengthUnit = LengthUnit.CENTIMETRES,
     val tier: Tier = Tier.FREE,
     val scansToday: Int = 0,

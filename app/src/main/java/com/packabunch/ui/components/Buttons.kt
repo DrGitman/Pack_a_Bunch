@@ -110,6 +110,7 @@ fun SecondaryButton(
     height: Dp = 54.dp,
     contentColor: Color = PrimaryDark,
     iconTint: Color = Primary,
+    backgroundColor: Color = Color.White,
 ) {
     val interaction = remembered()
     val view = LocalView.current
@@ -120,7 +121,7 @@ fun SecondaryButton(
             .fillMaxWidth()
             .height(height)
             .pressScale(pressedScale = 0.95f, enabled = enabled, interactionSource = interaction)
-            .background(Color.White, shape)
+            .background(backgroundColor, shape)
             .border(BorderStroke(1.5.dp, OutlineStrong), shape)
             .clip(shape)
             .clickable(

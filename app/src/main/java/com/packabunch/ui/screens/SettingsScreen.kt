@@ -2,61 +2,29 @@ package com.packabunch.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.packabunch.BuildConfig
 import com.packabunch.packing.Tier
 import com.packabunch.ui.AppSettings
-import com.packabunch.ui.components.NavDestination
-import com.packabunch.ui.components.NavPill
-import com.packabunch.ui.components.NavPillClearance
-import com.packabunch.ui.components.PackAppBar
-import com.packabunch.ui.components.PackCard
-import com.packabunch.ui.components.PackIcons
-import com.packabunch.ui.components.SectionHeading
-import com.packabunch.ui.components.ScreenScaffold
-import com.packabunch.ui.components.UnitToggle
+import com.packabunch.ui.components.*
 import com.packabunch.ui.format.LengthUnit
-import com.packabunch.ui.motion.pressScale
-import com.packabunch.ui.theme.BrandTint
-import com.packabunch.ui.theme.ErrorRed
-import com.packabunch.ui.theme.Primary
-import com.packabunch.ui.theme.Spacing
-import com.packabunch.ui.theme.TextPrimary
-import com.packabunch.ui.theme.TextTertiary
-import com.packabunch.ui.theme.UiFamily
+import com.packabunch.ui.theme.*
 
-/**
- * Settings — `design/artboards/Settings.dc.html`.
- *
- * Contains the things Google Play requires to be reachable and the things a person needs
- * to undo a decision: manage the subscription (which links out to Play, because that is
- * where it is actually cancelled), restore purchases, delete every trace of local data, and
- * read the privacy policy.
- *
- * Deleting local data really does delete it — projects, and the item photo files with them.
- * A "delete" that leaves photos on disk would make the Data safety declaration untrue.
- */
+/** Settings.dc.html, populated with the current account and persisted preferences. */
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
@@ -75,199 +43,118 @@ fun SettingsScreen(
     onSupport: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    email: String? = null,
+    onCameraMeasuringChange: (Boolean) -> Unit = {},
+    onDefaultEdgeGapChange: (Int) -> Unit = {},
 ) {
+    var showHelp by rememberSaveable { mutableStateOf(false) }
+    var showDelete by rememberSaveable { mutableStateOf(false) }
+    var showGap by rememberSaveable { mutableStateOf(false) }
+    if (showHelp) AlertDialog(onDismissRequest = { showHelp = false }, title = { Text("Privacy, terms and help") },
+        text = { Column {
+            TextButton(onClick = { showHelp = false; onPrivacy() }) { Text("Privacy policy") }
+            TextButton(onClick = { showHelp = false; onTerms() }) { Text("Terms") }
+            TextButton(onClick = { showHelp = false; onSupport() }) { Text("Support") }
+        } }, confirmButton = { TextButton(onClick = { showHelp = false }) { Text("Close") } })
+    if (showDelete) AlertDialog(onDismissRequest = { showDelete = false }, title = { Text("Delete local packs?") },
+        text = { Text("This removes this account's $savedPackCount saved packs from this phone. It cannot be undone. Your sign-in account is not deleted.") },
+        confirmButton = { TextButton(onClick = { showDelete = false; onDeleteAllData() }) { Text("Delete local packs", color = ErrorRed) } },
+        dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Cancel") } })
+    if (showGap) AlertDialog(onDismissRequest = { showGap = false }, title = { Text("Gap around the edges") },
+        text = { Column {
+            Text("Default for new spaces. Existing packs keep their own gap.")
+            listOf(0, 2, 5, 10, 20, 50).forEach { mm ->
+                Row(Modifier.fillMaxWidth().clickable { onDefaultEdgeGapChange(mm); showGap = false }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(selected = settings.defaultEdgeGapMm == mm, onClick = { onDefaultEdgeGapChange(mm); showGap = false })
+                    Text("$mm mm", fontFamily = NumericFamily)
+                }
+            }
+        } }, confirmButton = { TextButton(onClick = { showGap = false }) { Text("Cancel") } })
+
     Box(modifier.fillMaxSize()) {
         ScreenScaffold {
-            PackAppBar(title = "Settings", onBack = onBack)
-
-            Column(
-                Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = Spacing.gutter)
-                    .padding(bottom = NavPillClearance),
-            ) {
-                Spacer(Modifier.height(Spacing.md))
-
-                PlanCard(
-                    tier = settings.tier,
-                    savedPackCount = savedPackCount,
-                    onUpgrade = onUpgrade,
-                )
-
-                Spacer(Modifier.height(Spacing.lg))
-                SectionHeading("Account")
-                Spacer(Modifier.height(10.dp))
-                SettingRow(PackIcons.Person, "Your account", onClick = onAccount)
-
-                Spacer(Modifier.height(Spacing.lg))
-                SectionHeading("Measuring")
-                Spacer(Modifier.height(10.dp))
-
-                PackCard(contentPadding = 0.dp) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+            Text("Settings", Modifier.padding(start = 20.dp, end = 20.dp, top = 10.dp),
+                color = TextPrimary, fontFamily = UiFamily, fontSize = 28.sp,
+                fontWeight = FontWeight.ExtraBold, letterSpacing = (-.7).sp)
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
+                .padding(bottom = NavPillClearance)) {
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Surface)
+                    .clickable(onClick = onAccount).padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
+                    Box(Modifier.size(46.dp).background(Primary, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                        Text(email?.firstOrNull()?.uppercase() ?: "P", color = OnPrimary, fontFamily = UiFamily,
+                            fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text(email?.substringBefore('@') ?: "Your account", color = TextPrimary, fontFamily = UiFamily,
+                            fontSize = 15.5.sp, fontWeight = FontWeight.Bold)
+                        Text((if (settings.tier == Tier.PLUS) "Pack Plus" else "Free plan") + " · saved on this phone",
+                            color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp, lineHeight = 18.sp)
+                    }
+                    Icon(PackIcons.Forward, null, Modifier.size(19.dp), tint = TextTertiary)
+                }
+                SettingsHeading("MEASURING", 20)
+                SettingsGroup {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                        SettingsLabel("Units", Modifier.weight(1f))
+                        UnitToggle(settings.unit, onUnitChange)
+                    }
+                    SettingsDivider()
+                    Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(
-                                "Units",
-                                color = TextPrimary,
-                                fontFamily = UiFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 15.sp,
-                            )
-                            Text(
-                                "Everything is stored the same way either way.",
-                                color = TextTertiary,
-                                fontFamily = UiFamily,
-                                fontSize = 12.5f.sp,
-                            )
+                            SettingsLabel("Camera measuring")
+                            Text(if (settings.cameraMeasuring) "Checks support when opened" else "Typed measurements only",
+                                color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp)
                         }
-                        UnitToggle(unit = settings.unit, onUnitChange = onUnitChange)
+                        Switch(settings.cameraMeasuring, onCameraMeasuringChange)
+                    }
+                    SettingsDivider()
+                    Row(Modifier.fillMaxWidth().clickable { showGap = true }.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                        SettingsLabel("Gap around the edges", Modifier.weight(1f))
+                        Text("${settings.defaultEdgeGapMm} mm", Modifier.background(SurfaceMuted, RoundedCornerShape(99.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
+                            color = BodyInk, fontFamily = NumericFamily, fontSize = 14.sp)
                     }
                 }
-
-                Spacer(Modifier.height(Spacing.lg))
-                SectionHeading("Notifications")
-                Spacer(Modifier.height(10.dp))
-                SettingRow(PackIcons.Bell, "Notification settings", onClick = onNotifications)
-
-                Spacer(Modifier.height(Spacing.lg))
-                SectionHeading("Subscription")
-                Spacer(Modifier.height(10.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SettingRow(
-                        PackIcons.Forward,
-                        "Manage subscription",
-                        detail = "Opens Google Play",
-                        onClick = onManageSubscription,
-                    )
-                    SettingRow(PackIcons.Undo, "Restore purchases", onClick = onRestorePurchases)
+                SettingsHeading("APP", 18)
+                SettingsGroup {
+                    SettingsAction(PackIcons.Bell, "Notifications", onNotifications)
+                    SettingsDivider()
+                    SettingsAction(PackIcons.Cube, "Manage Pack Plus", onManageSubscription)
+                    SettingsDivider()
+                    SettingsAction(PackIcons.Undo, "Restore purchases", onRestorePurchases)
+                    SettingsDivider()
+                    SettingsAction(PackIcons.Info, "Privacy, terms and help", { showHelp = true })
+                    SettingsDivider()
+                    SettingsAction(PackIcons.Trash, "Delete everything on this phone", { showDelete = true }, ErrorRed)
                 }
-
-                Spacer(Modifier.height(Spacing.lg))
-                SectionHeading("About")
-                Spacer(Modifier.height(10.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SettingRow(PackIcons.Lock, "Privacy policy", onClick = onPrivacy)
-                    SettingRow(PackIcons.Info, "Terms", onClick = onTerms)
-                    SettingRow(PackIcons.Mail, "Support", onClick = onSupport)
-                }
-
-                Spacer(Modifier.height(Spacing.lg))
-                SectionHeading("Your data")
-                Spacer(Modifier.height(10.dp))
-
-                SettingRow(
-                    icon = PackIcons.Trash,
-                    title = "Delete all local data",
-                    detail = "Every pack and every item photo on this phone. Cannot be undone.",
-                    tint = ErrorRed,
-                    onClick = onDeleteAllData,
-                )
-
-                Spacer(Modifier.height(Spacing.base))
-                Text(
-                    text = "Packs are stored on this phone only. Nothing is uploaded.",
-                    color = TextTertiary,
-                    fontFamily = UiFamily,
-                    fontSize = 12.5f.sp,
-                    lineHeight = 18.sp,
-                )
-                Spacer(Modifier.height(Spacing.xl))
+                Text("Pack a Bunch ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                    Modifier.align(Alignment.CenterHorizontally).padding(top = 14.dp), color = TextDisabled,
+                    fontFamily = NumericFamily, fontSize = 12.sp)
             }
         }
-
-        NavPill(
-            current = NavDestination.Settings,
-            onNavigate = onNavigate,
-            onNewPack = onNewPack,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
-        )
+        NavPill(NavDestination.Settings, onNavigate, onNewPack,
+            Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp))
     }
 }
 
-@Composable
-private fun PlanCard(tier: Tier, savedPackCount: Int, onUpgrade: () -> Unit) {
-    PackCard(elevation = 8.dp, contentPadding = Spacing.base) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                Modifier.size(44.dp).background(BrandTint, RoundedCornerShape(15.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    PackIcons.Cube,
-                    contentDescription = null,
-                    tint = Primary,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-            Spacer(Modifier.size(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = if (tier == Tier.PLUS) "Pack Plus" else "Free plan",
-                    color = TextPrimary,
-                    fontFamily = UiFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                )
-                Text(
-                    text = if (savedPackCount == 1) "1 pack saved" else "$savedPackCount packs saved",
-                    color = TextTertiary,
-                    fontFamily = UiFamily,
-                    fontSize = 12.5f.sp,
-                )
-            }
-            if (tier != Tier.PLUS) {
-                com.packabunch.ui.components.PackTextButton(text = "See Plus", onClick = onUpgrade)
-            }
-        }
-    }
+@Composable private fun SettingsHeading(text: String, top: Int) {
+    Text(text, Modifier.padding(top = top.dp, bottom = 10.dp), color = TextTertiary,
+        fontFamily = UiFamily, fontSize = 12.5.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp)
 }
-
-@Composable
-private fun SettingRow(
-    icon: ImageVector,
-    title: String,
-    onClick: () -> Unit,
-    detail: String? = null,
-    tint: Color = Primary,
-) {
-    val shape = RoundedCornerShape(18.dp)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .pressScale(pressedScale = 0.99f)
-            .background(Color.White, shape)
-            .clickable(onClick = onClick)
-            .padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = if (tint == ErrorRed) ErrorRed else TextPrimary,
-                fontFamily = UiFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
-            )
-            if (detail != null) {
-                Text(
-                    text = detail,
-                    color = TextTertiary,
-                    fontFamily = UiFamily,
-                    fontSize = 12.5f.sp,
-                    lineHeight = 18.sp,
-                )
-            }
-        }
-        Icon(
-            PackIcons.Forward,
-            contentDescription = null,
-            tint = Color(0xFFC3B0A0),
-            modifier = Modifier.size(18.dp),
-        )
+@Composable private fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(22.dp)).padding(horizontal = 16.dp, vertical = 4.dp), content = content)
+}
+@Composable private fun SettingsDivider() { HorizontalDivider(color = Divider, thickness = 1.dp) }
+@Composable private fun SettingsLabel(text: String, modifier: Modifier = Modifier, color: Color = TextPrimary) {
+    Text(text, modifier, color = color, fontFamily = UiFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+}
+@Composable private fun SettingsAction(icon: ImageVector, label: String, onClick: () -> Unit, tint: Color = TextSecondary) {
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
+        Icon(icon, null, Modifier.size(20.dp), tint = tint)
+        SettingsLabel(label, Modifier.weight(1f), if (tint == ErrorRed) ErrorRed else TextPrimary)
+        if (tint != ErrorRed) Icon(PackIcons.Forward, null, Modifier.size(19.dp), tint = TextTertiary)
     }
 }

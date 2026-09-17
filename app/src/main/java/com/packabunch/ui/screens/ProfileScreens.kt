@@ -74,6 +74,7 @@ fun ProfileScreen(
     onDeleteAccount: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    completedPacks: Int = 0,
 ) {
     ScreenScaffold(modifier) {
         PackAppBar(title = "Account", onBack = onBack)
@@ -85,73 +86,68 @@ fun ProfileScreen(
         ) {
             Spacer(Modifier.height(Spacing.md))
 
-            PackCard(elevation = 8.dp, contentPadding = Spacing.base) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconTile(
-                        icon = PackIcons.Person,
-                        tint = Primary,
-                        background = BrandTint,
-                        size = 48.dp,
-                        iconSize = 24.dp,
-                    )
-                    Spacer(Modifier.size(12.dp))
+            PackCard(shape = RoundedCornerShape(28.dp), elevation = 10.dp, contentPadding = 20.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(15.dp)) {
+                    Box(Modifier.size(68.dp).background(Primary, RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
+                        Text(email?.firstOrNull()?.uppercase() ?: "P", color = com.packabunch.ui.theme.OnPrimary,
+                            fontFamily = UiFamily, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.5).sp)
+                    }
                     Column(Modifier.weight(1f)) {
-                        Text(
-                            text = email ?: "Not signed in",
-                            color = TextPrimary,
-                            fontFamily = UiFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                        )
-                        Text(
-                            text = if (tier == Tier.PLUS) "Pack Plus" else "Free plan",
-                            color = TextTertiary,
-                            fontFamily = UiFamily,
-                            fontSize = 12.5f.sp,
-                        )
+                        Text(email?.substringBefore('@') ?: "Your account", color = TextPrimary, fontFamily = UiFamily,
+                            fontWeight = FontWeight.ExtraBold, fontSize = 19.sp, letterSpacing = (-.4).sp)
+                        Text(email.orEmpty(), Modifier.padding(top = 3.dp), color = TextSecondary,
+                            fontFamily = UiFamily, fontSize = 13.5.sp)
+                        Spacer(Modifier.height(9.dp))
+                        Row(Modifier.background(BrandTint, RoundedCornerShape(99.dp)).padding(horizontal = 11.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Icon(PackIcons.Cube, null, Modifier.size(13.dp), tint = com.packabunch.ui.theme.PrimaryDark)
+                            Text(if (tier == Tier.PLUS) "PACK PLUS" else "FREE PLAN", color = com.packabunch.ui.theme.PrimaryDark,
+                                fontFamily = UiFamily, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = .5.sp)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(20.dp))
+                androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
+                Row(Modifier.fillMaxWidth().padding(top = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    listOf(savedPackCount to "packs", itemsMeasured to "things measured", completedPacks to "packs checked").forEach { (value, label) ->
+                        Column(Modifier.weight(1f)) {
+                            Text(value.toString(), color = TextPrimary, fontFamily = com.packabunch.ui.theme.NumericFamily, fontSize = 21.sp)
+                            Text(label, Modifier.padding(top = 3.dp), color = TextSecondary, fontFamily = UiFamily,
+                                fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, lineHeight = 16.sp)
+                        }
                     }
                 }
             }
-
-            Spacer(Modifier.height(Spacing.base))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                StatTile(
-                    value = savedPackCount.toString(),
-                    caption = if (savedPackCount == 1) "pack saved" else "packs saved",
-                    modifier = Modifier.weight(1f),
-                )
-                StatTile(
-                    value = itemsMeasured.toString(),
-                    caption = "things measured",
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            Spacer(Modifier.height(Spacing.base))
-
+            Spacer(Modifier.height(14.dp))
             // What is actually true, not what the design assumed. Somebody who believes
             // their packs are backed up and finds out otherwise has lost real work.
-            Note(
-                title = if (backupEnabled) "Backed up" else "On this phone only",
-                text = if (backupEnabled) {
-                    "Your packs are copied to your account."
-                } else {
-                    "Backup isn't switched on yet. Everything lives on this phone, and " +
-                        "uninstalling the app takes it with you."
-                },
-                tone = if (backupEnabled) NoteTone.Confirmed else NoteTone.Caution,
-                icon = PackIcons.Info,
-            )
-
+            PackCard(shape = RoundedCornerShape(22.dp), contentPadding = 16.dp) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
+                    IconTile(PackIcons.Info, tint = if (backupEnabled) com.packabunch.ui.theme.Success else TextSecondary,
+                        background = if (backupEnabled) com.packabunch.ui.theme.SuccessTint else com.packabunch.ui.theme.SurfaceMuted,
+                        size = 42.dp, iconSize = 21.dp, cornerRadius = 14.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text(if (backupEnabled) "Backed up" else "On this phone only", color = TextPrimary,
+                            fontFamily = UiFamily, fontSize = 15.sp, fontWeight = FontWeight.Bold, lineHeight = 20.sp)
+                        Text(if (backupEnabled) "Your packs are copied to your account." else "Cloud sync is not connected yet.",
+                            Modifier.padding(top = 2.dp), color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp, lineHeight = 18.sp)
+                    }
+                    Text(if (backupEnabled) "ON" else "OFF",
+                        Modifier.background(com.packabunch.ui.theme.SurfaceMuted, RoundedCornerShape(99.dp)).padding(horizontal = 11.dp, vertical = 6.dp),
+                        color = TextSecondary, fontFamily = UiFamily, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
+                }
+            }
             Spacer(Modifier.height(Spacing.lg))
-            SectionHeading("Sign-in")
+            SectionHeading("Account")
             Spacer(Modifier.height(10.dp))
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxWidth().background(com.packabunch.ui.theme.Surface, RoundedCornerShape(22.dp))
+                .padding(horizontal = 16.dp, vertical = 6.dp)) {
                 AccountRow(PackIcons.Mail, "Change email", onChangeEmail)
+                androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
                 AccountRow(PackIcons.Lock, "Change password", onChangePassword)
-                AccountRow(PackIcons.Cube, "Manage subscription", onManageSubscription)
+                androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
+                AccountRow(PackIcons.Cube, "Manage Pack Plus", onManageSubscription)
             }
 
             Spacer(Modifier.height(Spacing.lg))
@@ -181,13 +177,11 @@ private fun AccountRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .background(Color.White, RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
-            .padding(14.dp),
+            .padding(vertical = 15.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
         Text(
             text = title,
             color = TextPrimary,

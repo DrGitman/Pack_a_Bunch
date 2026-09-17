@@ -265,24 +265,28 @@ fun PackNavHost(
                 tier = settings.tier,
                 savedPackCount = projects.size,
                 itemsMeasured = viewModel.libraryItems(projects).size,
+                completedPacks = projects.count { project ->
+                    project.currentPlan?.let { plan -> plan.placements.isNotEmpty() &&
+                        plan.metrics.unplacedInstanceCount == 0 &&
+                        plan.placements.all { it.instanceId in project.packedInstanceIds } } == true
+                },
                 // Says what is true today, not what the design assumed.
                 backupEnabled = false,
-                onChangeEmail = {},
-                onChangePassword = {},
-                onManageSubscription = {},
+                onChangeEmail = { notice = "Email changes are not connected in this build yet." },
+                onChangePassword = { notice = "Password changes are not connected in this build yet." },
+                onManageSubscription = { notice = "Google Play Billing is not connected in this build." },
                 onSignOut = onSignOut,
-                onDeleteAccount = { navController.navigate(Routes.ACCOUNT_DELETE) },
+                onDeleteAccount = { notice = "Account deletion is not connected yet. Deleting local packs does not delete your Supabase account." },
                 onBack = { navController.popBackStack() },
             )
         }
 
         composable(Routes.ACCOUNT_DELETE) {
             AccountDeleteScreen(
-                email = "you@example.com",
+                email = account.email.orEmpty(),
                 hasActiveSubscription = settings.tier == com.packabunch.packing.Tier.PLUS,
                 onConfirmDelete = {
-                    viewModel.deleteAllLocalData()
-                    navController.popBackStack(Routes.WELCOME, inclusive = false)
+                    notice = "Account deletion is not connected yet. No data has been deleted."
                 },
                 onManageSubscription = {},
                 onBack = { navController.popBackStack() },
@@ -354,11 +358,13 @@ fun PackNavHost(
                 selected = editor.spaceKind,
                 // Not every ARCore phone can sense depth, and mapping needs it. Checked
                 // here so the choice is honest before it is made, not after.
-                depthCapable = viewModel.depthCapable,
+                depthCapable = viewModel.depthCapable && settings.cameraMeasuring,
                 limits = viewModel.limits,
                 onSelect = viewModel::setSpaceKind,
                 onContinue = {
-                    if (editor.spaceKind == SpaceKind.ANY_SHAPE) {
+                    if (!settings.cameraMeasuring) {
+                        navController.navigate(Routes.CREATE_SPACE)
+                    } else if (editor.spaceKind == SpaceKind.ANY_SHAPE) {
                         navController.navigate(Routes.SPACE_SCAN)
                     } else {
                         navController.navigate(Routes.MEASURE)
@@ -432,7 +438,10 @@ fun PackNavHost(
                 onDimensionsChange = viewModel::setSpaceDimensions,
                 onNext = { navController.navigate(Routes.ITEMS) },
                 onBack = { navController.popBackStack() },
-                onMeasureWithCamera = { navController.navigate(Routes.MEASURE) },
+                onMeasureWithCamera = {
+                    if (settings.cameraMeasuring) navController.navigate(Routes.MEASURE)
+                    else notice = "Camera measuring is turned off in Settings."
+                },
             )
         }
 
@@ -473,7 +482,10 @@ fun PackNavHost(
                 initialEditItemId = editItemId,
                 onEditConsumed = { editItemId = null },
                 onLibrary = { navController.navigate(Routes.ITEM_LIBRARY) },
-                onScan = { navController.navigate(Routes.SWEEP_ITEMS) },
+                onScan = {
+                    if (settings.cameraMeasuring) navController.navigate(Routes.SWEEP_ITEMS)
+                    else notice = "Camera measuring is turned off in Settings. You can still add items by typing their dimensions."
+                },
             )
         }
 
@@ -503,7 +515,7 @@ fun PackNavHost(
                         viewModel.setEdgeGap(gap)
                         items()
                     },
-                    onMeasureAgain = { navController.navigate(Routes.MEASURE) },
+                    onMeasureAgain = { navController.navigate(if (settings.cameraMeasuring) Routes.MEASURE else Routes.CREATE_SPACE) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -665,7 +677,10 @@ fun PackNavHost(
                     navController.navigate(Routes.SPACE_TYPE)
                 },
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
-                onAccount = { navController.navigate(Routes.SIGN_IN) },
+                onAccount = { navController.navigate(Routes.PROFILE) },
+                email = account.email,
+                onCameraMeasuringChange = viewModel::setCameraMeasuring,
+                onDefaultEdgeGapChange = viewModel::setDefaultEdgeGap,
                 onManageSubscription = { notice = "Google Play Billing is not connected in this build." },
                 onRestorePurchases = { notice = "Purchase restoration is not available until Google Play Billing is connected." },
                 onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },

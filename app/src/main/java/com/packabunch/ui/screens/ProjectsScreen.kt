@@ -1,6 +1,9 @@
 package com.packabunch.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -117,7 +120,7 @@ fun ProjectsScreen(
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Projects", Modifier.weight(1f), color = TextPrimary, fontFamily = UiFamily,
                     fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.7).sp)
-                PackIconButton(PackIcons.Search, "Search packs", { searchOpen = !searchOpen; if (!searchOpen) query = "" },
+                if (projects.isNotEmpty()) PackIconButton(PackIcons.Search, "Search packs", { searchOpen = !searchOpen; if (!searchOpen) query = "" },
                     modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)))
                 Box {
                     PackIconButton(PackIcons.Settings, "Sort packs", { sortOpen = true },
@@ -129,7 +132,7 @@ fun ProjectsScreen(
                 }
             }
 
-            Text(
+            if (loading || projects.isNotEmpty()) Text(
                 text = if (loading) "Loading saved packs…" else if (projects.size == 1) "1 pack saved on this device"
                 else "${projects.size} packs saved on this device",
                 color = TextTertiary,
@@ -140,7 +143,7 @@ fun ProjectsScreen(
 
             if (searchOpen) androidx.compose.material3.OutlinedTextField(query, { query = it },
                 Modifier.fillMaxWidth().padding(horizontal = 20.dp), label = { Text("Search packs") }, singleLine = true)
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 10.dp),
+            if (projects.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("All", "In progress", "Packed").forEach { candidate ->
                     androidx.compose.material3.FilterChip(selected = filter == candidate,
@@ -154,7 +157,7 @@ fun ProjectsScreen(
             if (loading) {
                 com.packabunch.ui.components.PackListSkeleton(Modifier.weight(1f))
             } else if (projects.isEmpty()) {
-                EmptyState(onNewPack = onNewPack, modifier = Modifier.weight(1f))
+                EmptyState(onNewPack = onNewPack, onSample = { onOpen("sample") }, modifier = Modifier.weight(1f))
             } else if (visibleProjects.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text("No packs match this search or filter.", color = TextSecondary, fontFamily = UiFamily)
@@ -331,29 +334,80 @@ private fun ProjectCard(
 }
 
 @Composable
-private fun EmptyState(onNewPack: () -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyState(onNewPack: () -> Unit, onSample: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = Spacing.gutter),
-        verticalArrangement = Arrangement.spacedBy(Spacing.base, Alignment.CenterVertically),
+        modifier = modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+            .padding(start = 20.dp, end = 20.dp, top = 44.dp, bottom = NavPillClearance),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        BrandMark(size = 64.dp)
+        EmptyCrateIllustration()
+        Spacer(Modifier.height(26.dp))
         Text(
-            text = "No packs yet",
+            text = "Nothing packed yet",
             color = TextPrimary,
             fontFamily = UiFamily,
             fontWeight = FontWeight.ExtraBold,
             fontSize = 22.sp,
+            letterSpacing = (-.4).sp,
         )
+        Spacer(Modifier.height(9.dp))
         Text(
-            text = "Measure a space, add what's going in it, and we'll work out an order.",
+            text = "Start with a space you can measure — a crate, a storage box, a drawer, a car boot.",
+            modifier = Modifier.widthIn(max = 290.dp),
             color = TextSecondary,
             fontFamily = UiFamily,
             fontSize = 15.sp,
             lineHeight = 23.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
-        PrimaryButton(text = "Plan a pack", onClick = onNewPack)
+        Spacer(Modifier.height(26.dp))
+        PrimaryButton(text = "New pack", onClick = onNewPack)
+        Spacer(Modifier.height(10.dp))
+        com.packabunch.ui.components.SecondaryButton(text = "Open the sample pack", onClick = onSample,
+            backgroundColor = com.packabunch.ui.theme.Ground)
+        Spacer(Modifier.height(28.dp))
+        Row(Modifier.fillMaxWidth().background(com.packabunch.ui.theme.Surface, RoundedCornerShape(22.dp)).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(36.dp).background(com.packabunch.ui.theme.BrandTint, RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center) {
+                androidx.compose.material3.Icon(PackIcons.Info, null, Modifier.size(19.dp), tint = com.packabunch.ui.theme.Primary)
+            }
+            Column(Modifier.weight(1f)) {
+                Text("Measure the inside", color = TextPrimary, fontFamily = UiFamily, fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(3.dp))
+                Text("Always measure the space inside the box, not the outside, and keep the opening clear.",
+                    color = TextSecondary, fontFamily = UiFamily, fontSize = 13.5.sp, lineHeight = 20.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyCrateIllustration() {
+    Box(Modifier.size(180.dp, 150.dp).background(com.packabunch.ui.theme.SurfaceSunken, RoundedCornerShape(32.dp)),
+        contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.Canvas(Modifier.size(132.dp, 110.dp)) {
+            val scale = size.width / 132f
+            fun polygon(vararg xy: Float) = androidx.compose.ui.graphics.Path().apply {
+                moveTo(xy[0] * scale, xy[1] * scale)
+                for (i in 2 until xy.size step 2) lineTo(xy[i] * scale, xy[i + 1] * scale)
+                close()
+            }
+            val top = polygon(14f,46f,66f,20f,118f,46f,66f,72f)
+            drawPath(top, com.packabunch.ui.theme.EmptyCrateTop)
+            drawPath(polygon(14f,46f,66f,72f,66f,94f,14f,68f), com.packabunch.ui.theme.EmptyCrateLeft, alpha = .85f)
+            drawPath(polygon(66f,72f,118f,46f,118f,68f,66f,94f), com.packabunch.ui.theme.EmptyCrateRight, alpha = .85f)
+            val stroke = androidx.compose.ui.graphics.drawscope.Stroke(2f * scale,
+                join = androidx.compose.ui.graphics.StrokeJoin.Round,
+                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(7f * scale, 6f * scale)))
+            drawPath(top, com.packabunch.ui.theme.EmptyCrateStroke, style = stroke)
+            for ((x, y) in listOf(14f to 46f, 66f to 72f, 118f to 46f)) {
+                drawLine(com.packabunch.ui.theme.EmptyCrateStroke,
+                    androidx.compose.ui.geometry.Offset(x * scale, y * scale),
+                    androidx.compose.ui.geometry.Offset(x * scale, (y + 22f) * scale),
+                    strokeWidth = 2f * scale, cap = androidx.compose.ui.graphics.StrokeCap.Round, pathEffect = stroke.pathEffect)
+            }
+        }
     }
 }
 

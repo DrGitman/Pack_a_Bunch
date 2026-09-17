@@ -25,7 +25,7 @@ class SupabaseAccount(context: Context) {
     private var session: JSONObject? = vault.read()?.let { runCatching { JSONObject(it) }.getOrNull() }
         ?.takeIf { it.optString("project_url") == BuildConfig.SUPABASE_URL.trimEnd('/') }
     val configured: Boolean get() = BuildConfig.SUPABASE_URL.startsWith("https://") &&
-        BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank() && BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank()
+        BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()
     val email: String? get() = session?.optJSONObject("user")?.optString("email")?.takeIf { it.isNotBlank() }
     val userId: String? get() = session?.optJSONObject("user")?.optString("id")?.takeIf { it.isNotBlank() }
     val hasSession: Boolean get() = userId != null && session?.optString("refresh_token")?.isNotBlank() == true
@@ -56,6 +56,7 @@ class SupabaseAccount(context: Context) {
 
     suspend fun signIn(context: Context) = mutex.withLock {
         check(configured) { "Supabase setup is not complete for this build." }
+        check(BuildConfig.GOOGLE_WEB_CLIENT_ID.isNotBlank()) { "Google sign-in is not configured for this build. Use email and password." }
         val nonce = UUID.randomUUID().toString()
         val hashed = MessageDigest.getInstance("SHA-256").digest(nonce.toByteArray())
             .joinToString("") { "%02x".format(it) }

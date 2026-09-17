@@ -19,6 +19,7 @@ class DesignPreviewActivity : ComponentActivity() {
         setContent { PackABunchTheme {
             var unit by remember { mutableStateOf(LengthUnit.CENTIMETRES) }
             var habit by remember { mutableStateOf<PackingHabit?>(PackingHabit.MOVING_HOUSE) }
+            var previewSettings by remember { mutableStateOf(com.packabunch.ui.AppSettings()) }
             when (screen) {
                 "Onboarding" -> OnboardingScreen({ finish() })
                 "OnbSetup" -> OnbSetupScreen(unit, habit, { unit = it }, { habit = it }, {}, {}, onBack = { finish() })
@@ -28,6 +29,15 @@ class DesignPreviewActivity : ComponentActivity() {
                 "Main" -> WelcomeScreen({}, {}, {})
                 "Projects" -> ProjectsScreen(listOf(ProjectRepository.sampleProject()), unit, {}, {}, {})
                 "ProjectsEmpty" -> ProjectsScreen(emptyList(), unit, {}, {}, {})
+                "Settings" -> SettingsScreen(settings = previewSettings, savedPackCount = 0,
+                    onUnitChange = { previewSettings = previewSettings.copy(unit = it) }, onNavigate = {},
+                    onNewPack = {}, onUpgrade = {}, onAccount = {}, onManageSubscription = {},
+                    onRestorePurchases = {}, onNotifications = {}, onDeleteAllData = {},
+                    onPrivacy = {}, onTerms = {}, onSupport = {}, onBack = {}, email = "preview@example.com",
+                    onCameraMeasuringChange = { previewSettings = previewSettings.copy(cameraMeasuring = it) },
+                    onDefaultEdgeGapChange = { previewSettings = previewSettings.copy(defaultEdgeGapMm = it) })
+                "Profile" -> ProfileScreen("preview@example.com", com.packabunch.packing.Tier.FREE, 0, 0, false,
+                    {}, {}, {}, {}, {}, {})
                 else -> SignInScreen({}, {}, {})
             }
         } }
