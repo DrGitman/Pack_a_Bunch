@@ -27,3 +27,4 @@ docs/
 *.local.properties
 service-account*.json
 supabase/.temp/
+.kotlin/

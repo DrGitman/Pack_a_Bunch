@@ -109,6 +109,7 @@ fun PackingGuideScreen(
                 ) {
                     if (space != null && plan != null) {
                         IsometricCrate(
+                            showControls = true,
                             items = state.items,
                             space = space,
                             placements = plan.placements,

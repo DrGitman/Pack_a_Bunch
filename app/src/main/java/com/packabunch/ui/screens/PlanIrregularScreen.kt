@@ -79,8 +79,6 @@ fun PlanIrregularScreen(
     val plan = state.plan
     val space = state.space
     val scan = space?.scan
-    var topDown by remember { mutableStateOf(false) }
-    val layers = remember(plan) { layersOf(plan?.placements.orEmpty()) }
 
     val usableLitres = ((space?.usableVolumeMm3 ?: 0L) / 1_000_000.0).roundToInt()
     val fixedObstructions = scan?.obstructions?.count { !it.removable } ?: 0
@@ -100,16 +98,6 @@ fun PlanIrregularScreen(
 
         Spacer(Modifier.height(Spacing.md))
 
-        Row(
-            Modifier.padding(horizontal = Spacing.gutter),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            ViewChip("In 3D", selected = !topDown) { topDown = false }
-            ViewChip("From above", selected = topDown) { topDown = true }
-        }
-
-        Spacer(Modifier.height(Spacing.md))
-
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             PackCard(shape = RoundedCornerShape(28.dp), elevation = 12.dp, contentPadding = 14.dp) {
                 Box(
@@ -119,18 +107,8 @@ fun PlanIrregularScreen(
                         .background(BrandTint, RoundedCornerShape(22.dp)),
                 ) {
                     if (plan != null && space != null) {
-                        if (topDown && layers.isNotEmpty()) {
-                            LayerView(
-                                items = state.items,
-                                space = space,
-                                layer = layers.first(),
-                                modifier = Modifier.fillMaxWidth().height(300.dp),
-                                colorFor = { placement ->
-                                    itemColor(state.items.indexOfFirst { it.id == placement.specId })
-                                },
-                            )
-                        } else {
                             IsometricCrate(
+                            showControls = true,
                             items = state.items,
                                 space = space,
                                 placements = plan.placements,
@@ -139,26 +117,9 @@ fun PlanIrregularScreen(
                                     itemColor(state.items.indexOfFirst { it.id == placement.specId })
                                 },
                             )
-                        }
                     }
 
-                    // Where the load actually goes in. On a boot this is not the top, and a
-                    // plan that ignores it is a plan you cannot carry out.
-                    if (scan?.opening != null) {
-                        Text(
-                            text = "LOADS FROM HERE",
-                            color = Color(0xFF7C4223),
-                            fontFamily = UiFamily,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 10.sp,
-                            letterSpacing = 0.8.sp,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 10.dp)
-                                .background(Color(0xF0FFFFFF), RoundedCornerShape(999.dp))
-                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                        )
-                    }
+
                 }
             }
         }
@@ -269,4 +230,3 @@ private fun ViewChip(text: String, selected: Boolean, onClick: () -> Unit) {
         )
     }
 }
-

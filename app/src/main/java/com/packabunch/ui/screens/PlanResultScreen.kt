@@ -104,6 +104,7 @@ fun PlanResultScreen(
                 ) {
                     if (plan != null && space != null) {
                         IsometricCrate(
+                            showControls = true,
                             items = state.items,
                             space = space,
                             placements = plan.placements,
@@ -114,45 +115,12 @@ fun PlanResultScreen(
                         )
                     }
 
-                    // Overview / Layers, top left, exactly where the artboard puts it.
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(12.dp)
-                            .background(Color(0xF0FFFFFF), RoundedCornerShape(999.dp))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                    ) {
-                        PreviewModeChip(text = "Overview", selected = true, onClick = {})
-                        PreviewModeChip(text = "Layers", selected = false, onClick = onShowLayers)
-                    }
 
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(12.dp)
-                            .background(Color(0xF0FFFFFF), RoundedCornerShape(999.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        androidx.compose.material3.Icon(
-                            PackIcons.Rotate,
-                            contentDescription = null,
-                            tint = Color(0xFF8A7565),
-                            modifier = Modifier.size(15.dp),
-                        )
-                        Text(
-                            "Drag to turn",
-                            color = Color(0xFF7C6857),
-                            fontFamily = UiFamily,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 11.5f.sp,
-                        )
-                    }
                 }
             }
         }
+
+        androidx.compose.material3.TextButton(onClick = onShowLayers, modifier = Modifier.padding(horizontal = Spacing.gutter)) { Text("Inspect individual layers") }
 
         Spacer(Modifier.height(14.dp))
 

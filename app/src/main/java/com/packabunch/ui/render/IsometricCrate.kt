@@ -2,6 +2,12 @@ package com.packabunch.ui.render
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Text
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.packabunch.ui.theme.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.Composable
@@ -49,6 +55,8 @@ import kotlinx.coroutines.launch
  */
 
 /** Rotation applied about the vertical axis before projecting, in radians. */
+enum class PackingView(val label: String) { ISOMETRIC("3D"), TOP("Top"), FRONT("Front"), SIDE("Side") }
+
 private const val ISO_TILT = 0.5236f // 30°, the classic isometric angle
 
 @Composable
@@ -61,6 +69,7 @@ fun IsometricCrate(
     revealedThrough: Int = Int.MAX_VALUE,
     itemColorFor: (Placement) -> Color,
     interactive: Boolean = true,
+    showControls: Boolean = false,
     animateEntrance: Boolean = true,
     items: List<com.packabunch.packing.ItemSpec> = emptyList(),
 ) {
@@ -73,6 +82,8 @@ fun IsometricCrate(
             grid.cellAt(x,y,z) == com.packabunch.packing.Cell.SOLID
         }.map { face -> face.copy(points = face.points.map { p -> SurfacePoint(p.x+grid.originXMm, p.y+grid.originYMm, p.z+grid.originZMm) }) }
     } }
+    var camera by rememberSaveable { mutableStateOf(PackingView.ISOMETRIC) }
+    var seeThrough by rememberSaveable { mutableStateOf(true) }
     var yaw by remember { mutableFloatStateOf(0f) }
     val scope = rememberCoroutineScope()
     val settle = remember { Animatable(if (animateEntrance) 0f else 1f) }
@@ -86,19 +97,31 @@ fun IsometricCrate(
         settle.animateTo(1f, tween(durationMillis = Motion.MEDIUM_MS * 2, easing = Motion.Enter))
     }
 
+    Column(modifier) {
+    if (showControls) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            PackingView.entries.forEach { mode ->
+                FilterChip(selected = camera == mode, onClick = { camera = mode; yaw = 0f }, label = { Text(mode.label, fontSize = 12.sp) })
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            FilterChip(selected = seeThrough, onClick = { seeThrough = !seeThrough }, label = { Text("See-through", fontSize = 12.sp) })
+            Text(if (camera == PackingView.ISOMETRIC) "Drag to turn" else if (camera == PackingView.SIDE) "View from left" else "Nearest items in front", fontSize = 11.sp, color = TextSecondary, modifier = Modifier.padding(top = 14.dp))
+        }
+    }
     Canvas(
-        modifier = modifier.then(
-            if (!interactive) Modifier else Modifier.pointerInput(Unit) {
+        modifier = Modifier.fillMaxWidth().weight(1f).then(
+            if (!interactive || camera != PackingView.ISOMETRIC) Modifier else Modifier.pointerInput(camera) {
                 detectHorizontalDragGestures { _, dragAmount ->
                     scope.launch { yaw += dragAmount * 0.006f }
                 }
             },
         ),
     ) {
-        val view = CrateView(space, size, yaw)
+        val view = CrateView(space, size, yaw, camera)
 
-        if (scannedSurface == null) drawCrateShell(view, front = false)
-        else drawSurface(view, scannedSurface, CrateBackLeft, 0.65f)
+        if (scannedSurface == null) drawCrateShell(view, front = false, seeThrough = seeThrough)
+        else drawSurface(view, scannedSurface, CrateBackLeft, if (seeThrough) 0.15f else 0.65f)
 
         val ordered = placements
             .sortedBy { it.sequenceIndex }
@@ -112,7 +135,7 @@ fun IsometricCrate(
 
             val surface = surfaces[placement.specId]
             if (surface != null) {
-                drawSurface(view, surface.map { face -> face.copy(points = face.points.map { it.placed(placement) }) },
+                drawSurface(view, surface.map { face -> face.copy(points = face.points.map { it.placed(placement).let { p -> p.copy(z = p.z + (1f - itemProgress) * view.heightMm * 0.22f) } }) },
                     itemColorFor(placement), itemProgress * if (selectedInstanceId != null && placement.instanceId != selectedInstanceId) 0.34f else 1f)
                 val index = items.indexOfFirst { it.id == placement.specId } + 1
                 val point = view.project(placement.xMm + placement.orientedWidthMm / 2f,
@@ -129,7 +152,8 @@ fun IsometricCrate(
             )
         }
 
-        if (scannedSurface == null) drawCrateShell(view, front = true)
+        if (scannedSurface == null) drawCrateShell(view, front = true, seeThrough = seeThrough)
+    }
     }
 }
 
@@ -145,7 +169,7 @@ private fun staggered(overall: Float, index: Int, count: Int): Float {
  * The projection. Holds the scale and offset that map millimetres onto this canvas, so
  * every face is drawn through the same transform.
  */
-private class CrateView(val space: Space, canvas: Size, val yaw: Float) {
+internal class CrateView(val space: Space, canvas: Size, val yaw: Float, val camera: PackingView) {
     private val w = space.dimensions.widthMm.toFloat()
     private val d = space.dimensions.depthMm.toFloat()
     private val h = space.dimensions.heightMm.toFloat()
@@ -180,6 +204,12 @@ private class CrateView(val space: Space, canvas: Size, val yaw: Float) {
     }
 
     private fun rawProject(x: Float, y: Float, z: Float): Offset {
+        when (camera) {
+            PackingView.TOP -> return Offset(x, -y)
+            PackingView.FRONT -> return Offset(x, -z)
+            PackingView.SIDE -> return Offset(-y, -z)
+            PackingView.ISOMETRIC -> Unit
+        }
         val rx = (x - cx) * cos(yaw) - (y - cy) * sin(yaw)
         val ry = (x - cx) * sin(yaw) + (y - cy) * cos(yaw)
         return Offset(
@@ -194,13 +224,15 @@ private class CrateView(val space: Space, canvas: Size, val yaw: Float) {
     }
 
     /** Painter's algorithm: further from the camera is drawn first. */
-    fun depthKey(box: Box): Float {
-        val x = (box.minXMm + box.maxXMm) / 2f - cx
-        val y = (box.minYMm + box.maxYMm) / 2f - cy
-        val rx = x * cos(yaw) - y * sin(yaw)
-        val ry = x * sin(yaw) + y * cos(yaw)
-        return -(rx + ry) - box.minZMm / 1000f
+    fun depth(x: Float, y: Float, z: Float): Float = when (camera) {
+        PackingView.TOP -> z
+        PackingView.FRONT -> -y
+        PackingView.SIDE -> -x
+        PackingView.ISOMETRIC -> x * cos(yaw) - y * sin(yaw) + x * sin(yaw) + y * cos(yaw) + z
     }
+
+    fun depthKey(box: Box) = depth((box.minXMm + box.maxXMm) / 2f,
+        (box.minYMm + box.maxYMm) / 2f, (box.minZMm + box.maxZMm) / 2f)
 
     val floorZ: Float get() = 0f
     val widthMm: Float get() = w
@@ -224,67 +256,27 @@ private fun DrawScope.quadOutline(a: Offset, b: Offset, c: Offset, d: Offset, co
 
 // Crate shell, in the palette the artboards use for it.
 // One brown family, light to dark, in the manner of a dimensioned reference drawing.
-private val CrateFloor = Color(0xFFEADCCC)
-private val CrateBackLeft = Color(0xFFF2E7DA)
-private val CrateBackRight = Color(0xFFF7EFE6)
-private val CrateFrontLeft = Color(0xFFD9BE9E)
-private val CrateFrontRight = Color(0xFFC9A986)
-private val CrateRim = Color(0xFF7C4223)
-private val CrateEdge = Color(0xFF9A6A45)
-
 /**
  * The container itself. Drawn in two passes: the far walls and floor before the contents,
  * the near walls after, so items sit inside the crate rather than floating over a picture
  * of one.
  */
-private fun DrawScope.drawCrateShell(view: CrateView, front: Boolean) {
-    val w = view.widthMm
-    val d = view.depthMm
-    val h = view.heightMm
-
-    fun p(x: Float, y: Float, z: Float) = view.project(x, y, z)
-
-    if (!front) {
-        // Floor.
-        quad(p(0f, 0f, 0f), p(w, 0f, 0f), p(w, d, 0f), p(0f, d, 0f), CrateFloor)
-        quadOutline(p(0f, 0f, 0f), p(w, 0f, 0f), p(w, d, 0f), p(0f, d, 0f), CrateEdge, 1.4f)
-
-        // The two walls furthest from the camera, chosen by which way the crate is turned.
-        quad(p(0f, d, 0f), p(w, d, 0f), p(w, d, h), p(0f, d, h), CrateBackRight)
-        quad(p(w, 0f, 0f), p(w, d, 0f), p(w, d, h), p(w, 0f, h), CrateBackLeft)
-        quadOutline(p(0f, d, 0f), p(w, d, 0f), p(w, d, h), p(0f, d, h), CrateEdge, 1.4f)
-        quadOutline(p(w, 0f, 0f), p(w, d, 0f), p(w, d, h), p(w, 0f, h), CrateEdge, 1.4f)
-    } else {
-        // Near walls, drawn at partial opacity so the load stays visible through them.
-        quad(
-            p(0f, 0f, 0f), p(w, 0f, 0f), p(w, 0f, h), p(0f, 0f, h),
-            CrateFrontLeft.copy(alpha = 0.22f),
-        )
-        quad(
-            p(0f, 0f, 0f), p(0f, d, 0f), p(0f, d, h), p(0f, 0f, h),
-            CrateFrontRight.copy(alpha = 0.22f),
-        )
-        quadOutline(
-            p(0f, 0f, 0f), p(w, 0f, 0f), p(w, 0f, h), p(0f, 0f, h),
-            CrateEdge.copy(alpha = 0.55f), 1.4f,
-        )
-        quadOutline(
-            p(0f, 0f, 0f), p(0f, d, 0f), p(0f, d, h), p(0f, 0f, h),
-            CrateEdge.copy(alpha = 0.55f), 1.4f,
-        )
-
-        // The rim, at full strength — it is what makes the opening readable.
-        quadOutline(
-            p(0f, 0f, h), p(w, 0f, h), p(w, d, h), p(0f, d, h),
-            CrateRim, 2.6f,
-        )
-        listOf(
-            Triple(0f, 0f, 0f), Triple(w, 0f, 0f), Triple(0f, d, 0f), Triple(w, d, 0f),
-        ).forEach { (x, y, _) ->
-            drawLine(CrateRim, p(x, y, 0f), p(x, y, h), strokeWidth = 1.8f)
+private fun DrawScope.drawCrateShell(view: CrateView, front: Boolean, seeThrough: Boolean) {
+    val faces = cuboidFaces(0f, view.widthMm, 0f, view.depthMm, 0f, view.heightMm).filter { it.side != 5 }
+    val centreDepth = view.depth(view.widthMm / 2f, view.depthMm / 2f, view.heightMm / 2f)
+    faces.filter { face -> (face.points.map { view.depth(it.x, it.y, it.z) }.average() > centreDepth) == front }
+        .sortedBy { face -> face.points.sumOf { view.depth(it.x,it.y,it.z).toDouble() } }
+        .forEach { face ->
+            val p = face.points.map { view.project(it.x,it.y,it.z) }
+            quad(p[0],p[1],p[2],p[3], CrateBackLeft.copy(alpha = if (seeThrough) 0.08f else if (front) 0.22f else 1f))
+            quadOutline(p[0],p[1],p[2],p[3], CrateEdge.copy(alpha = 0.65f), 1.4f)
         }
-    }
 }
+
+private fun cuboidFaces(x0: Float, x1: Float, y0: Float, y1: Float, z0: Float, z1: Float): List<SurfaceFace> =
+    voxelSurface(1, 1, 1, 1) { _,_,_ -> true }.map { face -> face.copy(points = face.points.map { p ->
+        SurfacePoint(x0 + p.x * (x1-x0), y0 + p.y * (y1-y0), z0 + p.z * (z1-z0))
+    }) }
 
 /** One item: three visible faces plus its number, shaded so the form reads without an outline. */
 private fun DrawScope.drawPlacement(
@@ -311,27 +303,7 @@ private fun DrawScope.drawPlacement(
 
     fun p(x: Float, y: Float, z: Float) = view.project(x, y, z)
 
-    // Technical-drawing style: pale flat fills with a strong outline in the same hue, the
-    // way a dimensioned reference drawing reads. The three faces stay tonally separated so
-    // the form is legible, but the *outline* is what carries the shape — which is why this
-    // survives being shrunk to a project-card thumbnail where shading alone would mush.
-    val ink = base.darken(0.28f).copy(alpha = alpha)
-    val top = base.lighten(0.62f).copy(alpha = alpha)
-    val left = base.lighten(0.34f).copy(alpha = alpha)
-    val right = base.lighten(0.12f).copy(alpha = alpha)
-
-    val topFace = listOf(p(x0, y0, z1), p(x1, y0, z1), p(x1, y1, z1), p(x0, y1, z1))
-    val leftFace = listOf(p(x0, y0, z0), p(x1, y0, z0), p(x1, y0, z1), p(x0, y0, z1))
-    val rightFace = listOf(p(x0, y0, z0), p(x0, y1, z0), p(x0, y1, z1), p(x0, y0, z1))
-
-    quad(topFace[0], topFace[1], topFace[2], topFace[3], top)
-    quad(leftFace[0], leftFace[1], leftFace[2], leftFace[3], left)
-    quad(rightFace[0], rightFace[1], rightFace[2], rightFace[3], right)
-
-    val stroke = 2.2f
-    quadOutline(topFace[0], topFace[1], topFace[2], topFace[3], ink, stroke)
-    quadOutline(leftFace[0], leftFace[1], leftFace[2], leftFace[3], ink, stroke)
-    quadOutline(rightFace[0], rightFace[1], rightFace[2], rightFace[3], ink, stroke)
+    drawSurface(view, cuboidFaces(x0,x1,y0,y1,z0,z1), base, alpha)
 
     if (dimmed || progress < 0.85f) return
 
@@ -382,9 +354,7 @@ private fun Color.darken(amount: Float) = Color(
 
 /** Painter ordering with pale app-colour fills and dimension-drawing outlines. */
 private fun DrawScope.drawSurface(view: CrateView, faces: List<SurfaceFace>, base: Color, alpha: Float) {
-    fun depth(face: SurfaceFace): Float = face.points.sumOf { p ->
-        (p.x * cos(view.yaw) - p.y * sin(view.yaw) + p.x * sin(view.yaw) + p.y * cos(view.yaw) + p.z).toDouble()
-    }.toFloat()
+    fun depth(face: SurfaceFace): Float = face.points.sumOf { view.depth(it.x,it.y,it.z).toDouble() }.toFloat()
     faces.sortedBy { depth(it) }.forEach { face ->
         val p = face.points.map { view.project(it.x,it.y,it.z) }
         val fill = base.lighten(if (face.side == 5) 0.62f else if (face.side < 2) 0.34f else 0.12f).copy(alpha=alpha)
