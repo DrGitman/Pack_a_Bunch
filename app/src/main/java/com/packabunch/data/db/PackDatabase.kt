@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [ProjectEntity::class, ItemEntity::class, PlanSummaryEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class PackDatabase : RoomDatabase() {
@@ -48,6 +48,15 @@ abstract class PackDatabase : RoomDatabase() {
             .addMigrations(object : androidx.room.migration.Migration(2, 3) {
                 override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE plan_summaries ADD COLUMN planDetails BLOB")
+                }
+            })
+            .addMigrations(object : androidx.room.migration.Migration(3, 4) {
+                override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                    db.execSQL("CREATE TABLE items_new (id TEXT NOT NULL, projectId TEXT NOT NULL, name TEXT NOT NULL, widthMm INTEGER NOT NULL, depthMm INTEGER NOT NULL, heightMm INTEGER NOT NULL, quantity INTEGER NOT NULL, keepUpright INTEGER NOT NULL, maySupportItems INTEGER NOT NULL, measurementSource TEXT NOT NULL, photoPath TEXT, position INTEGER NOT NULL, shapeGeometry BLOB, visualGeometry BLOB, PRIMARY KEY(projectId,id), FOREIGN KEY(projectId) REFERENCES projects(id) ON DELETE CASCADE)")
+                    db.execSQL("INSERT INTO items_new SELECT * FROM items")
+                    db.execSQL("DROP TABLE items")
+                    db.execSQL("ALTER TABLE items_new RENAME TO items")
+                    db.execSQL("CREATE INDEX index_items_projectId ON items(projectId)")
                 }
             })
             // No fallbackToDestructiveMigration. Losing somebody's packs on an update is

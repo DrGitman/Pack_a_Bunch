@@ -166,6 +166,7 @@ fun PackNavHost(
     val editor by viewModel.editor.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val projectsLoading by viewModel.projectsLoading.collectAsStateWithLifecycle()
+    val syncState by viewModel.syncState.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     var notice by remember { mutableStateOf<String?>(null) }
     notice?.let { message ->
@@ -271,7 +272,10 @@ fun PackNavHost(
                         plan.placements.all { it.instanceId in project.packedInstanceIds } } == true
                 },
                 // Says what is true today, not what the design assumed.
-                backupEnabled = false,
+                backupEnabled = syncState.backedUp,
+                syncMessage = syncState.message,
+                syncRunning = syncState.running,
+                onSync = viewModel::syncNow,
                 onChangeEmail = { notice = "Email changes are not connected in this build yet." },
                 onChangePassword = { notice = "Password changes are not connected in this build yet." },
                 onManageSubscription = { notice = "Google Play Billing is not connected in this build." },

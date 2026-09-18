@@ -47,7 +47,24 @@ import kotlinx.coroutines.withContext
 class AppViewModel(
     private val repository: ProjectRepository,
     private val preferences: android.content.SharedPreferences,
+    private val cloudSync: com.packabunch.data.cloud.CloudPackSync? = null,
 ) : ViewModel() {
+    val syncState = cloudSync?.state ?: MutableStateFlow(com.packabunch.data.cloud.CloudSyncState()).asStateFlow()
+    fun syncNow() { viewModelScope.launch { cloudSync?.sync() } }
+
+    init {
+        if (cloudSync != null) {
+            viewModelScope.launch {
+                repository.projects.collect { cloudSync.localChanged() }
+            }
+            viewModelScope.launch {
+                while (true) {
+                    cloudSync.sync()
+                    kotlinx.coroutines.delay(30_000)
+                }
+            }
+        }
+    }
 
     private val _projectsLoading = MutableStateFlow(true)
     val projectsLoading = _projectsLoading.asStateFlow()
@@ -438,11 +455,16 @@ class AppViewModel(
         }
     }
 
-    class Factory(private val context: Context, private val userId: String) : ViewModelProvider.Factory {
+    class Factory(private val context: Context, private val userId: String,
+        private val account: com.packabunch.auth.SupabaseAccount? = null) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            AppViewModel(ProjectRepository.create(context, userId),
-                context.getSharedPreferences("app_preferences_$userId", Context.MODE_PRIVATE)) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>): T {
+            val repository = ProjectRepository.create(context,userId)
+            return AppViewModel(repository,
+                context.getSharedPreferences("app_preferences_$userId", Context.MODE_PRIVATE),
+                account?.let { com.packabunch.data.cloud.CloudPackSync(repository,it,userId,
+                    context.getSharedPreferences("cloud_sync_$userId",Context.MODE_PRIVATE)) }) as T
+        }
     }
 }
 

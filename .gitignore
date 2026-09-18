@@ -19,3 +19,11 @@ play-service-account*.json
 build/
 /captures
 docs/
+
+# Local credentials and environment files (examples contain placeholders only).
+.env
+.env.*
+!.env.example
+*.local.properties
+service-account*.json
+supabase/.temp/

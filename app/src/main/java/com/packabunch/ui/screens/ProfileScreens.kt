@@ -75,6 +75,9 @@ fun ProfileScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     completedPacks: Int = 0,
+    syncMessage: String? = null,
+    syncRunning: Boolean = false,
+    onSync: (() -> Unit)? = null,
 ) {
     ScreenScaffold(modifier) {
         PackAppBar(title = "Account", onBack = onBack)
@@ -129,7 +132,7 @@ fun ProfileScreen(
                     Column(Modifier.weight(1f)) {
                         Text(if (backupEnabled) "Backed up" else "On this phone only", color = TextPrimary,
                             fontFamily = UiFamily, fontSize = 15.sp, fontWeight = FontWeight.Bold, lineHeight = 20.sp)
-                        Text(if (backupEnabled) "Your packs are copied to your account." else "Cloud sync is not connected yet.",
+                        Text(syncMessage ?: if (backupEnabled) "Your packs are copied to your account." else "Cloud sync is not connected yet.",
                             Modifier.padding(top = 2.dp), color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp, lineHeight = 18.sp)
                     }
                     Text(if (backupEnabled) "ON" else "OFF",
@@ -137,6 +140,7 @@ fun ProfileScreen(
                         color = TextSecondary, fontFamily = UiFamily, fontSize = 11.5.sp, fontWeight = FontWeight.Bold)
                 }
             }
+            if(onSync != null) PackTextButton(if(syncRunning) "Syncing…" else "Sync now", { if(!syncRunning) onSync() })
             Spacer(Modifier.height(Spacing.lg))
             SectionHeading("Account")
             Spacer(Modifier.height(10.dp))

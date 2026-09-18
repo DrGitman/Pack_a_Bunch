@@ -1,0 +1,8 @@
+# Copy to local.properties (ignored by Git), then fill in your local settings.
+# Use forward slashes for Windows SDK paths.
+sdk.dir=C:/Users/YOUR_USER/AppData/Local/Android/Sdk
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_PUBLISHABLE_KEY=YOUR_SUPABASE_PUBLISHABLE_KEY
+GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
+# These three values are public Android client configuration, embedded in the APK.
+# NEVER add Paddle API keys, OAuth client secrets, service_role keys or DB passwords.

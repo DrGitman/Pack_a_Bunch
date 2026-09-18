@@ -1,5 +1,41 @@
 # Pack a Bunch cloud setup
 
+## Current connection status — 18 September 2026
+
+The Android app now has a normalized cloud adapter and an account-scoped sync coordinator.
+It syncs while the signed-in ViewModel is active, every 30 seconds, with a manual Sync now
+action on Account. This is not an Android background worker. Room remains the offline store.
+The Account status only says backed up after current local fingerprints match successful
+server saves. Connection failures keep local data and retry on the next pass.
+
+Migration `202609170001_sync.sql` was applied through the hosted SQL Editor on 18 September.
+It adds original client identifiers and atomic read/write RPCs with optimistic versions.
+Direct client table writes are revoked; owner checks remain enforced in the write RPC and
+RLS on reads. Conflicting local edits are retained as a separate Conflict copy before the
+cloud version is restored. Deletions use cloud tombstones and propagate on sync.
+
+The cloud format includes scan grids, obstruction masks, openings, collision and visual
+item masks, validated arrangements and guide progress. Photos are not uploaded.
+The local Room v3-to-v4 migration changes item identity to (projectId,id) so conflict copies
+can preserve original item/instance identities without replacing another pack's items.
+
+Local SQL tests (`tests/sync.sql`) passed: round trip, stale/null version rejection,
+invalid-data rollback, direct-write rejection, soft delete/restore, cross-owner isolation
+and anonymous rejection. Android build and existing unit tests passed. A debug geometry
+round-trip fixture has been added, but emulator execution and real-account end-to-end sync
+are still pending: the emulator cannot currently boot with under 1 GB free on C:.
+
+Configuration/Git guidance: copy `../local.properties.example` to ignored `local.properties`
+for Android configuration. CI environment variables take precedence. Server configuration
+uses Supabase secrets, with `supabase/.env.example` as a placeholder-only local template.
+The real `.env.local` is ignored. Android never reads the server environment file.
+Generated `app/build/**/BuildConfig.java` contains the public Android configuration by
+design; build outputs are ignored by Git. These values are also extractable from the APK.
+Never put server keys or OAuth client secrets into Android BuildConfig.
+The sections below retain earlier design/setup context; earlier statements that no sync
+adapter exists are superseded by this status. CLI migration history was not populated by
+SQL Editor execution; do not blindly replay either migration.
+
 ## Product decision
 
 Offline first: Room/SQLite remains the working database for measuring, editing, solving and
@@ -70,7 +106,7 @@ purging and account deletion require an explicit retention/deletion workflow.
 
 ## Apply and verify
 
-1. Open the SQL Editor in project gxvstomdawaaqezokhfp.
+1. Open the SQL Editor in project YOUR_PROJECT_REF.
 2. Run migrations/202609100001_packing.sql once. It is transactional and does not drop
    existing tables. Inspect any name conflict instead of adding destructive replacements.
 3. Verify RLS is enabled on all new tables.
@@ -80,7 +116,7 @@ purging and account deletion require an explicit retention/deletion workflow.
 5. Repeat access tests with two real Supabase test accounts before enabling uploads.
 
 The initial migration was applied through the authenticated Supabase SQL Editor on
-2026-09-16 to project gxvstomdawaaqezokhfp. The public schema was empty beforehand.
+2026-09-16 to project YOUR_PROJECT_REF. The public schema was empty beforehand.
 Post-deployment inspection returned all 11 tables, RLS enabled on each, one ownership
 policy per table, and no anonymous SELECT privilege. SQL Editor execution does not add
 a Supabase CLI migration-history record; do not blindly reapply the initial migration.
@@ -89,14 +125,14 @@ key is intentionally unable to perform database administration.
 
 ## Google OAuth: exact project setup
 
-The supplied project responds at https://gxvstomdawaaqezokhfp.supabase.co.
-Its public auth settings reported Google disabled during this setup.
+The supplied project responds at https://YOUR_PROJECT_REF.supabase.co.
+Google was verified Enabled in the hosted provider dashboard on 2026-09-17 after the user saved the client secret. A successful Android sign-in is still unverified.
 
 1. In Google Cloud, use the project containing web client
-   770623136334-f2fctsb1odt44d4e6ijmflpv7r38jg75.apps.googleusercontent.com.
+   YOUR_WEB_CLIENT_ID.apps.googleusercontent.com.
    Confirm it still exists: the supplied console notice warned of inactivity deletion.
 2. Add this Authorized redirect URI to that Web application client:
-   https://gxvstomdawaaqezokhfp.supabase.co/auth/v1/callback
+   https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback
    The localhost/WebContainer entries are web-development settings and do not replace
    Android OAuth registration. Keep entries still used by another app; remove stale ones
    only after confirming they are unused.

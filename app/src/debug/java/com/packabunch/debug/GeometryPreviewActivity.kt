@@ -35,12 +35,24 @@ class GeometryPreviewActivity : ComponentActivity() {
             ItemSpec("c","Chair",chair.boundsMm,visualShape=GeometryCodec.shape(GeometryCodec.shape(chair))))
         val placements=items.mapIndexed { i,item -> Placement(item.id,item.id,120+i*200,100,0,
             item.dimensions.widthMm,item.dimensions.depthMm,item.dimensions.heightMm,Orientation.WIDTH_DEPTH_HEIGHT,i) }
+        val fixtureSpace=Space("s","Fixture",Dimensions(600,400,300),scan=scan)
+        val solved=PackingEngine.solve(PackingRequest(fixtureSpace,items),SolveBudget.unlimited()) as SolveResult.Solved
+        val fixture=com.packabunch.data.Project("cloud-geometry-fixture","Geometry fixture",fixtureSpace,items,
+            solved.plan,1L,solved.plan.placements.take(1).map { it.instanceId }.toSet())
+        val document=com.packabunch.data.cloud.CloudPackCodec.encode(fixture,"00000000-0000-0000-0000-000000000001")
+        document.getJSONObject("pack").put("updated_at","1970-01-01T00:00:00.001Z")
+        val restored=com.packabunch.data.cloud.CloudPackCodec.decode(document)
+        check(restored.request.revision()==fixture.request.revision())
+        check(restored.currentPlan==fixture.currentPlan)
+        check(restored.packedInstanceIds==fixture.packedInstanceIds)
+        check(restored.items.all { it.visualShape!=null })
+        java.io.File(filesDir,"cloud-geometry-fixture.json").writeText(document.toString())
         setContent { PackABunchTheme {
             androidx.compose.material3.Surface { Column(Modifier.fillMaxSize().padding(20.dp).statusBarsPadding()) {
                 Text("Geometry test fixture", color=TextPrimary)
-                Text("Not a camera scan · saved surfaces reloaded", color=TextSecondary)
-                IsometricCrate(Space("s","Fixture",Dimensions(600,400,300),scan=scan),placements,
-                    Modifier.fillMaxWidth().weight(1f),items=items,itemColorFor={itemColor(if(it.specId=="b")0 else 1)},animateEntrance=false)
+                Text("Cloud format round trip passed · not a camera scan", color=TextSecondary)
+                IsometricCrate(restored.space,restored.currentPlan!!.placements,
+                    Modifier.fillMaxWidth().weight(1f),items=restored.items,itemColorFor={itemColor(if(it.specId=="b")0 else 1)},animateEntrance=false)
                 Text("1 Bottle    2 Chair", color=TextPrimary)
                 Text("Observed surfaces inside an irregular mapped space",color=TextSecondary)
             } }

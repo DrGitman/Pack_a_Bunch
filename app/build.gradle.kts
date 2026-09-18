@@ -12,7 +12,9 @@ val cloudProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 fun cloudSetting(name: String, fallback: String = ""): String =
-    cloudProperties.getProperty(name, fallback).replace("\\", "\\\\").replace("\"", "\\\"")
+    (System.getenv(name) ?: cloudProperties.getProperty(name, fallback))
+        .replace("\\", "\\\\").replace("\"", "\\\"")
+        .replace("\r", "\\r").replace("\n", "\\n")
 
 android {
     namespace = "com.packabunch"
@@ -21,8 +23,7 @@ android {
     defaultConfig {
         buildConfigField("String", "SUPABASE_URL", "\"" + cloudSetting("SUPABASE_URL") + "\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + cloudSetting("SUPABASE_PUBLISHABLE_KEY") + "\"")
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"" + cloudSetting("GOOGLE_WEB_CLIENT_ID",
-            "770623136334-f2fctsb1odt44d4e6ijmflpv7r38jg75.apps.googleusercontent.com") + "\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"" + cloudSetting("GOOGLE_WEB_CLIENT_ID") + "\"")
         // TODO: confirm before the first Play upload — the application id is permanent.
         applicationId = "com.packabunch"
         minSdk = 26

@@ -56,9 +56,9 @@ fun SettingsScreen(
             TextButton(onClick = { showHelp = false; onTerms() }) { Text("Terms") }
             TextButton(onClick = { showHelp = false; onSupport() }) { Text("Support") }
         } }, confirmButton = { TextButton(onClick = { showHelp = false }) { Text("Close") } })
-    if (showDelete) AlertDialog(onDismissRequest = { showDelete = false }, title = { Text("Delete local packs?") },
-        text = { Text("This removes this account's $savedPackCount saved packs from this phone. It cannot be undone. Your sign-in account is not deleted.") },
-        confirmButton = { TextButton(onClick = { showDelete = false; onDeleteAllData() }) { Text("Delete local packs", color = ErrorRed) } },
+    if (showDelete) AlertDialog(onDismissRequest = { showDelete = false }, title = { Text("Delete all saved packs?") },
+        text = { Text("This removes this account's $savedPackCount saved packs from this phone and marks them deleted in your cloud account when sync completes. Your sign-in account is not deleted.") },
+        confirmButton = { TextButton(onClick = { showDelete = false; onDeleteAllData() }) { Text("Delete saved packs", color = ErrorRed) } },
         dismissButton = { TextButton(onClick = { showDelete = false }) { Text("Cancel") } })
     if (showGap) AlertDialog(onDismissRequest = { showGap = false }, title = { Text("Gap around the edges") },
         text = { Column {
@@ -127,7 +127,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsAction(PackIcons.Info, "Privacy, terms and help", { showHelp = true })
                     SettingsDivider()
-                    SettingsAction(PackIcons.Trash, "Delete everything on this phone", { showDelete = true }, ErrorRed)
+                    SettingsAction(PackIcons.Trash, "Delete all saved packs", { showDelete = true }, ErrorRed)
                 }
                 Text("Pack a Bunch ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     Modifier.align(Alignment.CenterHorizontally).padding(top = 14.dp), color = TextDisabled,

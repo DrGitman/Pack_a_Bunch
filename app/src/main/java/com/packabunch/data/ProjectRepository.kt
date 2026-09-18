@@ -18,6 +18,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.flow.first
 
 /**
  * Where packs live. Backed by Room, so they survive the app being killed.
@@ -26,6 +29,22 @@ import kotlinx.coroutines.withContext
  * Legacy packs without placements are solved once and upgraded on opening.
  */
 class ProjectRepository(private val dao: ProjectDao) {
+    private val writeMutex = Mutex()
+
+    suspend fun snapshot(): List<Project> = projects.first()
+
+    suspend fun replaceFromCloud(id: String, expected: Project?, incoming: Project?, preserveConflict: Boolean,
+        stillMatches: (Project?) -> Boolean): Boolean =
+        writeMutex.withLock {
+            if (!stillMatches(project(id))) return@withLock false
+            if (preserveConflict && expected != null) {
+                saveExact(expected.copy(id=java.util.UUID.randomUUID().toString(),name=("Conflict copy — "+expected.name).take(160)))
+            }
+            if(incoming==null) dao.deleteProject(id) else saveExact(incoming)
+            true
+        }
+
+    private suspend fun saveExact(project: Project) = dao.save(project.toEntity(), project.toItemEntities(), project.toSummaryEntity())
 
     val projects: Flow<List<Project>> =
         dao.observeAll().map { rows -> rows.map { it.toProject() } }
@@ -50,16 +69,16 @@ class ProjectRepository(private val dao: ProjectDao) {
         }
     }
 
-    suspend fun upsert(project: Project) = withContext(Dispatchers.IO) {
+    suspend fun upsert(project: Project) = withContext(Dispatchers.IO) { writeMutex.withLock {
         val stamped = project.copy(updatedAtMillis = System.currentTimeMillis())
         dao.save(
             project = stamped.toEntity(),
             items = stamped.toItemEntities(),
             summary = stamped.toSummaryEntity(),
         )
-    }
+    } }
 
-    suspend fun delete(id: String) = withContext(Dispatchers.IO) { dao.deleteProject(id) }
+    suspend fun delete(id: String) = withContext(Dispatchers.IO) { writeMutex.withLock { dao.deleteProject(id) } }
 
     /**
      * Wipes every pack on the device.

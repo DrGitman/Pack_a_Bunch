@@ -42,6 +42,7 @@ data class ProjectEntity(
 
 @Entity(
     tableName = "items",
+    primaryKeys = ["projectId", "id"],
     foreignKeys = [
         ForeignKey(
             entity = ProjectEntity::class,
@@ -53,7 +54,7 @@ data class ProjectEntity(
     indices = [Index("projectId")],
 )
 data class ItemEntity(
-    @PrimaryKey val id: String,
+    val id: String,
     val projectId: String,
     val name: String,
     val widthMm: Int,

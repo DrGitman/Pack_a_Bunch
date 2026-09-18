@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
                 com.packabunch.auth.RequiredAccount { account, signOut ->
                     val appViewModel: AppViewModel = viewModel(
                         key = "packs-" + account.userId,
-                        factory = AppViewModel.Factory(applicationContext, account.userId!!),
+                        factory = AppViewModel.Factory(applicationContext, account.userId!!, account),
                     )
                     PackNavHost(
                         viewModel = appViewModel,
