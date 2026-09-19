@@ -67,7 +67,7 @@ fun WelcomeScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(Modifier.size(38.dp).background(Primary, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) { Icon(PackIcons.Cube, null, Modifier.size(21.dp), tint = com.packabunch.ui.theme.OnPrimary) }
+            Image(painterResource(R.drawable.logo_theme_brown_white_inside), "Pack a Bunch", Modifier.size(38.dp))
             Text(
                 text = "Pack a Bunch",
                 color = TextPrimary,

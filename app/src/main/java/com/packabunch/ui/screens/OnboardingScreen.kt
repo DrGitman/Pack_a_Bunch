@@ -42,9 +42,7 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
     ScreenScaffold(modifier) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(34.dp).background(Primary, RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
-                Icon(PackIcons.Cube, null, Modifier.size(19.dp), tint = OnPrimary)
-            }
+            androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.logo_theme_brown_white_inside), "Pack a Bunch", Modifier.size(34.dp))
             Text("Pack a Bunch", Modifier.weight(1f), color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 15.5.sp)
             PackTextButton("Skip", onFinished, color = TextTertiary)
         }

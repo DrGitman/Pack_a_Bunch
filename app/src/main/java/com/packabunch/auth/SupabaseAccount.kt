@@ -122,7 +122,18 @@ class SupabaseAccount(context: Context) {
                 val status = connection.responseCode
                 if (status !in 200..299) {
                     // Never log response bodies or tokens. Show an actionable, non-sensitive error.
-                    error(when (status) {
+                    val code = runCatching { JSONObject(connection.errorStream.bufferedReader().use { it.readText() })
+                        .optString("error_code") }.getOrDefault("")
+                    error(when (code) {
+                        "email_address_invalid" -> "That email address was rejected. Use a real address you can open."
+                        "email_address_not_authorized" -> "Sign-up emails can't be sent to this address yet. The app's email service needs setting up."
+                        "user_already_exists", "email_exists" -> "An account with this email already exists. Log in instead."
+                        "weak_password" -> "Choose a stronger password."
+                        "email_not_confirmed" -> "Confirm your email first, using the link we sent you."
+                        "invalid_credentials" -> "Wrong email or password."
+                        "over_email_send_rate_limit" -> "Too many emails sent. Please wait a few minutes and try again."
+                        else -> null
+                    } ?: when (status) {
                         400, 401, 403, 422 -> if (path.contains("grant_type=id_token"))
                             "Google sign-in was rejected. Check the Google provider, client IDs and signing fingerprint."
                             else "Couldn't authenticate. Check your email and password, confirm your email if required, and try again."

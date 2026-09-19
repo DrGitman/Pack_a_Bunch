@@ -16,16 +16,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.packabunch.R
 
-/**
- * The official mark, from `logos/`.
- *
- * One note worth keeping: the logo's brown (#5C2626) is deeper and redder than the token
- * primary (#A65C34). That is deliberate here — the mark is reproduced as drawn and is not
- * re-tinted to the palette. Everything that is *not* the logo still uses the tokens.
- */
-
-/** Brand brown, sampled from the supplied artwork. Only the logo may use it. */
-val LogoBrown = Color(0xFF5C2626)
+/** The official mark, from `logos/`. Tile brown sampled from logo_theme_brown_white_inside.png. */
+val LogoBrown = Color(0xFF955532)
 
 /** The parcel mark on the brand tile — splash, about row, empty states that want the brand. */
 @Composable
