@@ -1,5 +1,6 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.motion.popIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -122,13 +123,14 @@ fun PurchaseOutcomeScreen(
         )
     }
 
-    ScreenScaffold(modifier) {
-        Spacer(Modifier.weight(1f))
+    ArtboardPage(modifier) {
+        PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             IconTile(
                 icon = spec.icon,
                 tint = spec.tint,
+                modifier = if (outcome == PurchaseOutcome.Succeeded) Modifier.popIn() else Modifier,
                 background = spec.background,
                 size = 64.dp,
                 iconSize = 30.dp,
@@ -190,7 +192,7 @@ fun PurchaseOutcomeScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(
             Modifier.padding(horizontal = Spacing.gutter),

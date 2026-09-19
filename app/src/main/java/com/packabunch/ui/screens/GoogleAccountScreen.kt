@@ -15,7 +15,7 @@ fun GoogleAccountScreen(account: SupabaseAccount, onSignOut: () -> Unit, onBack:
         PackAppBar(title = "Your account", onBack = onBack)
         Column(Modifier.padding(Spacing.gutter), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(account.email ?: "Signed in")
-            Note(text = "Your packs are saved on this device. Cloud sync is not connected yet.", icon = PackIcons.Info)
+            Note(text = "Your packs are saved on this phone and back up to your account.", icon = PackIcons.Info)
             SecondaryButton(text = "Sign out", onClick = onSignOut)
         }
     }

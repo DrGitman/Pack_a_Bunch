@@ -1,5 +1,6 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.motion.pressScale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -181,6 +182,7 @@ private fun AccountRow(
     Row(
         Modifier
             .fillMaxWidth()
+            .pressScale(pressedScale = 0.98f)
             .clickable(onClick = onClick)
             .padding(vertical = 15.dp),
         verticalAlignment = Alignment.CenterVertically,

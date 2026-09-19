@@ -65,7 +65,7 @@ fun UpgradeScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(title = "", onBack = onBack)
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
@@ -130,7 +130,7 @@ fun UpgradeScreen(
             )
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             Box(

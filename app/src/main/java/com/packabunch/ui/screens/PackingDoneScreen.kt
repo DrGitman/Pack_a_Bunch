@@ -1,5 +1,6 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.motion.popIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -67,13 +68,14 @@ fun PackingDoneScreen(
     val plan = state.plan
     var answered by remember { mutableStateOf<Boolean?>(null) }
 
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         Spacer(Modifier.height(Spacing.xl))
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             IconTile(
                 icon = PackIcons.Check,
                 tint = Success,
+                modifier = Modifier.popIn(),
                 background = SuccessTint,
                 size = 56.dp,
                 iconSize = 28.dp,
@@ -161,7 +163,7 @@ fun PackingDoneScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         // Only shown when the free tier genuinely cannot hold another pack — not on every
         // completed pack, and never before the result has been delivered.

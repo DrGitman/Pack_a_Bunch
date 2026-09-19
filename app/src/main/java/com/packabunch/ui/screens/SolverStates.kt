@@ -483,7 +483,7 @@ private fun FixRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .pressScale(pressedScale = 0.99f)
+            .pressScale(pressedScale = 0.97f)
             .background(Color.White, RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
             .padding(14.dp),

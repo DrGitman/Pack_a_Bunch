@@ -66,6 +66,7 @@ import com.packabunch.ui.theme.UiFamily
  * the result screen would disagree with.
  */
 @Composable
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 fun ProjectsScreen(
     projects: List<Project>,
     unit: LengthUnit,
@@ -81,6 +82,8 @@ fun ProjectsScreen(
     onDuplicate: (Project) -> Unit = {},
     onRemeasure: (Project) -> Unit = {},
     onShare: (Project) -> Unit = {},
+    refreshing: Boolean = false,
+    onRefresh: () -> Unit = {},
 ) {
     // The three data states live here together because they are one flow: open the menu,
     // confirm the delete, then get a window to take it back.
@@ -163,8 +166,11 @@ fun ProjectsScreen(
                     Text("No packs match this search or filter.", color = TextSecondary, fontFamily = UiFamily)
                 }
             } else {
+                androidx.compose.material3.pulltorefresh.PullToRefreshBox(
+                    isRefreshing = refreshing, onRefresh = onRefresh, modifier = Modifier.weight(1f),
+                ) {
                 LazyColumn(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(
                         start = Spacing.gutter,
                         end = Spacing.gutter,
@@ -182,6 +188,7 @@ fun ProjectsScreen(
                             modifier = Modifier.animateItem(),
                         )
                     }
+                }
                 }
             }
         }
@@ -256,7 +263,7 @@ private fun ProjectCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .pressScale(pressedScale = 0.985f)
+            .pressScale(pressedScale = 0.97f)
             .warmShadow(8.dp, shape)
             .background(Color.White, shape)
             .clickable(onClick = onClick)

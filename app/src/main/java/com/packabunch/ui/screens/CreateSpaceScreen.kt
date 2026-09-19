@@ -105,7 +105,7 @@ fun CreateSpaceScreen(
         }
     }
 
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(title = "New pack", onBack = onBack)
 
         Column(Modifier.padding(horizontal = Spacing.gutter, vertical = 14.dp)) {
@@ -274,7 +274,7 @@ fun CreateSpaceScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             PrimaryButton(

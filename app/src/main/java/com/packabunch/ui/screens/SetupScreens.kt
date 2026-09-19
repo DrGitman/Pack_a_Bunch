@@ -111,7 +111,7 @@ fun OnbSetupScreen(
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 LengthUnit.entries.forEach { candidate ->
-                    Column(Modifier.weight(1f).background(Color.White, RoundedCornerShape(22.dp))
+                    Column(Modifier.weight(1f).pressScale(pressedScale = 0.96f).background(Color.White, RoundedCornerShape(22.dp))
                         .border(if (unit == candidate) 2.dp else 1.dp, if (unit == candidate) Primary else Outline, RoundedCornerShape(22.dp))
                         .clickable { onUnitChange(candidate) }.padding(horizontal = 14.dp, vertical = 18.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
@@ -173,7 +173,7 @@ private fun HabitRow(habit: PackingHabit, selected: Boolean, onClick: () -> Unit
     Row(
         Modifier
             .fillMaxWidth()
-            .pressScale(pressedScale = 0.99f)
+            .pressScale(pressedScale = 0.97f)
             .background(background, shape)
             .border(if (selected) 2.dp else 1.dp, border, shape)
             .clickable(onClick = onClick)

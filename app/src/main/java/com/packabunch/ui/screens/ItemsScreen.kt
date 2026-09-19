@@ -242,7 +242,7 @@ private fun ItemRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .pressScale(pressedScale = 0.985f)
+            .pressScale(pressedScale = 0.97f)
             .warmShadow(6.dp, shape)
             .background(Color.White, shape)
             .clickable(onClick = onClick)

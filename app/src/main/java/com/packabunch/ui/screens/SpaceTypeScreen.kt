@@ -71,7 +71,7 @@ fun SpaceTypeScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(title = "New pack", onBack = onBack)
 
         Column(Modifier.padding(horizontal = Spacing.gutter, vertical = 14.dp)) {
@@ -143,7 +143,7 @@ fun SpaceTypeScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             PrimaryButton(
@@ -177,7 +177,7 @@ private fun KindCard(
     Column(
         Modifier
             .fillMaxWidth()
-            .pressScale(pressedScale = 0.99f, enabled = enabled)
+            .pressScale(pressedScale = 0.97f, enabled = enabled)
             .warmShadow(if (selected) 8.dp else 4.dp, shape)
             .background(Color.White, shape)
             .border(if (selected) 2.dp else 1.dp, border, shape)

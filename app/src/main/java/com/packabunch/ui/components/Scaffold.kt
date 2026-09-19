@@ -197,6 +197,9 @@ fun NavPill(
     onNewPack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Each screen draws its own pill, so remember the last tab to animate from it.
+    val previous = remember { lastNavSelection ?: current }
+    androidx.compose.runtime.SideEffect { lastNavSelection = current }
     Row(
         modifier = modifier
             .warmShadow(14.dp, RoundedCornerShape(34.dp))
@@ -209,6 +212,7 @@ fun NavPill(
             icon = PackIcons.Projects,
             label = "Projects",
             selected = current == NavDestination.Projects,
+            wasSelected = previous == NavDestination.Projects,
             onClick = { onNavigate(NavDestination.Projects) },
         )
 
@@ -232,6 +236,7 @@ fun NavPill(
             icon = PackIcons.Settings,
             label = "Settings",
             selected = current == NavDestination.Settings,
+            wasSelected = previous == NavDestination.Settings,
             onClick = { onNavigate(NavDestination.Settings) },
         )
     }
@@ -242,23 +247,16 @@ private fun NavPillItem(
     icon: ImageVector,
     label: String,
     selected: Boolean,
+    wasSelected: Boolean,
     onClick: () -> Unit,
 ) {
-    val expansion by animateFloatAsState(
-        targetValue = if (selected) 1f else 0f,
-        animationSpec = Motion.standardTween(),
-        label = "navExpansion",
-    )
-    val background by animateColorAsState(
-        targetValue = if (selected) Color.White else Color.Transparent,
-        animationSpec = Motion.standardTween(),
-        label = "navBackground",
-    )
-    val tint by animateColorAsState(
-        targetValue = if (selected) Primary else Color(0xFFC9B29E),
-        animationSpec = Motion.standardTween(),
-        label = "navTint",
-    )
+    val progress = remember { androidx.compose.animation.core.Animatable(if (wasSelected) 1f else 0f) }
+    androidx.compose.runtime.LaunchedEffect(selected) {
+        progress.animateTo(if (selected) 1f else 0f, Motion.pressSpring())
+    }
+    val expansion = progress.value.coerceIn(0f, 1f)
+    val background = androidx.compose.ui.graphics.lerp(Color.Transparent, Color.White, expansion)
+    val tint = androidx.compose.ui.graphics.lerp(Color(0xFFC9B29E), Primary, expansion)
 
     Row(
         modifier = Modifier
@@ -287,6 +285,8 @@ private fun NavPillItem(
         }
     }
 }
+
+private var lastNavSelection: NavDestination? = null
 
 /** Standard bottom padding so content clears the floating nav pill. */
 val NavPillClearance = 96.dp

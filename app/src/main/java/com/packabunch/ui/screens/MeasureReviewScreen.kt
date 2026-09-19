@@ -85,7 +85,7 @@ fun MeasureReviewScreen(
     val heightMm = parseLengthToMm(height, unit)
     val valid = widthMm != null && depthMm != null && heightMm != null
 
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(title = "Measure", onBack = onBack)
 
         Column(Modifier.padding(horizontal = Spacing.gutter, vertical = 12.dp)) {
@@ -187,7 +187,7 @@ fun MeasureReviewScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(
             Modifier.padding(horizontal = Spacing.gutter),

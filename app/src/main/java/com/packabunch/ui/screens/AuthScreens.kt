@@ -1,5 +1,6 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.motion.pressScale
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,7 +53,7 @@ private fun AuthText(text: String, size: Float = 15f, line: Int = 23,
 private fun GoogleButton(onClick: () -> Unit) {
     val interactions = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     val view = androidx.compose.ui.platform.LocalView.current
-    Row(Modifier.fillMaxWidth().height(56.dp)
+    Row(Modifier.fillMaxWidth().height(56.dp).pressScale(pressedScale = 0.95f, interactionSource = interactions)
         .background(Surface, RoundedCornerShape(28.dp))
         .border(1.5.dp, OutlineStrong, RoundedCornerShape(28.dp))
         .clip(RoundedCornerShape(28.dp))
@@ -111,7 +112,7 @@ fun SignInScreen(onContinueWithGoogle: () -> Unit, onContinueWithEmail: () -> Un
             PrimaryButton("Sign up with email", onContinueWithEmail, icon = PackIcons.Mail)
         }
         TrustCard(rows = listOf("An email address is all we ask for. No phone number.",
-            "Your packs and measurements stay on this phone for now.",
+            "Your packs back up to your account and still work offline.",
             "Sign in with Google or your email and password."),
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp))
         PushDown()
@@ -188,7 +189,7 @@ fun LogInScreen(localPackCount: Int, onLogIn: (String, String) -> Unit, onGoogle
                 PackTextButton("Forgot password?", onForgot)
             }
             Spacer(Modifier.height(12.dp))
-            Note(text = "Your session is saved securely on this phone. Cloud backup and merging are not connected yet.", icon = PackIcons.Lock)
+            Note(text = "Your session is saved securely on this phone. Packs back up to your account.", icon = PackIcons.Lock)
         }
         PushDown()
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)) {
@@ -217,7 +218,7 @@ fun CreateAccountScreen(onCreate: (String, String, Boolean, Boolean) -> Unit, on
             AuthField("Password", password, { password = it }, password = true, strength = true)
             Spacer(Modifier.height(20.dp))
             TrustCard("What the account is for", listOf("Sign in securely with your email and password",
-                "Keep packs separate for each account on this phone", "Cloud backup is not connected yet"))
+                "Keep packs separate for each account on this phone", "Back up your packs and pick them up on another phone"))
             Spacer(Modifier.height(16.dp))
             AuthText("We may ask you to confirm your email before logging in.", 13.5f, 20)
         }

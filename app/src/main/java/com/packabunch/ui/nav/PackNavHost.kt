@@ -11,6 +11,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
@@ -112,10 +113,10 @@ object Routes {
  * sequence — space, then items, then the plan, then the pack — and the direction of travel
  * is what tells you where you are in it.
  *
- * Durations come from the tokens: 250 ms in, 150 ms out. Nothing longer, because the whole
+ * Durations come from Motion: 320 ms in, 180 ms out — visible, never slow, because the whole
  * app is meant to feel like a tool rather than a presentation.
  */
-private const val SLIDE_FRACTION = 8
+private const val SLIDE_FRACTION = 4
 
 private fun AnimatedContentTransitionScope<*>.enterForward(): EnterTransition =
     slideIntoContainer(
@@ -154,6 +155,17 @@ private fun resultExit(): ExitTransition =
     fadeOut(tween(Motion.SHORT_MS, easing = Motion.Exit)) +
         scaleOut(tween(Motion.SHORT_MS, easing = Motion.Exit), targetScale = 0.98f)
 
+/** Google Play's own page for this app's subscription: cancel, change plan, update payment. */
+private fun openPlaySubscriptions(context: android.content.Context) {
+    val uri = android.net.Uri.parse("https://play.google.com/store/account/subscriptions?package=" + context.packageName)
+    runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri)) }
+}
+
+private val TabRoutes = setOf(Routes.PROJECTS, Routes.SETTINGS)
+
+private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.isTabSwitch() =
+    initialState.destination.route in TabRoutes && targetState.destination.route in TabRoutes
+
 @Composable
 fun PackNavHost(
     viewModel: AppViewModel,
@@ -168,11 +180,12 @@ fun PackNavHost(
     val projectsLoading by viewModel.projectsLoading.collectAsStateWithLifecycle()
     val syncState by viewModel.syncState.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var notice by remember { mutableStateOf<String?>(null) }
     notice?.let { message ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { notice = null },
-            title = { androidx.compose.material3.Text("Local preview") },
+            title = { androidx.compose.material3.Text("Pack a Bunch") },
             text = { androidx.compose.material3.Text(message) },
             confirmButton = { androidx.compose.material3.TextButton(onClick = { notice = null }) {
                 androidx.compose.material3.Text("OK")
@@ -199,10 +212,11 @@ fun PackNavHost(
         navController = navController,
         startDestination = startRoute,
         modifier = modifier,
-        enterTransition = { enterForward() },
-        exitTransition = { exitForward() },
-        popEnterTransition = { enterBack() },
-        popExitTransition = { exitBack() },
+        // Tabs are siblings, not steps: switching between them fades through instead of sliding.
+        enterTransition = { if (isTabSwitch()) resultEnter() else enterForward() },
+        exitTransition = { if (isTabSwitch()) resultExit() else exitForward() },
+        popEnterTransition = { if (isTabSwitch()) resultEnter() else enterBack() },
+        popExitTransition = { if (isTabSwitch()) resultExit() else exitBack() },
     ) {
         composable(Routes.WELCOME) {
             WelcomeScreen(
@@ -275,8 +289,15 @@ fun PackNavHost(
                 syncRunning = syncState.running,
                 onSync = viewModel::syncNow,
                 onChangeEmail = { notice = "Email changes are not connected in this build yet." },
-                onChangePassword = { notice = "Password changes are not connected in this build yet." },
-                onManageSubscription = { notice = "Google Play Billing is not connected in this build." },
+                onChangePassword = {
+                    val email = account.email
+                    if (email == null) notice = "Your account has no email address to send a reset link to."
+                    else scope.launch {
+                        notice = runCatching { account.sendRecovery(email) }.fold(
+                            { "We sent a password reset link to $email." }, { it.message ?: "Couldn't send the reset link. Try again." })
+                    }
+                },
+                onManageSubscription = { openPlaySubscriptions(context) },
                 onSignOut = onSignOut,
                 onDeleteAccount = { notice = "Account deletion is not connected yet. Deleting local packs does not delete your Supabase account." },
                 onBack = { navController.popBackStack() },
@@ -308,7 +329,10 @@ fun PackNavHost(
         }
 
         composable(Routes.PROJECTS) {
+            val sync by viewModel.syncState.collectAsStateWithLifecycle()
             ProjectsScreen(
+                refreshing = sync.running,
+                onRefresh = viewModel::syncNow,
                 loading = projectsLoading,
                 projects = projects,
                 unit = settings.unit,
@@ -683,8 +707,13 @@ fun PackNavHost(
                 email = account.email,
                 onCameraMeasuringChange = viewModel::setCameraMeasuring,
                 onDefaultEdgeGapChange = viewModel::setDefaultEdgeGap,
-                onManageSubscription = { notice = "Google Play Billing is not connected in this build." },
-                onRestorePurchases = { notice = "Purchase restoration is not available until Google Play Billing is connected." },
+                onManageSubscription = { openPlaySubscriptions(context) },
+                onRestorePurchases = {
+                    viewModel.restorePurchases { restored ->
+                        notice = if (restored) "Pack-a-Bunch Pro restored." else
+                            "No active Pack-a-Bunch Pro on this Google account."
+                    }
+                },
                 onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
                 onDeleteAllData = viewModel::deleteAllLocalData,
                 onPrivacy = { notice = "A published privacy policy has not been configured. This preview stores packs locally." },

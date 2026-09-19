@@ -155,7 +155,7 @@ private fun VersionCard(version: PackVersion, selected: Boolean, onClick: () -> 
     Column(
         Modifier
             .fillMaxWidth()
-            .pressScale(pressedScale = 0.99f)
+            .pressScale(pressedScale = 0.97f)
             .background(if (selected) BrandTint else Color.White, shape)
             .border(if (selected) 2.dp else 1.dp, if (selected) Primary else Outline, shape)
             .clickable(onClick = onClick)
@@ -340,7 +340,7 @@ private fun NotificationRow(notification: AppNotification, onClick: () -> Unit) 
     Row(
         Modifier
             .fillMaxWidth()
-            .pressScale(pressedScale = 0.99f)
+            .pressScale(pressedScale = 0.97f)
             .background(if (notification.unread) BrandTint else Color.White, shape)
             .clickable(onClick = onClick)
             .padding(14.dp),

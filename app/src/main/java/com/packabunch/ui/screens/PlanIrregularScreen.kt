@@ -83,7 +83,7 @@ fun PlanIrregularScreen(
     val usableLitres = ((space?.usableVolumeMm3 ?: 0L) / 1_000_000.0).roundToInt()
     val fixedObstructions = scan?.obstructions?.count { !it.removable } ?: 0
 
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(
             title = state.name.ifEmpty { "Your space" },
             subtitle = buildString {
@@ -198,7 +198,7 @@ fun PlanIrregularScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             PrimaryButton(

@@ -65,7 +65,7 @@ fun OpeningTooSmallScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(title = "It won't go through", onBack = onBack)
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
@@ -154,7 +154,7 @@ fun OpeningTooSmallScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(
             Modifier.padding(horizontal = Spacing.gutter),

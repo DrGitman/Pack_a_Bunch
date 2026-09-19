@@ -295,7 +295,7 @@ fun CameraRationale(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    com.packabunch.ui.components.ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         com.packabunch.ui.components.PackAppBar(title = "Photo", onBack = onBack)
 
         Spacer(Modifier.height(Spacing.xl))
@@ -322,7 +322,7 @@ fun CameraRationale(
             )
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(
             Modifier.padding(horizontal = Spacing.gutter),

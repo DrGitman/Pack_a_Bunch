@@ -73,7 +73,7 @@ fun PlanResultScreen(
     val plan = state.plan
     val space = state.space
 
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(
             title = state.name.ifEmpty { "Your pack" },
             subtitle = space?.let { formatDimensions(it.dimensions, unit) },
@@ -170,7 +170,7 @@ fun PlanResultScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Row(
             modifier = Modifier.padding(horizontal = Spacing.gutter),

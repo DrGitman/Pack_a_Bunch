@@ -72,7 +72,7 @@ fun PlanLayersScreen(
     var selected by remember { mutableIntStateOf(0) }
     val layer = layers.getOrNull(selected.coerceIn(0, (layers.size - 1).coerceAtLeast(0)))
 
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(
             title = state.name.ifEmpty { "Your pack" },
             subtitle = "Looking straight down",
@@ -162,7 +162,7 @@ fun PlanLayersScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Row(
             Modifier

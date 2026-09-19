@@ -154,7 +154,7 @@ private fun MenuRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .pressScale(pressedScale = 0.99f)
+            .pressScale(pressedScale = 0.97f)
             .background(SurfaceField, shape)
             .clickable(onClick = onClick)
             .padding(14.dp),

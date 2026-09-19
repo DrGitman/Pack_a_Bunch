@@ -85,7 +85,7 @@ private fun DrawScope.drawAxisLabel(
 ) {
     val laid = measurer.measure(
         text = text,
-        style = TextStyle(fontFamily = NumericFamily, fontSize = (9f * scale).sp, color = color),
+        style = TextStyle(fontFamily = NumericFamily, fontSize = (9f * scale / density).sp, color = color),
     )
     drawText(laid, topLeft = at)
 }

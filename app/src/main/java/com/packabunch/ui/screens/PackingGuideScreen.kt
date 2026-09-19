@@ -73,7 +73,7 @@ fun PackingGuideScreen(
     val spec = current?.let { placement -> state.items.firstOrNull { it.id == placement.specId } }
     val itemIndex = state.items.indexOfFirst { it.id == current?.specId }
 
-    ScreenScaffold(modifier) {
+    ArtboardPage(modifier) {
         PackAppBar(
             title = "Packing guide",
             onBack = onBack,
@@ -175,7 +175,7 @@ fun PackingGuideScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

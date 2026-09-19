@@ -1,5 +1,6 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.motion.pressScale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -64,7 +65,7 @@ fun SettingsScreen(
         text = { Column {
             Text("Default for new spaces. Existing packs keep their own gap.")
             listOf(0, 2, 5, 10, 20, 50).forEach { mm ->
-                Row(Modifier.fillMaxWidth().clickable { onDefaultEdgeGapChange(mm); showGap = false }.padding(vertical = 4.dp),
+                Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f).clickable { onDefaultEdgeGapChange(mm); showGap = false }.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = settings.defaultEdgeGapMm == mm, onClick = { onDefaultEdgeGapChange(mm); showGap = false })
                     Text("$mm mm", fontFamily = NumericFamily)
@@ -80,7 +81,7 @@ fun SettingsScreen(
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
                 .padding(bottom = NavPillClearance)) {
                 Spacer(Modifier.height(16.dp))
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Surface)
+                Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.97f).clip(RoundedCornerShape(22.dp)).background(Surface)
                     .clickable(onClick = onAccount).padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
                     Box(Modifier.size(46.dp).background(Primary, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
@@ -90,7 +91,7 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f)) {
                         Text(email?.substringBefore('@') ?: "Your account", color = TextPrimary, fontFamily = UiFamily,
                             fontSize = 15.5.sp, fontWeight = FontWeight.Bold)
-                        Text((if (settings.tier == Tier.PLUS) "Pack-a-Bunch Pro" else "Free plan") + " · saved on this phone",
+                        Text(if (settings.tier == Tier.PLUS) "Pack-a-Bunch Pro" else "Free plan",
                             color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp, lineHeight = 18.sp)
                     }
                     Icon(PackIcons.Forward, null, Modifier.size(19.dp), tint = TextTertiary)
@@ -111,7 +112,7 @@ fun SettingsScreen(
                         Switch(settings.cameraMeasuring, onCameraMeasuringChange)
                     }
                     SettingsDivider()
-                    Row(Modifier.fillMaxWidth().clickable { showGap = true }.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f).clickable { showGap = true }.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         SettingsLabel("Gap around the edges", Modifier.weight(1f))
                         Text("${settings.defaultEdgeGapMm} mm", Modifier.background(SurfaceMuted, RoundedCornerShape(99.dp)).padding(horizontal = 12.dp, vertical = 6.dp),
                             color = BodyInk, fontFamily = NumericFamily, fontSize = 14.sp)
@@ -151,7 +152,7 @@ fun SettingsScreen(
     Text(text, modifier, color = color, fontFamily = UiFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
 }
 @Composable private fun SettingsAction(icon: ImageVector, label: String, onClick: () -> Unit, tint: Color = TextSecondary) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp),
+    Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f).clickable(onClick = onClick).padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
         Icon(icon, null, Modifier.size(20.dp), tint = tint)
         SettingsLabel(label, Modifier.weight(1f), if (tint == ErrorRed) ErrorRed else TextPrimary)

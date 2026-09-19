@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 /**
  * The app's motion vocabulary, in one place.
  *
- * The design tokens allow 150–250 ms and nothing longer, which rules out anything showy.
+ * Durations sit in the 180–320 ms band UX guidance recommends, which rules out anything showy.
  * What is left is motion that does a job: telling you a control registered your finger,
  * showing where a sheet came from, and letting a number settle so you notice it changed.
  *
@@ -40,13 +40,13 @@ import androidx.compose.ui.unit.dp
 object Motion {
 
     /** Token: `durationShortMs`. Presses, toggles, chip selection. */
-    const val SHORT_MS = 150
+    const val SHORT_MS = 180
 
     /** Token: `durationMediumMs`. Screen changes, sheets, expanding cards. */
-    const val MEDIUM_MS = 250
+    const val MEDIUM_MS = 320
 
     /** Entrance stagger between items in a list. Deliberately small — this is a utility. */
-    const val STAGGER_MS = 34
+    const val STAGGER_MS = 45
 
     /**
      * Decelerate. Things arriving on screen: sheets, screens, entering cards. Fast at the
@@ -121,7 +121,7 @@ fun Modifier.pressScale(
 fun rememberStaggeredEntrance(
     index: Int,
     enabled: Boolean = true,
-    riseFrom: Dp = 10.dp,
+    riseFrom: Dp = 18.dp,
 ): EntranceState {
     val progress = remember { Animatable(if (enabled) 0f else 1f) }
 
@@ -141,6 +141,19 @@ fun Modifier.entrance(state: EntranceState): Modifier = composed {
     graphicsLayer {
         alpha = state.progress
         translationY = state.riseFrom.toPx() * (1f - state.progress)
+    }
+}
+
+/** A success mark lands once with a small overshoot when its screen appears. */
+fun Modifier.popIn(): Modifier = composed {
+    val scale = remember { Animatable(0.4f) }
+    LaunchedEffect(Unit) {
+        scale.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = Spring.StiffnessMediumLow))
+    }
+    graphicsLayer {
+        scaleX = scale.value
+        scaleY = scale.value
+        alpha = ((scale.value - 0.4f) / 0.6f).coerceIn(0f, 1f)
     }
 }
 
