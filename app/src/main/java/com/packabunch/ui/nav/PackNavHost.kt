@@ -720,8 +720,8 @@ fun PackNavHost(
                 onSubscribe = { viewModel.subscribe(activity) },
                 onRestore = {
                     viewModel.restorePurchases { restored ->
-                        notice = if (restored) "Pack Plus restored." else
-                            "No active Pack Plus on this Google account. Restoring does not bring back deleted packs."
+                        notice = if (restored) "Pack-a-Bunch Pro restored." else
+                            "No active Pack-a-Bunch Pro on this Google account. Restoring does not bring back deleted packs."
                     }
                 },
                 onTerms = { notice = "Published terms have not been configured for this preview." },

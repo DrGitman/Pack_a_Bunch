@@ -136,7 +136,7 @@ fun SpaceTypeScreen(
                 Spacer(Modifier.height(10.dp))
                 Note(
                     text = "Free maps spaces up to ${limits.maxScannedSpaceLitres} litres — " +
-                        "about a large crate. A car boot needs Pack Plus.",
+                        "about a large crate. A car boot needs Pack-a-Bunch Pro.",
                     tone = NoteTone.Caution,
                     icon = PackIcons.Lock,
                 )

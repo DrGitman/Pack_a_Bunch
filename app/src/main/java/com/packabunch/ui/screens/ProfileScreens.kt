@@ -104,7 +104,7 @@ fun ProfileScreen(
                         Row(Modifier.background(BrandTint, RoundedCornerShape(99.dp)).padding(horizontal = 11.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(PackIcons.Cube, null, Modifier.size(13.dp), tint = com.packabunch.ui.theme.PrimaryDark)
-                            Text(if (tier == Tier.PLUS) "PACK PLUS" else "FREE PLAN", color = com.packabunch.ui.theme.PrimaryDark,
+                            Text(if (tier == Tier.PLUS) "PACK-A-BUNCH PRO" else "FREE PLAN", color = com.packabunch.ui.theme.PrimaryDark,
                                 fontFamily = UiFamily, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = .5.sp)
                         }
                     }
@@ -151,7 +151,7 @@ fun ProfileScreen(
                 androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
                 AccountRow(PackIcons.Lock, "Change password", onChangePassword)
                 androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
-                AccountRow(PackIcons.Cube, "Manage Pack Plus", onManageSubscription)
+                AccountRow(PackIcons.Cube, "Manage Pack-a-Bunch Pro", onManageSubscription)
             }
 
             Spacer(Modifier.height(Spacing.lg))
@@ -280,7 +280,7 @@ fun AccountDeleteScreen(
                 title = "What doesn't",
                 items = buildList {
                     if (hasActiveSubscription) {
-                        add("Your Pack Plus subscription — cancel that in Google Play, or it keeps billing")
+                        add("Your Pack-a-Bunch Pro subscription — cancel that in Google Play, or it keeps billing")
                     }
                     add("Anything you've already packed. Obviously.")
                 },

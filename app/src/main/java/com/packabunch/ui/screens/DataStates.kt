@@ -308,7 +308,7 @@ fun LimitSavedPacksSheet(
 
             Text(
                 text = "You already have “$existingPackName”. You can replace it and " +
-                    "carry on for free, or keep both with Pack Plus.",
+                    "carry on for free, or keep both with Pack-a-Bunch Pro.",
                 color = TextSecondary,
                 fontFamily = UiFamily,
                 fontSize = 14.5f.sp,
@@ -317,7 +317,7 @@ fun LimitSavedPacksSheet(
 
             Spacer(Modifier.height(Spacing.lg))
 
-            PrimaryButton(text = "Keep both with Pack Plus", onClick = onUpgrade)
+            PrimaryButton(text = "Keep both with Pack-a-Bunch Pro", onClick = onUpgrade)
             Spacer(Modifier.height(8.dp))
             // Replacing is a genuine free route out, not a punishment. The old pack is named
             // so nobody replaces the wrong one by accident.

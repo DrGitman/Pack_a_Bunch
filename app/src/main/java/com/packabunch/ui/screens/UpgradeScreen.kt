@@ -39,7 +39,7 @@ import com.packabunch.ui.theme.TextTertiary
 import com.packabunch.ui.theme.UiFamily
 
 /**
- * Pack Plus — `design/artboards/Upgrade.dc.html`.
+ * Pack-a-Bunch Pro — `design/artboards/Upgrade.dc.html`.
  *
  * Rules this screen follows, all of which are easy to break and expensive to break:
  *
@@ -70,7 +70,7 @@ fun UpgradeScreen(
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             Text(
-                text = "PACK PLUS",
+                text = "PACK-A-BUNCH PRO",
                 color = Primary,
                 fontFamily = UiFamily,
                 fontWeight = FontWeight.ExtraBold,

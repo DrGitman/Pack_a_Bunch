@@ -189,7 +189,7 @@ fun PackingDoneScreen(
                             modifier = Modifier.padding(top = 3.dp),
                         )
                         Spacer(Modifier.height(10.dp))
-                        SecondaryButton(text = "See Pack Plus", onClick = onUpgrade)
+                        SecondaryButton(text = "See Pack-a-Bunch Pro", onClick = onUpgrade)
                     }
                 }
             }

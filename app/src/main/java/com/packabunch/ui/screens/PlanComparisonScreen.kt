@@ -41,7 +41,7 @@ import com.packabunch.ui.theme.TextTertiary
 import com.packabunch.ui.theme.UiFamily
 
 /**
- * Free vs Pack Plus — `design/artboards/PlanComparison.dc.html`.
+ * Free vs Pack-a-Bunch Pro — `design/artboards/PlanComparison.dc.html`.
  *
  * ### One line in the artboard had to change
  *
@@ -125,7 +125,7 @@ fun PlanComparisonScreen(
     )
 
     ScreenScaffold(modifier) {
-        PackAppBar(title = "Free and Pack Plus", onBack = onBack)
+        PackAppBar(title = "Free and Pack-a-Bunch Pro", onBack = onBack)
 
         Column(
             Modifier
@@ -135,7 +135,7 @@ fun PlanComparisonScreen(
             Spacer(Modifier.height(Spacing.sm))
 
             Text(
-                text = "Everything that makes the app work is free. Pack Plus is for keeping " +
+                text = "Everything that makes the app work is free. Pack-a-Bunch Pro is for keeping " +
                     "things, and for the big spaces.",
                 color = TextSecondary,
                 fontFamily = UiFamily,
@@ -148,7 +148,7 @@ fun PlanComparisonScreen(
             Row(Modifier.fillMaxWidth()) {
                 Spacer(Modifier.weight(1f))
                 ColumnHeading("FREE", Modifier.width(64.dp), TextTertiary)
-                ColumnHeading("PLUS", Modifier.width(64.dp), Primary)
+                ColumnHeading("PRO", Modifier.width(64.dp), Primary)
             }
 
             Spacer(Modifier.height(6.dp))
@@ -211,7 +211,7 @@ fun PlanComparisonScreen(
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             PrimaryButton(
-                text = price?.let { "Get Pack Plus — $it" } ?: "Pack Plus",
+                text = price?.let { "Get Pack-a-Bunch Pro — $it" } ?: "Pack-a-Bunch Pro",
                 onClick = onSubscribe,
                 enabled = price != null,
             )

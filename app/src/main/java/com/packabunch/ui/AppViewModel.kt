@@ -53,7 +53,7 @@ class AppViewModel(
     val syncState = cloudSync?.state ?: MutableStateFlow(com.packabunch.data.cloud.CloudSyncState()).asStateFlow()
     fun syncNow() { viewModelScope.launch { cloudSync?.sync() } }
 
-    // -- Pack Plus ------------------------------------------------------------------------
+    // -- Pack-a-Bunch Pro ------------------------------------------------------------------------
 
     private val _plusPackage = MutableStateFlow<com.revenuecat.purchases.Package?>(null)
     /** Null until Google Play returns a real, localised product. The paywall stays disabled. */

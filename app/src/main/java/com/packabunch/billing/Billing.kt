@@ -20,7 +20,7 @@ import com.revenuecat.purchases.awaitRestore
 import com.revenuecat.purchases.interfaces.UpdatedCustomerInfoListener
 
 /**
- * Pack Plus, through Google Play Billing via RevenueCat.
+ * Pack-a-Bunch Pro, through Google Play Billing via RevenueCat.
  *
  * The one rule: **Plus is unlocked by RevenueCat's verified entitlement, never by a tap.**
  * A purchase returning is not what switches the tier on — [onEntitlement] is, and it fires
@@ -32,13 +32,15 @@ import com.revenuecat.purchases.interfaces.UpdatedCustomerInfoListener
 object Billing {
 
     /** Must match the entitlement identifier in the RevenueCat dashboard. */
-    const val ENTITLEMENT = "plus"
+    const val ENTITLEMENT = "pack_a_bunch_pro"
 
-    val configured: Boolean get() = BuildConfig.REVENUECAT_API_KEY.startsWith("goog_") && Purchases.isConfigured
+    val configured: Boolean get() = Purchases.isConfigured
 
     fun configure(context: Context) {
         val key = BuildConfig.REVENUECAT_API_KEY
-        if (!key.startsWith("goog_") || Purchases.isConfigured) return
+        // Test Store keys (test_) fake purchases, so they are debug-only; Play builds need goog_.
+        val usable = key.startsWith("goog_") || (BuildConfig.DEBUG && key.startsWith("test_"))
+        if (!usable || Purchases.isConfigured) return
         Purchases.configure(PurchasesConfiguration.Builder(context, key).build())
     }
 
