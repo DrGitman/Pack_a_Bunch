@@ -59,9 +59,6 @@ import com.packabunch.ui.theme.UiFamily
 /**
  * Projects — `design/artboards/Projects.dc.html` and `ProjectsEmpty.dc.html`.
  *
- * The subtitle says "on this device" and means it: nothing here is synced. When accounts
- * land that line has to change, and it should not change before they do.
- *
  * Metric chips reuse the plan's own numbers, so a card cannot show a fill percentage that
  * the result screen would disagree with.
  */
@@ -136,8 +133,8 @@ fun ProjectsScreen(
             }
 
             if (loading || projects.isNotEmpty()) Text(
-                text = if (loading) "Loading saved packs…" else if (projects.size == 1) "1 pack saved on this device"
-                else "${projects.size} packs saved on this device",
+                text = if (loading) "Loading saved packs…" else if (projects.size == 1) "1 pack saved"
+                else "${projects.size} packs saved",
                 color = TextTertiary,
                 fontFamily = UiFamily,
                 fontSize = 13.sp,

@@ -38,8 +38,9 @@ object Billing {
 
     fun configure(context: Context) {
         val key = BuildConfig.REVENUECAT_API_KEY
-        // Test Store keys (test_) fake purchases, so never in release; Play builds need goog_.
-        val usable = key.startsWith("goog_") || (BuildConfig.BUILD_TYPE != "release" && key.startsWith("test_"))
+        // Test Store keys (test_) only run in debuggable builds; RevenueCat closes any other
+        // build that uses one. Staging and release need the goog_ key.
+        val usable = key.startsWith("goog_") || (BuildConfig.DEBUG && key.startsWith("test_"))
         if (!usable || Purchases.isConfigured) return
         Purchases.configure(PurchasesConfiguration.Builder(context, key).build())
     }
