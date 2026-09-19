@@ -1,5 +1,10 @@
 package com.packabunch.ui.components
 
+import kotlinx.coroutines.launch
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.layout.offset
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -188,7 +193,8 @@ enum class NavDestination { Projects, Settings }
  *
  * It sits *over* the content rather than in a bottom bar slot, which is why screens that
  * use it scroll behind it instead of being squashed above it. The current destination
- * expands to show its label; the other collapses to its icon.
+ * expands to show its label; the other collapses to its icon. One white highlight slides
+ * between the tabs (passing behind the FAB) rather than each tab changing colour in place.
  */
 @Composable
 fun NavPill(
@@ -197,48 +203,69 @@ fun NavPill(
     onNewPack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Each screen draws its own pill, so remember the last tab to animate from it.
+    // Each screen draws its own pill, so start the highlight where the last screen left it.
     val previous = remember { lastNavSelection ?: current }
     androidx.compose.runtime.SideEffect { lastNavSelection = current }
-    Row(
-        modifier = modifier
+    val bounds = remember { androidx.compose.runtime.mutableStateMapOf<NavDestination, Pair<Float, Float>>() }
+    val x = remember { androidx.compose.animation.core.Animatable(0f) }
+    val w = remember { androidx.compose.animation.core.Animatable(0f) }
+    val target = bounds[current]
+    androidx.compose.runtime.LaunchedEffect(target) {
+        val to = target ?: return@LaunchedEffect
+        if (w.value == 0f) { // first layout: appear under the previous tab, then travel
+            val from = bounds[previous] ?: to
+            x.snapTo(from.first); w.snapTo(from.second)
+        }
+        val spec = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.75f, stiffness = 420f)
+        kotlinx.coroutines.coroutineScope {
+            launch { x.animateTo(to.first, spec) }
+            launch { w.animateTo(to.second, spec) }
+        }
+    }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+
+    Box(
+        modifier
             .warmShadow(14.dp, RoundedCornerShape(34.dp))
             .background(Chrome, RoundedCornerShape(34.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        NavPillItem(
-            icon = PackIcons.Projects,
-            label = "Projects",
-            selected = current == NavDestination.Projects,
-            wasSelected = previous == NavDestination.Projects,
-            onClick = { onNavigate(NavDestination.Projects) },
+        if (w.value > 0f) Box(
+            Modifier
+                .offset { androidx.compose.ui.unit.IntOffset(x.value.toInt(), 0) }
+                .size(with(density) { w.value.toDp() }, 52.dp)
+                .background(Color.White, RoundedCornerShape(26.dp)),
         )
-
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .pressScale(pressedScale = 0.9f)
-                .background(Accent, RoundedCornerShape(28.dp))
-                .clip(RoundedCornerShape(28.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(color = Chrome),
-                    onClick = onNewPack,
-                ),
-            contentAlignment = Alignment.Center,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Icon(PackIcons.Plus, contentDescription = "New pack", tint = Chrome, modifier = Modifier.size(24.dp))
-        }
+            NavPillItem(PackIcons.Projects, "Projects", current == NavDestination.Projects,
+                previous == NavDestination.Projects, { bounds[NavDestination.Projects] = it }) {
+                onNavigate(NavDestination.Projects)
+            }
 
-        NavPillItem(
-            icon = PackIcons.Settings,
-            label = "Settings",
-            selected = current == NavDestination.Settings,
-            wasSelected = previous == NavDestination.Settings,
-            onClick = { onNavigate(NavDestination.Settings) },
-        )
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .pressScale(pressedScale = 0.9f)
+                    .background(Accent, RoundedCornerShape(28.dp))
+                    .clip(RoundedCornerShape(28.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = Chrome),
+                        onClick = onNewPack,
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(PackIcons.Plus, contentDescription = "New pack", tint = Chrome, modifier = Modifier.size(24.dp))
+            }
+
+            NavPillItem(PackIcons.Settings, "Settings", current == NavDestination.Settings,
+                previous == NavDestination.Settings, { bounds[NavDestination.Settings] = it }) {
+                onNavigate(NavDestination.Settings)
+            }
+        }
     }
 }
 
@@ -248,26 +275,30 @@ private fun NavPillItem(
     label: String,
     selected: Boolean,
     wasSelected: Boolean,
+    onBounds: (Pair<Float, Float>) -> Unit,
     onClick: () -> Unit,
 ) {
     val progress = remember { androidx.compose.animation.core.Animatable(if (wasSelected) 1f else 0f) }
     androidx.compose.runtime.LaunchedEffect(selected) {
-        progress.animateTo(if (selected) 1f else 0f, Motion.pressSpring())
+        progress.animateTo(if (selected) 1f else 0f, Motion.standardTween())
     }
     val expansion = progress.value.coerceIn(0f, 1f)
-    val background = androidx.compose.ui.graphics.lerp(Color.Transparent, Color.White, expansion)
     val tint = androidx.compose.ui.graphics.lerp(Color(0xFFC9B29E), Primary, expansion)
+    val view = androidx.compose.ui.platform.LocalView.current
 
     Row(
         modifier = Modifier
             .height(52.dp)
+            .onPlaced { onBounds(it.positionInParent().x to it.size.width.toFloat()) }
             .pressScale(pressedScale = 0.94f)
-            .background(background, RoundedCornerShape(26.dp))
             .clip(RoundedCornerShape(26.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = ripple(color = Primary),
-                onClick = onClick,
+                onClick = {
+                    view.performHapticFeedback(android.view.HapticFeedbackConstants.VIRTUAL_KEY)
+                    onClick()
+                },
             )
             .padding(horizontal = (14 + 6 * expansion).dp),
         verticalAlignment = Alignment.CenterVertically,
