@@ -180,8 +180,8 @@ fun PackNavHost(
         )
     }
     var editItemId by rememberSaveable { mutableStateOf<String?>(null) }
-    val startRoute = remember { if (viewModel.setupCompleteAtLaunch) Routes.PROJECTS else Routes.WELCOME }
-    androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.completeSetup() }
+    // Onboarding runs before sign-in (RequiredAccount), so a signed-in person always lands on their packs.
+    val startRoute = Routes.PROJECTS
     fun home() = navController.navigate(Routes.PROJECTS) {
         popUpTo(navController.graph.id) { inclusive = true }
         launchSingleTop = true
@@ -192,9 +192,7 @@ fun PackNavHost(
     }
     fun finishSetup() {
         viewModel.completeSetup()
-        navController.navigate(Routes.WELCOME) {
-            popUpTo(navController.graph.id) { inclusive = true }
-        }
+        home()
     }
 
     NavHost(

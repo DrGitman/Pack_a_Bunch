@@ -146,7 +146,7 @@ fun OnbSetupScreen(
             )
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             PrimaryButton(text = "Continue", onClick = onContinue)
@@ -271,7 +271,7 @@ fun NotificationRationaleScreen(
             )
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(
             Modifier.padding(horizontal = Spacing.gutter),

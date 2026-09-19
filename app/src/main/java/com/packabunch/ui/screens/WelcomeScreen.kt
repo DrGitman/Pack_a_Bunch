@@ -144,7 +144,7 @@ fun WelcomeScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
+        PushDown()
 
         Column(
             modifier = Modifier

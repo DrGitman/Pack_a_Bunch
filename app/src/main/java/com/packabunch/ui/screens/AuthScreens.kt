@@ -35,6 +35,10 @@ internal fun ArtboardPage(modifier: Modifier = Modifier, content: @Composable Co
     }
 }
 
+/** Pushes the buttons down on tall phones; keeps a real gap on short ones, where the page scrolls. */
+@Composable
+internal fun ColumnScope.PushDown() { Spacer(Modifier.height(24.dp)); Spacer(Modifier.weight(1f)) }
+
 @Composable
 private fun AuthText(text: String, size: Float = 15f, line: Int = 23,
     color: Color = TextSecondary, weight: FontWeight = FontWeight.Normal,
@@ -110,7 +114,7 @@ fun SignInScreen(onContinueWithGoogle: () -> Unit, onContinueWithEmail: () -> Un
             "Your packs and measurements stay on this phone for now.",
             "Sign in with Google or your email and password."),
             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp))
-        Spacer(Modifier.weight(1f))
+        PushDown()
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically) {
             AuthText("Already have an account?", 14.5f)
@@ -186,7 +190,7 @@ fun LogInScreen(localPackCount: Int, onLogIn: (String, String) -> Unit, onGoogle
             Spacer(Modifier.height(12.dp))
             Note(text = "Your session is saved securely on this phone. Cloud backup and merging are not connected yet.", icon = PackIcons.Lock)
         }
-        Spacer(Modifier.weight(1f))
+        PushDown()
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)) {
             PrimaryButton("Log in", { onLogIn(email.trim(), password) }, enabled = email.contains('@') && password.isNotEmpty())
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center,
@@ -217,7 +221,7 @@ fun CreateAccountScreen(onCreate: (String, String, Boolean, Boolean) -> Unit, on
             Spacer(Modifier.height(16.dp))
             AuthText("We may ask you to confirm your email before logging in.", 13.5f, 20)
         }
-        Spacer(Modifier.weight(1f))
+        PushDown()
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)) {
             PrimaryButton("Create account", { onCreate(email.trim(), password, false, false) },
                 enabled = email.contains('@') && email.length > 3 && password.length >= 8)
@@ -248,7 +252,7 @@ fun ForgotPasswordScreen(sent: Boolean = false, onSend: (String) -> Unit, onBack
                 "If you signed up with Google, go back and use the Google button",
                 "We show the same message whether or not the address has an account"))
         }
-        Spacer(Modifier.weight(1f))
+        PushDown()
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)) {
             if (!sent) PrimaryButton("Send the link", { onSend(email.trim()) }, enabled = email.contains('@'))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { PackTextButton("Back to log in", onBack) }

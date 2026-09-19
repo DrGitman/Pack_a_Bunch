@@ -100,7 +100,6 @@ class AppViewModel(
         cameraMeasuring = preferences.getBoolean("cameraMeasuring", true),
         defaultEdgeGapMm = preferences.getInt("defaultEdgeGapMm", 5).coerceIn(0, 50),
     ))
-    val setupCompleteAtLaunch = preferences.getBoolean("setupComplete", false)
 
     fun completeSetup() {
         preferences.edit().putBoolean("setupComplete", true).apply()
