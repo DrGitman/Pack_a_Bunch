@@ -19,6 +19,7 @@ datastore = "1.1.7"
 
 arcore = "1.56.0"
 camerax = "1.6.2"
+revenuecat = "10.22.1"
 mlkitLabeling = "17.0.9"
 mlkitText = "16.0.1"
 mlkitBarcode = "17.3.0"
@@ -64,6 +65,9 @@ camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax"
 mlkit-image-labeling = { module = "com.google.mlkit:image-labeling", version.ref = "mlkitLabeling" }
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
 mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
+
+# Wraps Google Play Billing; entitlements are verified server-side by RevenueCat.
+revenuecat = { module = "com.revenuecat.purchases:purchases", version.ref = "revenuecat" }
 
 junit = { module = "junit:junit", version.ref = "junit" }
 kotlin-test-junit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlinTest" }

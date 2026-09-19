@@ -24,6 +24,7 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"" + cloudSetting("SUPABASE_URL") + "\"")
         buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"" + cloudSetting("SUPABASE_PUBLISHABLE_KEY") + "\"")
         buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"" + cloudSetting("GOOGLE_WEB_CLIENT_ID") + "\"")
+        buildConfigField("String", "REVENUECAT_API_KEY", "\"" + cloudSetting("REVENUECAT_API_KEY") + "\"")
         // TODO: confirm before the first Play upload — the application id is permanent.
         applicationId = "com.packabunch"
         minSdk = 26
@@ -106,6 +107,7 @@ dependencies {
     ksp(libs.room.compiler)
     implementation(libs.datastore.preferences)
     implementation(libs.arcore)
+    implementation(libs.revenuecat)
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)

@@ -697,14 +697,33 @@ fun PackNavHost(
         }
 
         composable(Routes.UPGRADE) {
+            val plusPackage by viewModel.plusPackage.collectAsStateWithLifecycle()
+            val outcome by viewModel.purchaseOutcome.collectAsStateWithLifecycle()
+            val activity = androidx.compose.ui.platform.LocalContext.current as android.app.Activity
+            outcome?.let { result ->
+                com.packabunch.ui.screens.PurchaseOutcomeScreen(
+                    outcome = result,
+                    onContinue = {
+                        viewModel.clearPurchaseOutcome()
+                        if (result == com.packabunch.ui.screens.PurchaseOutcome.Succeeded) navController.popBackStack()
+                    },
+                    onTryAgain = { viewModel.clearPurchaseOutcome(); viewModel.subscribe(activity) },
+                    onContactSupport = { viewModel.clearPurchaseOutcome() },
+                )
+                return@composable
+            }
             UpgradeScreen(
-                // Null until Play Billing is wired: the button stays disabled rather than
-                // showing a price we invented.
-                price = null,
+                // Google Play's localised price, or null — never a price we invented.
+                price = plusPackage?.product?.price?.formatted,
                 period = "a month",
-                purchaseEnabled = false,
-                onSubscribe = {},
-                onRestore = { notice = "Google Play Billing is not connected in this build." },
+                purchaseEnabled = plusPackage != null,
+                onSubscribe = { viewModel.subscribe(activity) },
+                onRestore = {
+                    viewModel.restorePurchases { restored ->
+                        notice = if (restored) "Pack Plus restored." else
+                            "No active Pack Plus on this Google account. Restoring does not bring back deleted packs."
+                    }
+                },
                 onTerms = { notice = "Published terms have not been configured for this preview." },
                 onPrivacy = { notice = "A published privacy policy has not been configured for this preview." },
                 onCompare = { navController.navigate(Routes.PLAN_COMPARISON) },

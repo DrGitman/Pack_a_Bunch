@@ -48,9 +48,30 @@ class AppViewModel(
     private val repository: ProjectRepository,
     private val preferences: android.content.SharedPreferences,
     private val cloudSync: com.packabunch.data.cloud.CloudPackSync? = null,
+    private val userId: String? = null,
 ) : ViewModel() {
     val syncState = cloudSync?.state ?: MutableStateFlow(com.packabunch.data.cloud.CloudSyncState()).asStateFlow()
     fun syncNow() { viewModelScope.launch { cloudSync?.sync() } }
+
+    // -- Pack Plus ------------------------------------------------------------------------
+
+    private val _plusPackage = MutableStateFlow<com.revenuecat.purchases.Package?>(null)
+    /** Null until Google Play returns a real, localised product. The paywall stays disabled. */
+    val plusPackage = _plusPackage.asStateFlow()
+
+    private val _purchaseOutcome = MutableStateFlow<com.packabunch.ui.screens.PurchaseOutcome?>(null)
+    val purchaseOutcome = _purchaseOutcome.asStateFlow()
+
+    fun subscribe(activity: android.app.Activity) {
+        val pkg = _plusPackage.value ?: return
+        viewModelScope.launch { _purchaseOutcome.value = com.packabunch.billing.Billing.purchase(activity, pkg) }
+    }
+
+    fun restorePurchases(onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(com.packabunch.billing.Billing.restore()) }
+    }
+
+    fun clearPurchaseOutcome() { _purchaseOutcome.value = null }
 
     init {
         if (cloudSync != null) {
@@ -85,6 +106,14 @@ class AppViewModel(
         preferences.edit().putBoolean("setupComplete", true).apply()
     }
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+
+    // After _settings on purpose: RevenueCat may report cached entitlement synchronously.
+    init {
+        if (userId != null) viewModelScope.launch {
+            com.packabunch.billing.Billing.identify(userId) { active -> setTier(if (active) Tier.PLUS else Tier.FREE) }
+            _plusPackage.value = com.packabunch.billing.Billing.monthly()
+        }
+    }
 
     private val _editor = MutableStateFlow(PackEditorState())
     private var openGeneration = 0
@@ -463,7 +492,7 @@ class AppViewModel(
             return AppViewModel(repository,
                 context.getSharedPreferences("app_preferences_$userId", Context.MODE_PRIVATE),
                 account?.let { com.packabunch.data.cloud.CloudPackSync(repository,it,userId,
-                    context.getSharedPreferences("cloud_sync_$userId",Context.MODE_PRIVATE)) }) as T
+                    context.getSharedPreferences("cloud_sync_$userId",Context.MODE_PRIVATE)) }, userId) as T
         }
     }
 }
