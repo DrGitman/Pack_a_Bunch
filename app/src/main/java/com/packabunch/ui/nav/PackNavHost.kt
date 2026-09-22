@@ -462,6 +462,7 @@ fun PackNavHost(
                 onUnitChange = viewModel::setUnit,
                 onNameChange = viewModel::setSpaceName,
                 onDimensionsChange = viewModel::setSpaceDimensions,
+                habit = settings.packingHabit,
                 onNext = { navController.navigate(Routes.ITEMS) },
                 onBack = { navController.popBackStack() },
                 onMeasureWithCamera = {

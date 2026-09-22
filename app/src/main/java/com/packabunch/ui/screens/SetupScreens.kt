@@ -1,5 +1,7 @@
 package com.packabunch.ui.screens
 
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.clip
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -113,7 +115,12 @@ fun OnbSetupScreen(
                 LengthUnit.entries.forEach { candidate ->
                     Column(Modifier.weight(1f).pressScale(pressedScale = 0.96f).background(Color.White, RoundedCornerShape(22.dp))
                         .border(if (unit == candidate) 2.dp else 1.dp, if (unit == candidate) Primary else Outline, RoundedCornerShape(22.dp))
-                        .clickable { onUnitChange(candidate) }.padding(horizontal = 14.dp, vertical = 18.dp),
+                        // Clipped and tinted, or Android paints a grey rectangle over the card.
+                        .clip(RoundedCornerShape(22.dp))
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = androidx.compose.material3.ripple(color = Primary),
+                        ) { onUnitChange(candidate) }.padding(horizontal = 14.dp, vertical = 18.dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(candidate.shortLabel, color = TextPrimary, fontSize = 24.sp, fontFamily = com.packabunch.ui.theme.NumericFamily)
                         Spacer(Modifier.height(6.dp))
@@ -176,7 +183,12 @@ private fun HabitRow(habit: PackingHabit, selected: Boolean, onClick: () -> Unit
             .pressScale(pressedScale = 0.97f)
             .background(background, shape)
             .border(if (selected) 2.dp else 1.dp, border, shape)
-            .clickable(onClick = onClick)
+            .clip(shape)
+            .clickable(
+                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                indication = androidx.compose.material3.ripple(color = Primary),
+                onClick = onClick,
+            )
             .padding(15.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(13.dp),

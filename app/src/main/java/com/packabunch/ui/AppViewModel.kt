@@ -49,6 +49,7 @@ class AppViewModel(
     private val preferences: android.content.SharedPreferences,
     private val cloudSync: com.packabunch.data.cloud.CloudPackSync? = null,
     private val userId: String? = null,
+    private val cloudSettings: com.packabunch.data.cloud.CloudSettings? = null,
 ) : ViewModel() {
     val syncState = cloudSync?.state ?: MutableStateFlow(com.packabunch.data.cloud.CloudSyncState()).asStateFlow()
     fun syncNow() { viewModelScope.launch { cloudSync?.sync() } }
@@ -106,6 +107,28 @@ class AppViewModel(
     }
     val settings: StateFlow<AppSettings> = _settings.asStateFlow()
 
+    /**
+     * The account's measuring preferences beat whatever was chosen before signing in — that
+     * choice was only a guess for an account that had none yet, so a new account gets it
+     * pushed up instead.
+     */
+    init {
+        if (cloudSettings != null) viewModelScope.launch {
+            val remote = cloudSettings.load()
+            if (remote == null) {
+                cloudSettings.save(_settings.value.unit.name, _settings.value.packingHabit?.name)
+            } else {
+                LengthUnit.entries.firstOrNull { it.name == remote.unit }?.let(::setUnit)
+                PackingHabit.entries.firstOrNull { it.name == remote.habit }?.let(::setPackingHabit)
+            }
+        }
+    }
+
+    private fun pushSettings() {
+        val settings = cloudSettings ?: return
+        viewModelScope.launch { settings.save(_settings.value.unit.name, _settings.value.packingHabit?.name) }
+    }
+
     // After _settings on purpose: RevenueCat may report cached entitlement synchronously.
     init {
         if (userId != null) viewModelScope.launch {
@@ -139,6 +162,7 @@ class AppViewModel(
     fun setUnit(unit: LengthUnit) {
         preferences.edit().putString("unit", unit.name).apply()
         _settings.update { it.copy(unit = unit) }
+        pushSettings()
     }
 
     fun setTier(tier: Tier) = _settings.update { it.copy(tier = tier) }
@@ -157,6 +181,7 @@ class AppViewModel(
     fun setPackingHabit(habit: PackingHabit) {
         preferences.edit().putString("habit", habit.name).apply()
         _settings.update { it.copy(packingHabit = habit) }
+        pushSettings()
     }
 
     fun setNotificationPreferences(preferences: NotificationPreferences) =
@@ -491,7 +516,8 @@ class AppViewModel(
             return AppViewModel(repository,
                 context.getSharedPreferences("app_preferences_$userId", Context.MODE_PRIVATE),
                 account?.let { com.packabunch.data.cloud.CloudPackSync(repository,it,userId,
-                    context.getSharedPreferences("cloud_sync_$userId",Context.MODE_PRIVATE)) }, userId) as T
+                    context.getSharedPreferences("cloud_sync_$userId",Context.MODE_PRIVATE)) }, userId,
+                account?.let { com.packabunch.data.cloud.CloudSettings(it,userId) }) as T
         }
     }
 }

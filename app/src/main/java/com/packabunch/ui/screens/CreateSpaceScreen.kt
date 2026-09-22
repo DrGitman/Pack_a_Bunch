@@ -69,6 +69,17 @@ import com.packabunch.ui.theme.Primary
  */
 private val PRESETS = listOf("Crate", "Storage box", "Drawer", "Car boot", "Wardrobe", "Shelf")
 
+/**
+ * What the setup screen's "what are you packing, mostly?" answer is for: the presets a person
+ * is likely to want come first. It only reorders the same six; nothing is hidden.
+ */
+private fun presetsFor(habit: PackingHabit?): List<String> = when (habit) {
+    PackingHabit.LOADING_A_CAR -> listOf("Car boot", "Crate", "Storage box", "Shelf", "Drawer", "Wardrobe")
+    PackingHabit.STORAGE -> listOf("Storage box", "Drawer", "Shelf", "Crate", "Wardrobe", "Car boot")
+    PackingHabit.MOVING_HOUSE -> listOf("Crate", "Storage box", "Wardrobe", "Drawer", "Shelf", "Car boot")
+    null -> PRESETS
+}
+
 @Composable
 fun CreateSpaceScreen(
     state: PackEditorState,
@@ -80,6 +91,7 @@ fun CreateSpaceScreen(
     onBack: () -> Unit,
     onMeasureWithCamera: () -> Unit = {},
     modifier: Modifier = Modifier,
+    habit: PackingHabit? = null,
 ) {
     val existing = state.space?.dimensions
     var width by remember { mutableStateOf(existing?.widthMm?.takeIf { it > 0 }?.let { formatLength(it, unit) } ?: "") }
@@ -159,7 +171,7 @@ fun CreateSpaceScreen(
                 .padding(start = Spacing.gutter, end = Spacing.gutter),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            PRESETS.forEach { preset ->
+            presetsFor(habit).forEach { preset ->
                 SelectableChip(
                     text = preset,
                     selected = state.name == preset,
