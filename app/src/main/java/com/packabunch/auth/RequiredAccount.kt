@@ -3,6 +3,8 @@ package com.packabunch.auth
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.*
 import androidx.compose.ui.platform.LocalContext
 import com.packabunch.ui.screens.*
@@ -45,8 +47,12 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
     }
     fun google() = runAuth { account.signIn(context); authenticated = account.hasSession }
     if (checking) {
-        AlertDialog(onDismissRequest = {}, title = { Text("Checking your session…") },
-            confirmButton = {}, text = { CircularProgressIndicator() })
+        // Reading the saved session takes a moment; a dialog for it flashes and reads as a fault.
+        androidx.compose.foundation.layout.Box(
+            androidx.compose.ui.Modifier
+                .fillMaxSize()
+                .background(com.packabunch.ui.theme.Ground),
+        )
         return
     }
     if (authenticated) {

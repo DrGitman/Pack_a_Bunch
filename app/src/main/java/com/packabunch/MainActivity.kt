@@ -25,10 +25,7 @@ class MainActivity : ComponentActivity() {
             PackABunchTheme {
                 // Once per app launch, not per screen rotation.
                 var splashShown by rememberSaveable { mutableStateOf(false) }
-                if (!splashShown) {
-                    com.packabunch.ui.screens.SplashScreen(onFinished = { splashShown = true })
-                    return@PackABunchTheme
-                }
+                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
                 com.packabunch.auth.RequiredAccount { account, signOut ->
                     val appViewModel: AppViewModel = viewModel(
                         key = "packs-" + account.userId,
@@ -40,6 +37,9 @@ class MainActivity : ComponentActivity() {
                         onSignOut = signOut,
                         modifier = Modifier.fillMaxSize().background(Ground),
                     )
+                }
+                // On top, so restoring the session and loading packs happen while it plays.
+                if (!splashShown) com.packabunch.ui.screens.SplashScreen(onFinished = { splashShown = true })
                 }
             }
         }
