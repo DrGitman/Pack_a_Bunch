@@ -6,6 +6,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.packabunch.ui.AppViewModel
@@ -19,6 +23,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             PackABunchTheme {
+                // Once per app launch, not per screen rotation.
+                var splashShown by rememberSaveable { mutableStateOf(false) }
+                if (!splashShown) {
+                    com.packabunch.ui.screens.SplashScreen(onFinished = { splashShown = true })
+                    return@PackABunchTheme
+                }
                 com.packabunch.auth.RequiredAccount { account, signOut ->
                     val appViewModel: AppViewModel = viewModel(
                         key = "packs-" + account.userId,
