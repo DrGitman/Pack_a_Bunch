@@ -268,7 +268,7 @@ private fun ArMeasureSurface(
                     state.status == TrackingStatus.LOST ->
                         trackingLostAdvice(state.failureReason)
                     !state.reticleHasSurface ->
-                        "Point at a surface — there is nothing to measure from here."
+                        "Point at a surface, there is nothing to measure from here."
                     state.capturedScreen.isEmpty() -> state.stage.instruction
                     state.capturedScreen.size == 1 -> "Now tap the other end."
                     else -> "Happy with that? Confirm it, or measure again."
@@ -367,7 +367,7 @@ private fun MeasurementOverlay(state: com.packabunch.ar.ArMeasureState) {
 private fun trackingLostAdvice(reason: com.google.ar.core.TrackingFailureReason?): String =
     when (reason) {
         com.google.ar.core.TrackingFailureReason.EXCESSIVE_MOTION ->
-            "Slow down — it lost track of the room."
+            "Slow down, it lost track of the room."
         com.google.ar.core.TrackingFailureReason.INSUFFICIENT_LIGHT ->
             "Too dark to see the surface. More light, or type it instead."
         com.google.ar.core.TrackingFailureReason.INSUFFICIENT_FEATURES ->
@@ -404,7 +404,7 @@ private fun ArUnavailable(
 ) = RecoveryState(
     modifier = modifier,
     title = "This phone can't measure with the camera",
-    body = "Camera measuring needs AR support this phone doesn't have. Nothing else changes — " +
+    body = "Camera measuring needs AR support this phone doesn't have. Nothing else changes " +
         "typed measurements work exactly the same, and so does the rest of the app." +
         (detail?.let { "\n\n($it)" } ?: ""),
     primary = "Type the measurements" to onTypeInstead,

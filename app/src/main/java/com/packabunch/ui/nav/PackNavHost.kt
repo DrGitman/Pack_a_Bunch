@@ -358,7 +358,7 @@ fun PackNavHost(
                         appendLine(formatDimensions(project.space.dimensions, settings.unit))
                         appendLine(if (project.space.measurementSource == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE) "Camera estimate" else "Typed in")
                         project.items.forEachIndexed { index, item ->
-                            appendLine("${index + 1}. ${item.name} × ${item.quantity}: ${formatDimensions(item.dimensions, settings.unit)} — " +
+                            appendLine("${index + 1}. ${item.name} × ${item.quantity}: ${formatDimensions(item.dimensions, settings.unit)} " +
                                 if (item.measurementSource == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE) "Camera estimate" else "Typed in")
                         }
                     }
@@ -710,8 +710,8 @@ fun PackNavHost(
                 onManageSubscription = { openPlaySubscriptions(context) },
                 onRestorePurchases = {
                     viewModel.restorePurchases { restored ->
-                        notice = if (restored) "Pack-a-Bunch Pro restored." else
-                            "No active Pack-a-Bunch Pro on this Google account."
+                        notice = if (restored) "Pack a Bunch Pro restored." else
+                            "No active Pack a Bunch Pro on this Google account."
                     }
                 },
                 onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
@@ -747,8 +747,8 @@ fun PackNavHost(
                 onSubscribe = { viewModel.subscribe(activity) },
                 onRestore = {
                     viewModel.restorePurchases { restored ->
-                        notice = if (restored) "Pack-a-Bunch Pro restored." else
-                            "No active Pack-a-Bunch Pro on this Google account. Restoring does not bring back deleted packs."
+                        notice = if (restored) "Pack a Bunch Pro restored." else
+                            "No active Pack a Bunch Pro on this Google account. Restoring does not bring back deleted packs."
                     }
                 },
                 onTerms = { notice = "Published terms have not been configured for this preview." },

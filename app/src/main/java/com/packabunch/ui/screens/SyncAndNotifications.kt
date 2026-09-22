@@ -102,7 +102,7 @@ fun SyncConflictScreen(
 
             Text(
                 text = "“$packName” changed here and on your other device while one of them " +
-                    "was offline. Pick which one to keep — we won't merge them behind your back.",
+                    "was offline. Pick which one to keep, we won't merge them behind your back.",
                 color = TextSecondary,
                 fontFamily = UiFamily,
                 fontSize = 15.sp,
@@ -126,7 +126,7 @@ fun SyncConflictScreen(
             Spacer(Modifier.height(Spacing.base))
 
             Note(
-                text = "Not sure? Keep both — the other becomes “$packName (2)”. Nothing is " +
+                text = "Not sure? Keep both, the other becomes “$packName (2)”. Nothing is " +
                     "lost that way.",
                 icon = PackIcons.Info,
             )

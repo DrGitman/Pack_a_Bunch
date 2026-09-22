@@ -106,7 +106,7 @@ fun SpaceScanReviewScreen(
                     title = "There are gaps in the map",
                     text = "Unseen space counts as solid, so you'd pack into " +
                         "${litres(report.usableVolumeMm3)} instead of " +
-                        "${litres(report.optimisticVolumeMm3)} — safe, just smaller than " +
+                        "${litres(report.optimisticVolumeMm3)}, safe, just smaller than " +
                         "the space really is.",
                     tone = NoteTone.Caution,
                     icon = PackIcons.Warning,
@@ -426,7 +426,7 @@ fun ScanIncompleteScreen(
                     Text(
                         text = "Every patch counts as solid. You'd pack into " +
                             "${litres(report.usableVolumeMm3)} instead of " +
-                            "${litres(report.optimisticVolumeMm3)} — safe, just smaller " +
+                            "${litres(report.optimisticVolumeMm3)}, safe, just smaller " +
                             "than the space really is.",
                         color = Color(0xFF7A5A25),
                         fontFamily = UiFamily,

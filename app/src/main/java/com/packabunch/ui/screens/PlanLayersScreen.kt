@@ -125,7 +125,7 @@ fun PlanLayersScreen(
                     fontSize = 16.sp,
                 )
                 Text(
-                    text = "${formatLength(layer.baseMm, unit)} – " +
+                    text = "${formatLength(layer.baseMm, unit)} " +
                         "${formatLength(layer.topMm, unit)} ${unit.shortLabel} from the floor",
                     style = NumeralChip,
                     color = TextTertiary,

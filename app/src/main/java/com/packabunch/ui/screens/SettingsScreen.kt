@@ -91,7 +91,7 @@ fun SettingsScreen(
                     Column(Modifier.weight(1f)) {
                         Text(email?.substringBefore('@') ?: "Your account", color = TextPrimary, fontFamily = UiFamily,
                             fontSize = 15.5.sp, fontWeight = FontWeight.Bold)
-                        Text(if (settings.tier == Tier.PLUS) "Pack-a-Bunch Pro" else "Free plan",
+                        Text(if (settings.tier == Tier.PLUS) "Pack a Bunch Pro" else "Free plan",
                             color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp, lineHeight = 18.sp)
                     }
                     Icon(PackIcons.Forward, null, Modifier.size(19.dp), tint = TextTertiary)
@@ -122,7 +122,7 @@ fun SettingsScreen(
                 SettingsGroup {
                     SettingsAction(PackIcons.Bell, "Notifications", onNotifications)
                     SettingsDivider()
-                    SettingsAction(PackIcons.Cube, "Manage Pack-a-Bunch Pro", onManageSubscription)
+                    SettingsAction(PackIcons.Cube, "Manage Pack a Bunch Pro", onManageSubscription)
                     SettingsDivider()
                     SettingsAction(PackIcons.Undo, "Restore purchases", onRestorePurchases)
                     SettingsDivider()

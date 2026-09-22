@@ -121,7 +121,7 @@ fun SweepItemsScreen(
                     !isTracking -> "Move slowly over the floor or table to find the surface"
                     objects.isEmpty() -> "Point at your things and walk round them"
                     settled == objects.size -> "Visible items ready to review"
-                    else -> "Keep moving — the ones still waiting say what they need"
+                    else -> "Keep moving, the ones still waiting say what they need"
                 },
                 color = TextPrimary,
                 fontFamily = UiFamily,
@@ -226,7 +226,7 @@ private fun SweptRow(
             // than presenting all three as equally solid.
             if (measured != null && measured.summary == MeasuredDimensions.Provenance.PARTLY_MEASURED) {
                 Text(
-                    text = "${measured.estimatedAxes().joinToString()} filled in — never in view",
+                    text = "${measured.estimatedAxes().joinToString()} filled in, never in view",
                     color = Color(0xFF8A6A2E),
                     fontFamily = UiFamily,
                     fontSize = 11.5f.sp,

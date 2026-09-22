@@ -145,7 +145,7 @@ data class Recognition(
     /**
      * A name to prefill, which is a separate thing from a size and always editable.
      *
-     * The screen labels it "Suggested label — tap to change" precisely so nobody reads it
+     * The screen labels it "Suggested label, tap to change" precisely so nobody reads it
      * as the app having identified their specific object.
      */
     fun suggestedName(): String? = category?.replaceFirstChar { it.uppercase() }

@@ -67,7 +67,7 @@ class OpenFoodFactsCatalogue(
                 // The published packaging size is the bare product. Whatever is actually in
                 // front of somebody may have a sleeve, a box, or a bag around it.
                 toleranceMm = 10,
-                sourceNote = "$name — packaging size on Open Food Facts",
+                sourceNote = "$name, packaging size on Open Food Facts",
                 confidence = SuggestionConfidence.EXACT_PRODUCT,
             )
         }

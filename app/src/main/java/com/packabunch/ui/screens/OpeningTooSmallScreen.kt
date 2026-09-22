@@ -81,7 +81,7 @@ fun OpeningTooSmallScreen(
 
             Spacer(Modifier.height(Spacing.base))
 
-            ScreenHeading("There's room inside — but no way in")
+            ScreenHeading("There's room inside, but no way in")
 
             Spacer(Modifier.height(10.dp))
 
@@ -142,11 +142,11 @@ fun OpeningTooSmallScreen(
             SectionHeading("What usually works")
             Spacer(Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Suggestion("Fold the back seats down — the opening changes with them")
-                Suggestion("Re-measure the opening — ours came from the scan, not a tape")
+                Suggestion("Fold the back seats down, the opening changes with them")
+                Suggestion("Re-measure the opening, ours came from the scan, not a tape")
                 Suggestion(
                     if (otherPiecesStillFit > 0) {
-                        "Take it out of this pack — the other $otherPiecesStillFit still fit"
+                        "Take it out of this pack, the other $otherPiecesStillFit still fit"
                     } else {
                         "Take it out of this pack"
                     },

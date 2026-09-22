@@ -241,7 +241,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LockedLibrary(
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "Pack-a-Bunch Pro keeps every item you measure, so the toolbox you sized in " +
+            text = "Pack a Bunch Pro keeps every item you measure, so the toolbox you sized in " +
                 "March drops straight into the pack you're planning now.",
             color = TextSecondary,
             fontFamily = UiFamily,
@@ -260,7 +260,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LockedLibrary(
                 // Not a teaser. These are really saved and really theirs — the screen would
                 // be dishonest if it implied the measurements had been thrown away.
                 Text(
-                    text = "Your $measuredCount measured things are already saved — " +
+                    text = "Your $measuredCount measured things are already saved " +
                         "they're here waiting.",
                     color = Color(0xFF7C4223),
                     fontFamily = UiFamily,
@@ -279,7 +279,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LockedLibrary(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         PrimaryButton(
-            text = price?.let { "Get Pack-a-Bunch Pro — $it" } ?: "See Pack-a-Bunch Pro",
+            text = price?.let { "Get Pack a Bunch Pro, $it" } ?: "See Pack a Bunch Pro",
             onClick = onUpgrade,
         )
         SecondaryButton(text = "Not now", onClick = onBack)

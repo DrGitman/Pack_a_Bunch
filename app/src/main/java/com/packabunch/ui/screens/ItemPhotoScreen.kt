@@ -222,7 +222,7 @@ fun ItemPhotoScreen(
 
             // The sentence this screen exists for.
             Text(
-                text = "A photo helps you recognise the item later. It doesn't set the size — " +
+                text = "A photo helps you recognise the item later. It doesn't set the size " +
                     "you still measure or type that yourself.",
                 color = TextSecondary,
                 fontFamily = UiFamily,
@@ -313,7 +313,7 @@ fun CameraRationale(
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "Only for taking the picture, and it stays on this phone. If you say " +
-                    "no, everything else carries on working exactly as it does now — you " +
+                    "no, everything else carries on working exactly as it does now, you " +
                     "just won't have a picture on the item.",
                 color = TextSecondary,
                 fontFamily = UiFamily,

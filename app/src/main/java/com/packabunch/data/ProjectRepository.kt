@@ -38,7 +38,7 @@ class ProjectRepository(private val dao: ProjectDao) {
         writeMutex.withLock {
             if (!stillMatches(project(id))) return@withLock false
             if (preserveConflict && expected != null) {
-                saveExact(expected.copy(id=java.util.UUID.randomUUID().toString(),name=("Conflict copy — "+expected.name).take(160)))
+                saveExact(expected.copy(id=java.util.UUID.randomUUID().toString(),name=("Conflict copy "+expected.name).take(160)))
             }
             if(incoming==null) dao.deleteProject(id) else saveExact(incoming)
             true

@@ -112,7 +112,7 @@ class StandardSizesCatalogue : CatalogueSource {
                 // No standard exists, and the spread is wider than most packs can absorb.
                 // The tolerance says so rather than hiding it.
                 toleranceMm = 45,
-                sourceNote = "typical adult shoe box — varies a lot by brand",
+                sourceNote = "typical adult shoe box, varies a lot by brand",
                 confidence = SuggestionConfidence.CATEGORY_ONLY,
             ),
             "banker's box" to SuggestedDimensions(

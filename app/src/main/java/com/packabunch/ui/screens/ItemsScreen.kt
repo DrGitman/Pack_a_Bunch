@@ -178,8 +178,8 @@ fun ItemsScreen(
                     item {
                         Note(
                             title = "Twenty pieces on the free plan",
-                            text = "The planner searches well past twenty — twenty is where " +
-                                "the free plan stops. Split this into two packs, or see Pack-a-Bunch Pro.",
+                            text = "The planner searches well past twenty, twenty is where " +
+                                "the free plan stops. Split this into two packs, or see Pack a Bunch Pro.",
                             tone = NoteTone.Caution,
                             icon = PackIcons.Cube,
                         )

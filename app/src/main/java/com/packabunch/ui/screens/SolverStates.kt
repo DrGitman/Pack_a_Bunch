@@ -103,7 +103,7 @@ fun NoArrangementScreen(
 
             Text(
                 text = "Every ordering we tried left something out. That doesn't mean it's " +
-                    "impossible — it means this search didn't find a way.",
+                    "impossible, it means this search didn't find a way.",
                 color = TextSecondary,
                 fontFamily = UiFamily,
                 fontSize = 15.sp,
@@ -194,7 +194,7 @@ fun SolverTimeoutScreen(
 
             Text(
                 text = "${bestSoFar.metrics.requestedInstanceCount} pieces with rotations " +
-                    "makes a lot of combinations. We already have a valid arrangement — you " +
+                    "makes a lot of combinations. We already have a valid arrangement, you " +
                     "can take it, or let the search keep running for a better one.",
                 color = TextSecondary,
                 fontFamily = UiFamily,
@@ -230,7 +230,7 @@ fun SolverTimeoutScreen(
             PrimaryButton(text = "Use what we have", onClick = onUseBestSoFar)
             SecondaryButton(text = "Keep looking", onClick = onKeepLooking)
             Text(
-                text = "Nothing is lost either way — your items stay saved.",
+                text = "Nothing is lost either way, your items stay saved.",
                 color = TextTertiary,
                 fontFamily = UiFamily,
                 fontSize = 12.5f.sp,
@@ -437,7 +437,7 @@ fun OversizeItemScreen(
             SecondaryButton(text = "Use a bigger space instead", onClick = onUseBiggerSpace)
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 com.packabunch.ui.components.PackTextButton(
-                    text = "Save it anyway — it won't be placed",
+                    text = "Save it anyway, it won't be placed",
                     onClick = onSaveAnyway,
                     color = TextTertiary,
                 )

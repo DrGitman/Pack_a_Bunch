@@ -135,8 +135,8 @@ fun SpaceTypeScreen(
             if (selected == SpaceKind.ANY_SHAPE && limits.maxScannedSpaceLitres != null) {
                 Spacer(Modifier.height(10.dp))
                 Note(
-                    text = "Free maps spaces up to ${limits.maxScannedSpaceLitres} litres — " +
-                        "about a large crate. A car boot needs Pack-a-Bunch Pro.",
+                    text = "Free maps spaces up to ${limits.maxScannedSpaceLitres} litres " +
+                        "about a large crate. A car boot needs Pack a Bunch Pro.",
                     tone = NoteTone.Caution,
                     icon = PackIcons.Lock,
                 )

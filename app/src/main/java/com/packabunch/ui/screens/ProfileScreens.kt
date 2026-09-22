@@ -152,7 +152,7 @@ fun ProfileScreen(
                 androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
                 AccountRow(PackIcons.Lock, "Change password", onChangePassword)
                 androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
-                AccountRow(PackIcons.Cube, "Manage Pack-a-Bunch Pro", onManageSubscription)
+                AccountRow(PackIcons.Cube, "Manage Pack a Bunch Pro", onManageSubscription)
             }
 
             Spacer(Modifier.height(Spacing.lg))
@@ -282,7 +282,7 @@ fun AccountDeleteScreen(
                 title = "What doesn't",
                 items = buildList {
                     if (hasActiveSubscription) {
-                        add("Your Pack-a-Bunch Pro subscription — cancel that in Google Play, or it keeps billing")
+                        add("Your Pack a Bunch Pro subscription, cancel that in Google Play, or it keeps billing")
                     }
                     add("Anything you've already packed. Obviously.")
                 },

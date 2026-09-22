@@ -27,8 +27,8 @@ import kotlin.math.sqrt
 /** Which of the three edges is being measured. They are taken one at a time, on purpose. */
 enum class EdgeStage(val label: String, val instruction: String) {
     WIDTH("Width", "Tap one end of the width, then the other."),
-    DEPTH("Depth", "Now the depth — front to back."),
-    HEIGHT("Height", "Now the height — floor to rim."),
+    DEPTH("Depth", "Now the depth, front to back."),
+    HEIGHT("Height", "Now the height, floor to rim."),
 }
 
 /** What tracking is doing, in terms the UI can act on. */

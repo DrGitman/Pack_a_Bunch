@@ -168,7 +168,7 @@ fun PlanIrregularScreen(
                         Note(
                             title = "${first.name} won't go through the opening",
                             text = "There's room inside, but no way in. That's a different " +
-                                "problem from not fitting — see what usually works.",
+                                "problem from not fitting, see what usually works.",
                             tone = NoteTone.Problem,
                             icon = PackIcons.Warning,
                         )
@@ -181,7 +181,7 @@ fun PlanIrregularScreen(
 
                     plan.metrics.unplacedInstanceCount == 0 -> Note(
                         title = "Everything goes in",
-                        text = "And every piece can be lifted in, in this order — nothing is " +
+                        text = "And every piece can be lifted in, in this order, nothing is " +
                             "placed behind something you'd have to load first.",
                         tone = NoteTone.Confirmed,
                         icon = PackIcons.Check,
@@ -189,7 +189,7 @@ fun PlanIrregularScreen(
 
                     else -> Note(
                         text = "${plan.metrics.unplacedInstanceCount} left over. This " +
-                            "arrangement couldn't place them — that isn't proof they can " +
+                            "arrangement couldn't place them, that isn't proof they can " +
                             "never fit.",
                         tone = NoteTone.Caution,
                         icon = PackIcons.Info,

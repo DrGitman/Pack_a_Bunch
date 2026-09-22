@@ -41,7 +41,7 @@ import com.packabunch.ui.theme.TextTertiary
 import com.packabunch.ui.theme.UiFamily
 
 /**
- * Free vs Pack-a-Bunch Pro — `design/artboards/PlanComparison.dc.html`.
+ * Free vs Pack a Bunch Pro — `design/artboards/PlanComparison.dc.html`.
  *
  * ### One line in the artboard had to change
  *
@@ -93,13 +93,13 @@ fun PlanComparisonScreen(
             label = "Pieces in one pack",
             // The honest framing: the free number is commercial, the ceiling is not.
             detail = "Free stops at ${free.maxPiecesPerPack}. Past a few hundred the search " +
-                "can't return anything worth trusting — that limit is on both.",
+                "can't return anything worth trusting, that limit is on both.",
             free = "${free.maxPiecesPerPack}",
             plus = "∞",
         ),
         ComparisonRow(
             label = "Size of space you can scan",
-            detail = "A crate is 50–80 L. A car boot is 300–500 L.",
+            detail = "A crate is 50, 80 L. A car boot is 300, 500 L.",
             free = "${free.maxScannedSpaceLitres} L",
             plus = "Any",
         ),
@@ -118,14 +118,14 @@ fun PlanComparisonScreen(
         ComparisonRow(
             label = "Reuse items across packs",
             detail = "Measure a thing once",
-            free = "—",
+            free = " ",
             plus = "",
             plusIsYes = true,
         ),
     )
 
     ScreenScaffold(modifier) {
-        PackAppBar(title = "Free and Pack-a-Bunch Pro", onBack = onBack)
+        PackAppBar(title = "Free and Pack a Bunch Pro", onBack = onBack)
 
         Column(
             Modifier
@@ -135,7 +135,7 @@ fun PlanComparisonScreen(
             Spacer(Modifier.height(Spacing.sm))
 
             Text(
-                text = "Everything that makes the app work is free. Pack-a-Bunch Pro is for keeping " +
+                text = "Everything that makes the app work is free. Pack a Bunch Pro is for keeping " +
                     "things, and for the big spaces.",
                 color = TextSecondary,
                 fontFamily = UiFamily,
@@ -197,7 +197,7 @@ fun PlanComparisonScreen(
             ) {
                 Text(
                     text = "Paying doesn't make the measurements better or the packing " +
-                        "cleverer. Anything that isn't reliable yet isn't sold — it's just " +
+                        "cleverer. Anything that isn't reliable yet isn't sold, it's just " +
                         "missing, for everyone.",
                     color = Color(0xFF7C4223),
                     fontFamily = UiFamily,
@@ -211,7 +211,7 @@ fun PlanComparisonScreen(
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
             PrimaryButton(
-                text = price?.let { "Get Pack-a-Bunch Pro — $it" } ?: "Pack-a-Bunch Pro",
+                text = price?.let { "Get Pack a Bunch Pro, $it" } ?: "Pack a Bunch Pro",
                 onClick = onSubscribe,
                 enabled = price != null,
             )

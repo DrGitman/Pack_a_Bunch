@@ -20,7 +20,7 @@ import com.revenuecat.purchases.awaitRestore
 import com.revenuecat.purchases.interfaces.UpdatedCustomerInfoListener
 
 /**
- * Pack-a-Bunch Pro, through Google Play Billing via RevenueCat.
+ * Pack a Bunch Pro, through Google Play Billing via RevenueCat.
  *
  * The one rule: **Plus is unlocked by RevenueCat's verified entitlement, never by a tap.**
  * A purchase returning is not what switches the tier on — [onEntitlement] is, and it fires

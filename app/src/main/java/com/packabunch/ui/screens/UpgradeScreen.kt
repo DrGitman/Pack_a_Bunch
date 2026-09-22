@@ -39,7 +39,7 @@ import com.packabunch.ui.theme.TextTertiary
 import com.packabunch.ui.theme.UiFamily
 
 /**
- * Pack-a-Bunch Pro — `design/artboards/Upgrade.dc.html`.
+ * Pack a Bunch Pro — `design/artboards/Upgrade.dc.html`.
  *
  * Rules this screen follows, all of which are easy to break and expensive to break:
  *
@@ -115,7 +115,7 @@ fun UpgradeScreen(
             Benefit(
                 icon = PackIcons.Camera,
                 title = "Scan a space of any size",
-                detail = "Free scans up to ${TierLimits.FREE.maxScannedSpaceLitres} litres — " +
+                detail = "Free scans up to ${TierLimits.FREE.maxScannedSpaceLitres} litres " +
                     "a crate, but not a car boot.",
             )
             Benefit(
@@ -142,7 +142,7 @@ fun UpgradeScreen(
                 Column {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = price ?: "—",
+                            text = price ?: " ",
                             style = NumeralLarge.copy(fontSize = 26.sp),
                             color = TextPrimary,
                         )

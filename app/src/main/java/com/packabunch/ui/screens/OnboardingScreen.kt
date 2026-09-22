@@ -30,11 +30,11 @@ import kotlinx.coroutines.launch
 private data class IntroSlide(val art: Int, val motion: Int?, val step: String, val title: String, val body: String, val foot: String)
 private val introSlides = listOf(
     IntroSlide(R.drawable.onbmeasure, R.raw.onb_measure, "STEP ONE", "Measure the space",
-        "Point the camera at the inside of a crate, box or car boot — or just type the numbers off a tape measure. Both give you the same plan.",
+        "Point the camera at the inside of a crate, box or car boot, or just type the numbers off a tape measure. Both give you the same plan.",
         "Camera measuring works on some phones. Typing always works."),
     IntroSlide(R.drawable.onbplan, R.raw.onb_plan, "STEP TWO", "See what actually fits",
         "Add your things with their width, depth and height. You get an arrangement that respects turning, stacking and what mustn’t be squashed.", "Up to 20 pieces per pack."),
-    IntroSlide(R.drawable.onbpack, null, "STEP THREE", "Follow it, one piece at a time",
+    IntroSlide(R.drawable.onbpack, R.raw.onb_pack, "STEP THREE", "Follow it, one piece at a time",
         "Numbered steps in an order that keeps everything supported: which item, which way round, which corner it goes in.",
         "Mark each piece as it goes in. Your place is saved."),
 )
@@ -80,7 +80,7 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
                     Spacer(Modifier.height(24.dp))
                     LimitCard("Boxy spaces, open at the top", "Crates, storage boxes, drawers, a car boot. You measure the space inside and keep the opening clear.")
                     Spacer(Modifier.height(11.dp))
-                    LimitCard("Firm things, up to 20 pieces", "Every item gets a width, depth and height — measured with the camera or typed in. Then you get an order to pack them in.")
+                    LimitCard("Firm things, up to 20 pieces", "Every item gets a width, depth and height, measured with the camera or typed in. Then you get an order to pack them in.")
                     Spacer(Modifier.height(11.dp))
                     LimitCard("Not yet: soft or heavy", "Backpacks, duvets, and whether a stack will take the weight. Scanned shapes are approximate. Where we can't tell, we say so instead of guessing.", true)
                 }
@@ -115,31 +115,33 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
- * The designer's slide animation: the "intro" marker plays once, then the "loop" marker
- * repeats. Pausing when the slide is off screen keeps the pager smooth on older phones.
+ * The designer's slide animation: the "intro" marker plays once, then "loop" repeats forever.
+ *
+ * Driven by one animatable rather than two pieces of state — swapping a clip mid-flight left
+ * the first slide frozen on its last intro frame instead of looping.
  */
 @Composable
 private fun SlideMotion(raw: Int, playing: Boolean) {
     val composition by com.airbnb.lottie.compose.rememberLottieComposition(
         com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(raw),
     )
-    var introPlayed by remember(raw) { mutableStateOf(false) }
-    val clip = remember(introPlayed) {
-        com.airbnb.lottie.compose.LottieClipSpec.Marker(if (introPlayed) "loop" else "intro")
-    }
-    val progress by com.airbnb.lottie.compose.animateLottieCompositionAsState(
-        composition = composition,
-        clipSpec = clip,
-        iterations = if (introPlayed) com.airbnb.lottie.compose.LottieConstants.IterateForever else 1,
-        isPlaying = playing,
-        restartOnPlay = false,
-    )
-    LaunchedEffect(progress, composition) {
-        if (!introPlayed && composition != null && progress >= 1f) introPlayed = true
+    val animation = com.airbnb.lottie.compose.rememberLottieAnimatable()
+    LaunchedEffect(composition, playing) {
+        val loaded = composition ?: return@LaunchedEffect
+        if (!playing) return@LaunchedEffect
+        val markers = loaded.markers.map { it.name }
+        if ("intro" in markers) {
+            animation.animate(loaded, clipSpec = com.airbnb.lottie.compose.LottieClipSpec.Marker("intro"))
+        }
+        animation.animate(
+            composition = loaded,
+            clipSpec = if ("loop" in markers) com.airbnb.lottie.compose.LottieClipSpec.Marker("loop") else null,
+            iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
+        )
     }
     com.airbnb.lottie.compose.LottieAnimation(
         composition = composition,
-        progress = { progress },
+        progress = { animation.progress },
         modifier = Modifier.fillMaxWidth().height(290.dp),
     )
 }

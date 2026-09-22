@@ -185,7 +185,7 @@ private fun SpaceScanSurface(onScanned: (ScannedSpace) -> Unit, onTypeInstead: (
                     state.status == TrackingStatus.INITIALISING ->
                         "Hold still for a moment while it finds the room."
                     state.status == TrackingStatus.LOST ->
-                        "Lost track — move the phone slowly until it picks the room up again."
+                        "Lost track, move the phone slowly until it picks the room up again."
                     else ->
                         "Move slowly along one side, across the back, then the other side. " +
                             "Green means we've got it."
@@ -254,7 +254,7 @@ private fun CoverageBanner(percent: Int, thin: List<ScanRegion>) {
         if (thin.isNotEmpty()) {
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "${thin.first().label} still thin — sweep there",
+                text = "${thin.first().label} still thin, sweep there",
                 color = OnCamera,
                 fontFamily = UiFamily,
                 fontWeight = FontWeight.SemiBold,

@@ -70,8 +70,8 @@ fun PurchaseOutcomeScreen(
             icon = PackIcons.Check,
             tint = Success,
             background = SuccessTint,
-            title = "You're on Pack-a-Bunch Pro",
-            body = "Every cap is lifted. Your saved packs are already there — nothing to " +
+            title = "You're on Pack a Bunch Pro",
+            body = "Every cap is lifted. Your saved packs are already there, nothing to " +
                 "restore or move.",
             primary = "Get back to it",
             secondary = null,
@@ -82,8 +82,8 @@ fun PurchaseOutcomeScreen(
             tint = Caution,
             background = CautionTint,
             title = "Waiting on your payment",
-            body = "Some payment methods take a little while to clear — occasionally a few " +
-                "days. Pack-a-Bunch Pro switches on by itself the moment it does. You haven't been " +
+            body = "Some payment methods take a little while to clear, occasionally a few " +
+                "days. Pack a Bunch Pro switches on by itself the moment it does. You haven't been " +
                 "charged twice, and there's nothing to do.",
             primary = "Carry on for now",
             secondary = null,
@@ -116,8 +116,8 @@ fun PurchaseOutcomeScreen(
             tint = Caution,
             background = CautionTint,
             title = "You're offline",
-            body = "Subscribing needs a connection. Everything else — measuring, planning, " +
-                "the packing guide — works perfectly well without one.",
+            body = "Subscribing needs a connection. Everything else works perfectly well " +
+                "without one: measuring, planning and the packing guide.",
             primary = "Carry on offline",
             secondary = "Try again",
         )

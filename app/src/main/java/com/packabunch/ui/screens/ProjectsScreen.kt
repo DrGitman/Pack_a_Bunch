@@ -127,7 +127,7 @@ fun ProjectsScreen(
                         modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)))
                     androidx.compose.material3.DropdownMenu(sortOpen, { sortOpen = false }) {
                         androidx.compose.material3.DropdownMenuItem(text = { Text("Recently edited") }, onClick = { alphabetical = false; sortOpen = false })
-                        androidx.compose.material3.DropdownMenuItem(text = { Text("Name A–Z") }, onClick = { alphabetical = true; sortOpen = false })
+                        androidx.compose.material3.DropdownMenuItem(text = { Text("Name A, Z") }, onClick = { alphabetical = true; sortOpen = false })
                     }
                 }
             }
@@ -356,7 +356,7 @@ private fun EmptyState(onNewPack: () -> Unit, onSample: () -> Unit, modifier: Mo
         )
         Spacer(Modifier.height(9.dp))
         Text(
-            text = "Start with a space you can measure — a crate, a storage box, a drawer, a car boot.",
+            text = "Start with a space you can measure, a crate, a storage box, a drawer, a car boot.",
             modifier = Modifier.widthIn(max = 290.dp),
             color = TextSecondary,
             fontFamily = UiFamily,
