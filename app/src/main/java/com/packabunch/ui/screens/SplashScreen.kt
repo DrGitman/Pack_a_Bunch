@@ -33,7 +33,7 @@ fun SplashScreen(onFinished: () -> Unit) {
     LaunchedEffect(progress, composition) {
         if (composition != null && progress >= 1f) {
             // Let the finished lockup sit for a beat, so the splash lands rather than flicks past.
-            kotlinx.coroutines.delay(1_000)
+            kotlinx.coroutines.delay(500)
             onFinished()
         }
     }
