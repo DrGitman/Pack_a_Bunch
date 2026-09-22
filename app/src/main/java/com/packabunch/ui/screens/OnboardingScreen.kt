@@ -73,16 +73,12 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
                     Spacer(Modifier.height(12.dp))
                     Text(slide.body, color = TextSecondary, fontFamily = UiFamily, fontSize = 15.sp, lineHeight = 23.sp)
                 } else {
-                    Text("What this does,\nand what it doesn't", color = TextPrimary, fontFamily = UiFamily,
+                    Text("What it packs", color = TextPrimary, fontFamily = UiFamily,
                         fontWeight = FontWeight.ExtraBold, fontSize = 29.sp, lineHeight = 36.sp, letterSpacing = (-.9).sp)
-                    Spacer(Modifier.height(11.dp))
-                    Text("Thirty seconds now saves a wrong assumption later.", color = TextSecondary, fontFamily = UiFamily, fontSize = 15.sp, lineHeight = 23.sp)
-                    Spacer(Modifier.height(24.dp))
-                    LimitCard("Boxy spaces, open at the top", "Crates, storage boxes, drawers, a car boot. You measure the space inside and keep the opening clear.")
-                    Spacer(Modifier.height(11.dp))
-                    LimitCard("Firm things, up to 20 pieces", "Every item gets a width, depth and height, measured with the camera or typed in. Then you get an order to pack them in.")
-                    Spacer(Modifier.height(11.dp))
-                    LimitCard("Not yet: soft or heavy", "Backpacks, duvets, and whether a stack will take the weight. Scanned shapes are approximate. Where we can't tell, we say so instead of guessing.", true)
+                    Spacer(Modifier.height(18.dp))
+                    // The cards, badges and their wording all live inside this animation.
+                    SlideMotion(R.raw.onb_what, playing = pager.currentPage == page,
+                        modifier = Modifier.fillMaxWidth().aspectRatio(279f / 392f))
                 }
                 Spacer(Modifier.height(20.dp))
             }
@@ -103,9 +99,11 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
             }
         }
         Column(Modifier.padding(horizontal = 20.dp)) {
-            Text(if (pager.currentPage < 3) introSlides[pager.currentPage].foot else "Better to know now than half way through a move.",
-                Modifier.fillMaxWidth().padding(bottom = 14.dp), color = TextTertiary, fontFamily = UiFamily,
-                fontSize = 12.5.sp, textAlign = TextAlign.Center)
+            if (pager.currentPage < 3) {
+                Text(introSlides[pager.currentPage].foot,
+                    Modifier.fillMaxWidth().padding(bottom = 14.dp), color = TextTertiary, fontFamily = UiFamily,
+                    fontSize = 12.5.sp, textAlign = TextAlign.Center)
+            }
             PrimaryButton(if (pager.currentPage == 3) "Got it" else "Next", {
                 if (pager.currentPage == 3) onFinished() else scope.launch { pager.animateScrollToPage(pager.currentPage + 1) }
             })
@@ -121,7 +119,7 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
  * the first slide frozen on its last intro frame instead of looping.
  */
 @Composable
-private fun SlideMotion(raw: Int, playing: Boolean) {
+private fun SlideMotion(raw: Int, playing: Boolean, modifier: Modifier = Modifier.fillMaxWidth().height(290.dp)) {
     val composition by com.airbnb.lottie.compose.rememberLottieComposition(
         com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(raw),
     )
@@ -133,16 +131,21 @@ private fun SlideMotion(raw: Int, playing: Boolean) {
         if ("intro" in markers) {
             animation.animate(loaded, clipSpec = com.airbnb.lottie.compose.LottieClipSpec.Marker("intro"))
         }
-        animation.animate(
-            composition = loaded,
-            clipSpec = if ("loop" in markers) com.airbnb.lottie.compose.LottieClipSpec.Marker("loop") else null,
-            iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
-        )
+        // An intro with no loop is a one-off: it holds its last frame rather than restarting.
+        if ("loop" in markers || "intro" !in markers) {
+            animation.animate(
+                composition = loaded,
+                clipSpec = if ("loop" in markers) com.airbnb.lottie.compose.LottieClipSpec.Marker("loop") else null,
+                iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
+            )
+        }
     }
     com.airbnb.lottie.compose.LottieAnimation(
         composition = composition,
         progress = { animation.progress },
-        modifier = Modifier.fillMaxWidth().height(290.dp),
+        modifier = modifier,
+        // These are layered vector comps; software rendering drops frames on older phones.
+        renderMode = com.airbnb.lottie.RenderMode.HARDWARE,
     )
 }
 

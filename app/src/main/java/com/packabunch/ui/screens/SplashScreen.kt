@@ -54,6 +54,7 @@ fun SplashScreen(onFinished: () -> Unit) {
             progress = { progress },
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit,
+            renderMode = com.airbnb.lottie.RenderMode.HARDWARE,
         )
     }
 }
