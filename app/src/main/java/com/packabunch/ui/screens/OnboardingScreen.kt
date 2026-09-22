@@ -32,7 +32,7 @@ private val introSlides = listOf(
     IntroSlide(R.drawable.onbmeasure, R.raw.onb_measure, "STEP ONE", "Measure the space",
         "Point the camera at the inside of a crate, box or car boot — or just type the numbers off a tape measure. Both give you the same plan.",
         "Camera measuring works on some phones. Typing always works."),
-    IntroSlide(R.drawable.onbplan, null, "STEP TWO", "See what actually fits",
+    IntroSlide(R.drawable.onbplan, R.raw.onb_plan, "STEP TWO", "See what actually fits",
         "Add your things with their width, depth and height. You get an arrangement that respects turning, stacking and what mustn’t be squashed.", "Up to 20 pieces per pack."),
     IntroSlide(R.drawable.onbpack, null, "STEP THREE", "Follow it, one piece at a time",
         "Numbered steps in an order that keeps everything supported: which item, which way round, which corner it goes in.",
@@ -58,20 +58,7 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
                     Box(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(30.dp)).padding(18.dp)) {
                         Box(Modifier.fillMaxWidth().height(300.dp).background(BrandTint, RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) {
                             if (slide.motion != null) {
-                                val motion by com.airbnb.lottie.compose.rememberLottieComposition(
-                                    com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(slide.motion),
-                                )
-                                val motionProgress by com.airbnb.lottie.compose.animateLottieCompositionAsState(
-                                    motion,
-                                    iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
-                                    // A slide somebody has scrolled past should not keep animating.
-                                    isPlaying = pager.currentPage == page,
-                                )
-                                com.airbnb.lottie.compose.LottieAnimation(
-                                    composition = motion,
-                                    progress = { motionProgress },
-                                    modifier = Modifier.fillMaxWidth().height(290.dp),
-                                )
+                                SlideMotion(slide.motion, playing = pager.currentPage == page)
                             } else {
                                 Image(painterResource(slide.art), null, Modifier.fillMaxWidth().height(290.dp))
                             }
@@ -125,6 +112,36 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
         }
         Spacer(Modifier.height(12.dp))
     }
+}
+
+/**
+ * The designer's slide animation: the "intro" marker plays once, then the "loop" marker
+ * repeats. Pausing when the slide is off screen keeps the pager smooth on older phones.
+ */
+@Composable
+private fun SlideMotion(raw: Int, playing: Boolean) {
+    val composition by com.airbnb.lottie.compose.rememberLottieComposition(
+        com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(raw),
+    )
+    var introPlayed by remember(raw) { mutableStateOf(false) }
+    val clip = remember(introPlayed) {
+        com.airbnb.lottie.compose.LottieClipSpec.Marker(if (introPlayed) "loop" else "intro")
+    }
+    val progress by com.airbnb.lottie.compose.animateLottieCompositionAsState(
+        composition = composition,
+        clipSpec = clip,
+        iterations = if (introPlayed) com.airbnb.lottie.compose.LottieConstants.IterateForever else 1,
+        isPlaying = playing,
+        restartOnPlay = false,
+    )
+    LaunchedEffect(progress, composition) {
+        if (!introPlayed && composition != null && progress >= 1f) introPlayed = true
+    }
+    com.airbnb.lottie.compose.LottieAnimation(
+        composition = composition,
+        progress = { progress },
+        modifier = Modifier.fillMaxWidth().height(290.dp),
+    )
 }
 
 @Composable
