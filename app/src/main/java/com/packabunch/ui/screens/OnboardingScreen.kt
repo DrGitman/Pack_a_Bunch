@@ -23,14 +23,18 @@ import com.packabunch.ui.components.*
 import com.packabunch.ui.theme.*
 import kotlinx.coroutines.launch
 
-private data class IntroSlide(val art: Int, val step: String, val title: String, val body: String, val foot: String)
+/**
+ * [motion] is the designer's Lottie for that slide, or null until one exists — the still
+ * artwork stays as the fallback so a slide is never blank while the set is half finished.
+ */
+private data class IntroSlide(val art: Int, val motion: Int?, val step: String, val title: String, val body: String, val foot: String)
 private val introSlides = listOf(
-    IntroSlide(R.drawable.onbmeasure, "STEP ONE", "Measure the space",
+    IntroSlide(R.drawable.onbmeasure, R.raw.onb_measure, "STEP ONE", "Measure the space",
         "Point the camera at the inside of a crate, box or car boot — or just type the numbers off a tape measure. Both give you the same plan.",
         "Camera measuring works on some phones. Typing always works."),
-    IntroSlide(R.drawable.onbplan, "STEP TWO", "See what actually fits",
+    IntroSlide(R.drawable.onbplan, null, "STEP TWO", "See what actually fits",
         "Add your things with their width, depth and height. You get an arrangement that respects turning, stacking and what mustn’t be squashed.", "Up to 20 pieces per pack."),
-    IntroSlide(R.drawable.onbpack, "STEP THREE", "Follow it, one piece at a time",
+    IntroSlide(R.drawable.onbpack, null, "STEP THREE", "Follow it, one piece at a time",
         "Numbered steps in an order that keeps everything supported: which item, which way round, which corner it goes in.",
         "Mark each piece as it goes in. Your place is saved."),
 )
@@ -53,7 +57,24 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
                     val slide = introSlides[page]
                     Box(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(30.dp)).padding(18.dp)) {
                         Box(Modifier.fillMaxWidth().height(300.dp).background(BrandTint, RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) {
-                            Image(painterResource(slide.art), null, Modifier.fillMaxWidth().height(290.dp))
+                            if (slide.motion != null) {
+                                val motion by com.airbnb.lottie.compose.rememberLottieComposition(
+                                    com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(slide.motion),
+                                )
+                                val motionProgress by com.airbnb.lottie.compose.animateLottieCompositionAsState(
+                                    motion,
+                                    iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
+                                    // A slide somebody has scrolled past should not keep animating.
+                                    isPlaying = pager.currentPage == page,
+                                )
+                                com.airbnb.lottie.compose.LottieAnimation(
+                                    composition = motion,
+                                    progress = { motionProgress },
+                                    modifier = Modifier.fillMaxWidth().height(290.dp),
+                                )
+                            } else {
+                                Image(painterResource(slide.art), null, Modifier.fillMaxWidth().height(290.dp))
+                            }
                         }
                     }
                     Spacer(Modifier.height(30.dp))
@@ -79,9 +100,20 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
                 Spacer(Modifier.height(20.dp))
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
-            repeat(4) { index -> Box(Modifier.size(if (index == pager.currentPage) 26.dp else 8.dp, 8.dp)
-                .background(if (index == pager.currentPage) Primary else OutlineStrong, RoundedCornerShape(99.dp))) }
+        // Drawn here, not from the dots Lottie: that export lost the active pill's width,
+        // leaving four identical circles. Same shapes as the artboard, animated on the tokens.
+        Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 20.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+            repeat(4) { index ->
+                val active = index == pager.currentPage
+                val width by androidx.compose.animation.core.animateDpAsState(
+                    if (active) 26.dp else 8.dp, com.packabunch.ui.motion.Motion.standardTween(), label = "dotWidth",
+                )
+                val colour by androidx.compose.animation.animateColorAsState(
+                    if (active) Primary else OutlineStrong, com.packabunch.ui.motion.Motion.standardTween(), label = "dotColour",
+                )
+                Box(Modifier.size(width, 8.dp).background(colour, RoundedCornerShape(99.dp)))
+            }
         }
         Column(Modifier.padding(horizontal = 20.dp)) {
             Text(if (pager.currentPage < 3) introSlides[pager.currentPage].foot else "Better to know now than half way through a move.",
