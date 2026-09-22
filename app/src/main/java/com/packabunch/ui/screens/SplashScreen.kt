@@ -31,7 +31,11 @@ fun SplashScreen(onFinished: () -> Unit) {
     val progress by animateLottieCompositionAsState(composition, iterations = 1)
 
     LaunchedEffect(progress, composition) {
-        if (composition != null && progress >= 1f) onFinished()
+        if (composition != null && progress >= 1f) {
+            // Let the finished lockup sit for a beat, so the splash lands rather than flicks past.
+            kotlinx.coroutines.delay(1_000)
+            onFinished()
+        }
     }
 
     Box(
