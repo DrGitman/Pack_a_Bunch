@@ -332,7 +332,10 @@ fun PackNavHost(
 
         composable(Routes.PROJECTS) {
             val sync by viewModel.syncState.collectAsStateWithLifecycle()
+            // Read once per arrival: greet after a sign in, stay quiet on every later visit.
+            val greet = remember { com.packabunch.auth.JustSignedIn.consume() }
             ProjectsScreen(
+                greet = greet,
                 refreshing = sync.running,
                 onRefresh = viewModel::syncNow,
                 loading = projectsLoading,

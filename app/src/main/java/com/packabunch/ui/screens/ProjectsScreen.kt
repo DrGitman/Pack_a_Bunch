@@ -34,7 +34,6 @@ import com.packabunch.data.Project
 import com.packabunch.ui.components.BrandMark
 import com.packabunch.ui.components.DimensionChip
 import com.packabunch.ui.components.NavDestination
-import com.packabunch.ui.components.NavPill
 import com.packabunch.ui.components.NavPillClearance
 import com.packabunch.ui.components.PackAppBar
 import com.packabunch.ui.components.PackIconButton
@@ -81,6 +80,7 @@ fun ProjectsScreen(
     onShare: (Project) -> Unit = {},
     refreshing: Boolean = false,
     onRefresh: () -> Unit = {},
+    greet: Boolean = false,
 ) {
     // The three data states live here together because they are one flow: open the menu,
     // confirm the delete, then get a window to take it back.
@@ -123,8 +123,12 @@ fun ProjectsScreen(
                 if (projects.isNotEmpty()) PackIconButton(PackIcons.Search, "Search packs", { searchOpen = !searchOpen; if (!searchOpen) query = "" },
                     modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)))
                 Box {
-                    PackIconButton(PackIcons.Settings, "Sort packs", { sortOpen = true },
-                        modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)))
+                    com.packabunch.ui.components.LottieTapIcon(
+                        animation = com.packabunch.R.raw.icon_filter,
+                        contentDescription = "Sort packs",
+                        onClick = { sortOpen = true },
+                        size = 44.dp,
+                    )
                     androidx.compose.material3.DropdownMenu(sortOpen, { sortOpen = false }) {
                         androidx.compose.material3.DropdownMenuItem(text = { Text("Recently edited") }, onClick = { alphabetical = false; sortOpen = false })
                         androidx.compose.material3.DropdownMenuItem(text = { Text("Name A, Z") }, onClick = { alphabetical = true; sortOpen = false })
@@ -132,12 +136,15 @@ fun ProjectsScreen(
                 }
             }
 
-            if (loading || projects.isNotEmpty()) Text(
-                text = if (loading) "Loading saved packs…" else if (projects.size == 1) "1 pack saved"
-                else "${projects.size} packs saved",
+            if (loading) Text(
+                text = "Loading saved packs…",
                 color = TextTertiary,
                 fontFamily = UiFamily,
                 fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = 4.dp),
+            ) else if (projects.isNotEmpty()) com.packabunch.ui.components.ProjectsSubtitle(
+                packCount = projects.size,
+                greet = greet,
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = 4.dp),
             )
 
@@ -190,15 +197,13 @@ fun ProjectsScreen(
             }
         }
 
-        NavPill(
-            current = NavDestination.Projects,
-            onNavigate = { destination ->
-                if (destination == NavDestination.Settings) onSettings()
-            },
-            onNewPack = onNewPack,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 28.dp),
+com.packabunch.ui.components.PackNavBar(
+            destinations = com.packabunch.ui.components.PackDestinations,
+            selected = 0,
+            onSelect = { index -> if (index != 0) onSettings() },
+            fabAnimation = com.packabunch.R.raw.icon_plus,
+            onFabClick = onNewPack,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
         )
 
         DeletedProjectBar(
@@ -388,34 +393,27 @@ private fun EmptyState(onNewPack: () -> Unit, onSample: () -> Unit, modifier: Mo
 
 @Composable
 private fun EmptyCrateIllustration() {
+    val crate by com.airbnb.lottie.compose.rememberLottieComposition(
+        com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(com.packabunch.R.raw.empty_crate),
+    )
+    val animation = com.airbnb.lottie.compose.rememberLottieAnimatable()
+    androidx.compose.runtime.LaunchedEffect(crate) {
+        val loaded = crate ?: return@LaunchedEffect
+        animation.animate(loaded, clipSpec = com.airbnb.lottie.compose.LottieClipSpec.Marker("intro"))
+        animation.animate(loaded, clipSpec = com.airbnb.lottie.compose.LottieClipSpec.Marker("loop"),
+            iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever)
+    }
     Box(Modifier.size(180.dp, 150.dp).background(com.packabunch.ui.theme.SurfaceSunken, RoundedCornerShape(32.dp)),
         contentAlignment = Alignment.Center) {
-        androidx.compose.foundation.Canvas(Modifier.size(132.dp, 110.dp)) {
-            val scale = size.width / 132f
-            fun polygon(vararg xy: Float) = androidx.compose.ui.graphics.Path().apply {
-                moveTo(xy[0] * scale, xy[1] * scale)
-                for (i in 2 until xy.size step 2) lineTo(xy[i] * scale, xy[i + 1] * scale)
-                close()
-            }
-            val top = polygon(14f,46f,66f,20f,118f,46f,66f,72f)
-            drawPath(top, com.packabunch.ui.theme.EmptyCrateTop)
-            drawPath(polygon(14f,46f,66f,72f,66f,94f,14f,68f), com.packabunch.ui.theme.EmptyCrateLeft, alpha = .85f)
-            drawPath(polygon(66f,72f,118f,46f,118f,68f,66f,94f), com.packabunch.ui.theme.EmptyCrateRight, alpha = .85f)
-            val stroke = androidx.compose.ui.graphics.drawscope.Stroke(2f * scale,
-                join = androidx.compose.ui.graphics.StrokeJoin.Round,
-                pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(7f * scale, 6f * scale)))
-            drawPath(top, com.packabunch.ui.theme.EmptyCrateStroke, style = stroke)
-            for ((x, y) in listOf(14f to 46f, 66f to 72f, 118f to 46f)) {
-                drawLine(com.packabunch.ui.theme.EmptyCrateStroke,
-                    androidx.compose.ui.geometry.Offset(x * scale, y * scale),
-                    androidx.compose.ui.geometry.Offset(x * scale, (y + 22f) * scale),
-                    strokeWidth = 2f * scale, cap = androidx.compose.ui.graphics.StrokeCap.Round, pathEffect = stroke.pathEffect)
-            }
-        }
+        com.airbnb.lottie.compose.LottieAnimation(
+            composition = crate,
+            progress = { animation.progress },
+            modifier = Modifier.size(138.dp, 116.dp),
+            renderMode = com.airbnb.lottie.RenderMode.HARDWARE,
+        )
     }
 }
 
-@androidx.compose.ui.tooling.preview.Preview(widthDp = 412, heightDp = 916)
 @Composable
 private fun ProjectsPreview() {
     PackABunchTheme {

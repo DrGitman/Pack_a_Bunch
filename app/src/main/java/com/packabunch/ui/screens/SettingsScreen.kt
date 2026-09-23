@@ -135,8 +135,14 @@ fun SettingsScreen(
                     fontFamily = NumericFamily, fontSize = 12.sp)
             }
         }
-        NavPill(NavDestination.Settings, onNavigate, onNewPack,
-            Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp))
+com.packabunch.ui.components.PackNavBar(
+            destinations = com.packabunch.ui.components.PackDestinations,
+            selected = 1,
+            onSelect = { index -> if (index != 1) onNavigate(NavDestination.Projects) },
+            fabAnimation = com.packabunch.R.raw.icon_plus,
+            onFabClick = onNewPack,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+        )
     }
 }
 

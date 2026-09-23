@@ -50,21 +50,26 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
             Text("Pack a Bunch", Modifier.weight(1f), color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 15.5.sp)
             PackTextButton("Skip", onFinished, color = TextTertiary)
         }
-        HorizontalPager(pager, Modifier.weight(1f)) { page ->
+        BoxWithConstraints(Modifier.weight(1f)) {
+        // The artboards are 916dp tall and real phones are shorter, so the illustration gives
+        // up height first. The words below it must not need scrolling.
+        val artHeight = (maxHeight * 0.42f).coerceIn(180.dp, 300.dp)
+        HorizontalPager(pager, Modifier.fillMaxSize()) { page ->
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-                Spacer(Modifier.height(26.dp))
+                Spacer(Modifier.height(18.dp))
                 if (page < 3) {
                     val slide = introSlides[page]
-                    Box(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(30.dp)).padding(18.dp)) {
-                        Box(Modifier.fillMaxWidth().height(300.dp).background(BrandTint, RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(30.dp)).padding(14.dp)) {
+                        Box(Modifier.fillMaxWidth().height(artHeight).background(BrandTint, RoundedCornerShape(22.dp)), contentAlignment = Alignment.Center) {
                             if (slide.motion != null) {
-                                SlideMotion(slide.motion, playing = pager.currentPage == page)
+                                SlideMotion(slide.motion, playing = pager.currentPage == page,
+                                    modifier = Modifier.fillMaxWidth().height(artHeight - 10.dp))
                             } else {
-                                Image(painterResource(slide.art), null, Modifier.fillMaxWidth().height(290.dp))
+                                Image(painterResource(slide.art), null, Modifier.fillMaxWidth().height(artHeight - 10.dp))
                             }
                         }
                     }
-                    Spacer(Modifier.height(30.dp))
+                    Spacer(Modifier.height(22.dp))
                     Text(slide.step, color = Primary, fontFamily = UiFamily, fontSize = 12.5.sp,
                         fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
                     Spacer(Modifier.height(12.dp))
@@ -82,6 +87,7 @@ fun OnboardingScreen(onFinished: () -> Unit, modifier: Modifier = Modifier) {
                 }
                 Spacer(Modifier.height(20.dp))
             }
+        }
         }
         // Drawn here, not from the dots Lottie: that export lost the active pill's width,
         // leaving four identical circles. Same shapes as the artboard, animated on the tokens.

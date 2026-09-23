@@ -47,7 +47,11 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
             finally { busy = false }
         }
     }
-    fun google() = runAuth { account.signIn(context); authenticated = account.hasSession }
+    fun google() = runAuth {
+        account.signIn(context)
+        authenticated = account.hasSession
+        if (authenticated) JustSignedIn.mark()
+    }
     if (checking) {
         // Reading the saved session takes a moment; a dialog for it flashes and reads as a fault.
         androidx.compose.foundation.layout.Box(
@@ -94,13 +98,16 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
                 })
             "login" -> LogInScreen(localPackCount = 0,
                 onLogIn = { email, password -> runAuth {
-                    account.signInWithPassword(email, password); authenticated = account.hasSession
+                    account.signInWithPassword(email, password)
+                    authenticated = account.hasSession
+                    if (authenticated) JustSignedIn.mark()
                 } },
                 onGoogle = ::google, onForgot = { recoverySent = false; page = "forgot" },
                 onCreateAccount = { page = "signup" }, onBack = { page = "signIn" })
             "signup" -> CreateAccountScreen(
                 onCreate = { email, password, _, _ -> runAuth {
                     authenticated = account.signUp(email, password)
+                    if (authenticated) JustSignedIn.mark()
                     if (!authenticated) {
                         page = "login"
                         message = "Check your email to confirm your account, then log in. If you already have an account, log in or reset your password."
