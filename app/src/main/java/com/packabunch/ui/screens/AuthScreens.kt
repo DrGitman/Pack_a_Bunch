@@ -82,9 +82,38 @@ private fun TrustCard(title: String? = null, rows: List<String>, modifier: Modif
     }
 }
 
+/** The terms and privacy links, wrapping like a sentence rather than sitting in a card. */
+@Composable
+private fun LegalLine(lead: String, onTerms: () -> Unit, onPrivacy: () -> Unit, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.layout.FlowRow(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        AuthText(lead, 13.5f, 20)
+        LegalLink("Terms", onTerms)
+        AuthText("and", 13.5f, 20)
+        LegalLink("Privacy policy", onPrivacy)
+    }
+}
+
+@Composable
+private fun LegalLink(text: String, onClick: () -> Unit) {
+    Text(
+        text = text,
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick).padding(horizontal = 2.dp),
+        color = PrimaryDark,
+        fontFamily = UiFamily,
+        fontSize = 13.5.sp,
+        fontWeight = FontWeight.Bold,
+        textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline,
+    )
+}
+
 @Composable
 fun SignInScreen(onContinueWithGoogle: () -> Unit, onContinueWithEmail: () -> Unit,
-    onLogIn: () -> Unit, modifier: Modifier = Modifier) {
+    onLogIn: () -> Unit, modifier: Modifier = Modifier,
+    onTerms: () -> Unit = {}, onPrivacy: () -> Unit = {}) {
     ArtboardPage(modifier) {
         Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -93,8 +122,18 @@ fun SignInScreen(onContinueWithGoogle: () -> Unit, onContinueWithEmail: () -> Un
         }
         Box(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp).fillMaxWidth()
             .clip(RoundedCornerShape(30.dp)).background(Chrome)) {
-            Image(painterResource(R.drawable.auth_parcels), null,
-                Modifier.align(Alignment.BottomEnd).offset(x = 14.dp, y = 16.dp).size(150.dp, 130.dp), alpha = .75f)
+            val crate by com.airbnb.lottie.compose.rememberLottieComposition(
+                com.airbnb.lottie.compose.LottieCompositionSpec.RawRes(R.raw.signin_crate),
+            )
+            val crateProgress by com.airbnb.lottie.compose.animateLottieCompositionAsState(
+                crate, iterations = com.airbnb.lottie.compose.LottieConstants.IterateForever,
+            )
+            com.airbnb.lottie.compose.LottieAnimation(
+                composition = crate,
+                progress = { crateProgress },
+                modifier = Modifier.align(Alignment.BottomEnd).offset(x = 14.dp, y = 16.dp).size(150.dp, 130.dp),
+                renderMode = com.airbnb.lottie.RenderMode.HARDWARE,
+            )
             Column(Modifier.padding(horizontal = 22.dp, vertical = 24.dp)) {
                 Text("GET STARTED", color = HeroEyebrow, fontFamily = UiFamily,
                     fontSize = 11.5.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
@@ -111,10 +150,8 @@ fun SignInScreen(onContinueWithGoogle: () -> Unit, onContinueWithEmail: () -> Un
             GoogleButton(onContinueWithGoogle)
             PrimaryButton("Sign up with email", onContinueWithEmail, icon = PackIcons.Mail)
         }
-        TrustCard(rows = listOf("An email address is all we ask for. No phone number.",
-            "Your packs back up to your account and still work offline.",
-            "Sign in with Google or your email and password."),
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp))
+        LegalLine("By continuing you agree to our", onTerms, onPrivacy,
+            Modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp))
         PushDown()
         Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically) {
@@ -189,7 +226,6 @@ fun LogInScreen(localPackCount: Int, onLogIn: (String, String) -> Unit, onGoogle
                 PackTextButton("Forgot password?", onForgot)
             }
             Spacer(Modifier.height(12.dp))
-            Note(text = "Your session is saved securely on this phone. Packs back up to your account.", icon = PackIcons.Lock)
         }
         PushDown()
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)) {
@@ -205,9 +241,12 @@ fun LogInScreen(localPackCount: Int, onLogIn: (String, String) -> Unit, onGoogle
 
 @Composable
 fun CreateAccountScreen(onCreate: (String, String, Boolean, Boolean) -> Unit, onLogIn: () -> Unit,
-    onBack: () -> Unit, modifier: Modifier = Modifier) {
+    onBack: () -> Unit, modifier: Modifier = Modifier,
+    onTerms: () -> Unit = {}, onPrivacy: () -> Unit = {}) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    // Nobody is signed up without saying yes first, so this starts unticked every time.
+    var agreed by remember { mutableStateOf(false) }
     ArtboardPage(modifier) {
         PackAppBar("Create an account", onBack)
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 18.dp)) {
@@ -217,15 +256,18 @@ fun CreateAccountScreen(onCreate: (String, String, Boolean, Boolean) -> Unit, on
             Spacer(Modifier.height(12.dp))
             AuthField("Password", password, { password = it }, password = true, strength = true)
             Spacer(Modifier.height(20.dp))
-            TrustCard("What the account is for", listOf("Sign in securely with your email and password",
-                "Keep packs separate for each account on this phone", "Back up your packs and pick them up on another phone"))
-            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Checkbox(checked = agreed, onCheckedChange = { agreed = it },
+                    colors = CheckboxDefaults.colors(checkedColor = Primary, checkmarkColor = Color.White))
+                LegalLine("I agree to the", onTerms, onPrivacy, Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
             AuthText("We may ask you to confirm your email before logging in.", 13.5f, 20)
         }
         PushDown()
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)) {
-            PrimaryButton("Create account", { onCreate(email.trim(), password, false, false) },
-                enabled = email.contains('@') && email.length > 3 && password.length >= 8)
+            PrimaryButton("Create account", { onCreate(email.trim(), password, agreed, false) },
+                enabled = agreed && email.contains('@') && email.length > 3 && password.length >= 8)
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { PackTextButton("I already have an account", onLogIn) }
         }
     }

@@ -28,6 +28,8 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
     var habit by rememberSaveable { mutableStateOf(PackingHabit.entries.firstOrNull { it.name == onboarding.getString("habit", null) }) }
     var message by remember { mutableStateOf<String?>(null) }
     var recoverySent by remember { mutableStateOf(false) }
+    // Where a legal page returns to, since both sign in and sign up open them.
+    var back by rememberSaveable { mutableStateOf("signIn") }
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) {
         authenticated = account.restore()
@@ -72,7 +74,12 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
         }
     } else {
         BackHandler(enabled = page != "signIn" && page != "intro") {
-            if (!busy) page = when (page) { "setup" -> "intro"; "forgot" -> "login"; else -> "signIn" }
+            if (!busy) page = when (page) {
+                "setup" -> "intro"
+                "forgot" -> "login"
+                "terms", "privacy" -> back
+                else -> "signIn"
+            }
         }
         when (page) {
             "intro" -> OnboardingScreen(onFinished = { page = "setup" })
@@ -98,13 +105,19 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
                         page = "login"
                         message = "Check your email to confirm your account, then log in. If you already have an account, log in or reset your password."
                     }
-                } }, onLogIn = { page = "login" }, onBack = { page = "signIn" })
+                } }, onLogIn = { page = "login" }, onBack = { page = "signIn" },
+                onTerms = { back = "signup"; page = "terms" },
+                onPrivacy = { back = "signup"; page = "privacy" })
+            "terms" -> TermsScreen(onBack = { page = back })
+            "privacy" -> PrivacyPolicyScreen(onBack = { page = back })
             "forgot" -> ForgotPasswordScreen(
                 sent = recoverySent,
                 onSend = { email -> runAuth { account.sendRecovery(email); recoverySent = true } },
                 onBack = { page = "login" })
             else -> SignInScreen(onContinueWithGoogle = ::google,
-                onContinueWithEmail = { page = "signup" }, onLogIn = { page = "login" })
+                onContinueWithEmail = { page = "signup" }, onLogIn = { page = "login" },
+                onTerms = { back = "signIn"; page = "terms" },
+                onPrivacy = { back = "signIn"; page = "privacy" })
         }
     }
     if (busy) AlertDialog(onDismissRequest = {}, title = { Text("Connecting…") },

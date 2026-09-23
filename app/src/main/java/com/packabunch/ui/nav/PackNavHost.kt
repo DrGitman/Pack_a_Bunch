@@ -103,6 +103,8 @@ object Routes {
     const val NOTIFICATIONS = "notifications"      // Notifications.dc.html
     const val ONB_SETUP = "onbSetup"               // OnbSetup.dc.html
     const val ITEM_PHOTO = "itemPhoto"             // ItemPhoto.dc.html
+    const val TERMS = "terms"
+    const val PRIVACY = "privacy"
 }
 
 /**
@@ -717,11 +719,19 @@ fun PackNavHost(
                 },
                 onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
                 onDeleteAllData = viewModel::deleteAllLocalData,
-                onPrivacy = { notice = "A published privacy policy has not been configured. This preview stores packs locally." },
-                onTerms = { notice = "Published terms have not been configured for this preview." },
+                onPrivacy = { navController.navigate(Routes.PRIVACY) },
+                onTerms = { navController.navigate(Routes.TERMS) },
                 onSupport = { notice = "A support address has not been configured for this preview." },
                 onBack = { navController.popBackStack() },
             )
+        }
+
+        composable(Routes.TERMS) {
+            com.packabunch.ui.screens.TermsScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Routes.PRIVACY) {
+            com.packabunch.ui.screens.PrivacyPolicyScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.UPGRADE) {
@@ -752,8 +762,8 @@ fun PackNavHost(
                             "No active Pack a Bunch Pro on this Google account. Restoring does not bring back deleted packs."
                     }
                 },
-                onTerms = { notice = "Published terms have not been configured for this preview." },
-                onPrivacy = { notice = "A published privacy policy has not been configured for this preview." },
+                onTerms = { navController.navigate(Routes.TERMS) },
+                onPrivacy = { navController.navigate(Routes.PRIVACY) },
                 onCompare = { navController.navigate(Routes.PLAN_COMPARISON) },
                 onBack = { navController.popBackStack() },
             )
