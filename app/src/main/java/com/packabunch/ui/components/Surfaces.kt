@@ -17,6 +17,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -44,14 +46,13 @@ import com.packabunch.ui.theme.TextTertiary
 import com.packabunch.ui.theme.UiFamily
 
 /**
- * Shadows in the artboards are warm and low — `0 6px 18px rgba(90,58,35,0.06)` and
- * friends. Compose only gives us an elevation and a colour, so the brown is set here once
- * rather than a neutral grey drop shadow appearing under every card.
+ * No shadow. The designs are flat: cards, pills and the nav bar separate by colour and shape,
+ * not by lift, and Compose's drop shadow reads as grey haze against the cream ground.
+ *
+ * Kept as a modifier rather than deleted from every call site, so one line brings shadows back
+ * if the design ever wants them.
  */
-private val ShadowBrown = Color(0xFF5A3A23)
-
-fun Modifier.warmShadow(elevation: Dp, shape: Shape): Modifier =
-    shadow(elevation = elevation, shape = shape, ambientColor = ShadowBrown, spotColor = ShadowBrown)
+fun Modifier.warmShadow(elevation: Dp, shape: Shape): Modifier = this
 
 /** The standard white card: 22 dp corners, warm low shadow. */
 @Composable
@@ -261,11 +262,28 @@ fun DashedPlaceholder(
     modifier: Modifier = Modifier,
     icon: ImageVector? = PackIcons.Plus,
 ) {
+    val shape = RoundedCornerShape(22.dp)
+    val stroke = androidx.compose.ui.graphics.drawscope.Stroke(
+        width = with(androidx.compose.ui.platform.LocalDensity.current) { 1.6.dp.toPx() },
+        // A drawn dash, as the artboard has it. A plain border reads as a disabled field.
+        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+            with(androidx.compose.ui.platform.LocalDensity.current) {
+                floatArrayOf(7.dp.toPx(), 6.dp.toPx())
+            },
+        ),
+    )
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .border(1.6.dp, Color(0xFFDCC6AF), RoundedCornerShape(22.dp))
-            .padding(horizontal = Spacing.base, vertical = 17.dp),
+            .drawBehind {
+                drawRoundRect(
+                    color = Color(0xFFD9C8B4),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(22.dp.toPx()),
+                    style = stroke,
+                )
+            }
+            .clip(shape)
+            .padding(horizontal = Spacing.base, vertical = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -273,13 +291,13 @@ fun DashedPlaceholder(
             Icon(
                 icon,
                 contentDescription = null,
-                tint = Color(0xFFC3B0A0),
+                tint = com.packabunch.ui.theme.Primary,
                 modifier = Modifier.size(20.dp),
             )
         }
         Text(
             text = text,
-            color = Color(0xFFB09A85),
+            color = com.packabunch.ui.theme.PrimaryDark,
             fontFamily = UiFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 15.sp,

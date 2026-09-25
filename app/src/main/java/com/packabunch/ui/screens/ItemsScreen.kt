@@ -2,6 +2,7 @@ package com.packabunch.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -127,8 +128,9 @@ fun ItemsScreen(
                 Column(Modifier.padding(horizontal = Spacing.gutter)) {
                     Row(
                         Modifier.fillMaxWidth()
-                            .background(SurfaceMuted, RoundedCornerShape(16.dp))
-                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                            .background(com.packabunch.ui.theme.BrandTint, RoundedCornerShape(18.dp))
+                            .border(1.dp, com.packabunch.ui.theme.Outline, RoundedCornerShape(18.dp))
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -186,7 +188,7 @@ fun ItemsScreen(
 
                 item {
                     Box(Modifier.pressScale(pressedScale = 0.98f).clickable(onClick = onScan)) {
-                        DashedPlaceholder(text = "Scan items together")
+                        DashedPlaceholder(text = "Scan items together", icon = PackIcons.Ruler)
                     }
                 }
 
@@ -257,7 +259,28 @@ private fun ItemRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ItemNumberTile(number = index + 1, color = itemColor(index), size = 34.dp, cornerRadius = 12.dp, fontSize = 14)
+        Box(Modifier.size(46.dp)) {
+            Box(
+                Modifier.size(42.dp).align(Alignment.BottomEnd)
+                    .background(itemColor(index).copy(alpha = 0.16f), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(PackIcons.Cube, null, Modifier.size(22.dp), tint = itemColor(index))
+            }
+            // The number rides the corner of the tile rather than replacing the picture.
+            Box(
+                Modifier.size(20.dp).align(Alignment.TopStart)
+                    .background(itemColor(index), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "${index + 1}",
+                    color = Color.White,
+                    fontFamily = com.packabunch.ui.theme.NumericFamily,
+                    fontSize = 11.sp,
+                )
+            }
+        }
 
         Column(Modifier.weight(1f)) {
             Text(
@@ -281,6 +304,7 @@ private fun ItemRow(
                 fontWeight = FontWeight.Medium,
                 fontSize = 11.5.sp,
                 maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier
                     .padding(top = 5.dp)
                     .background(SurfaceMuted, RoundedCornerShape(999.dp))
@@ -299,10 +323,10 @@ private fun ItemRow(
 
 /** The one-line summary of what the solver may and may not do with this item. */
 private fun ItemSpec.constraintLabel(): String = when {
-    keepUpright && !maySupportItems -> "Keep upright · nothing on top"
+    keepUpright && !maySupportItems -> "Upright, nothing on top"
     keepUpright -> "Keep upright"
     !maySupportItems -> "Nothing on top"
-    else -> "Can turn any way"
+    else -> "Turns any way"
 }
 
 @Preview(widthDp = 412, heightDp = 916)

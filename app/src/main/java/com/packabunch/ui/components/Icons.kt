@@ -90,6 +90,7 @@ object PackIcons {
     )
 
     val Plus: ImageVector = strokeIcon("Plus", "M12 5v14M5 12h14", strokeWidth = 2.3f)
+    val Minus: ImageVector = strokeIcon("Minus", "M5 12h14", strokeWidth = 2.3f)
     val Search: ImageVector = strokeIcon("Search", circle(11f, 11f, 7f), "M20 20l-3.6-3.6")
 
     val Settings: ImageVector = strokeIcon(

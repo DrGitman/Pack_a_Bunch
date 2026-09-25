@@ -1,6 +1,7 @@
 package com.packabunch.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.widthIn
@@ -141,8 +142,29 @@ fun ProjectsScreen(
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = 4.dp),
             )
 
-            if (searchOpen) androidx.compose.material3.OutlinedTextField(query, { query = it },
-                Modifier.fillMaxWidth().padding(horizontal = 20.dp), label = { Text("Search packs") }, singleLine = true)
+            // A plain white pill with the words inside it: no floating label, and light enough
+            // against the cream ground to be obvious.
+            if (searchOpen) androidx.compose.foundation.text.BasicTextField(
+                value = query,
+                onValueChange = { query = it },
+                singleLine = true,
+                textStyle = androidx.compose.ui.text.TextStyle(
+                    color = TextPrimary, fontFamily = UiFamily, fontSize = 15.sp,
+                ),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(com.packabunch.ui.theme.Primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 6.dp)
+                    .background(Color.White, RoundedCornerShape(14.dp))
+                    .border(1.dp, com.packabunch.ui.theme.Outline, RoundedCornerShape(14.dp))
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                decorationBox = { inner ->
+                    if (query.isEmpty()) {
+                        Text("Search packs", color = TextTertiary, fontFamily = UiFamily, fontSize = 15.sp)
+                    }
+                    inner()
+                },
+            )
             if (projects.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("All", "In progress", "Packed").forEach { candidate ->

@@ -166,7 +166,7 @@ fun Stepper(
             .background(background, RoundedCornerShape(999.dp))
             .padding(4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         StepperButton("−", enabled = value > range.first, background = buttonBackground) {
             onValueChange((value - 1).coerceIn(range))
@@ -175,7 +175,7 @@ fun Stepper(
             text = value.toString(),
             style = NumeralField.copy(fontSize = 16.sp),
             color = TextPrimary,
-            modifier = Modifier.width(20.dp),
+            modifier = Modifier.width(18.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
         StepperButton("+", enabled = value < range.last, background = buttonBackground) {
@@ -193,7 +193,7 @@ private fun StepperButton(
 ) {
     Box(
         modifier = Modifier
-            .size(34.dp)
+            .size(30.dp)
             .pressScale(pressedScale = 0.9f, enabled = enabled)
             .background(background, RoundedCornerShape(17.dp))
             .clip(RoundedCornerShape(17.dp))
@@ -205,12 +205,12 @@ private fun StepperButton(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = glyph,
-            color = if (enabled) Color(0xFF5C4A3A) else Color(0xFFC3B0A0),
-            fontFamily = UiFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 17.sp,
+        // Drawn, not typed: a "+" glyph sits on its text baseline and never looks centred.
+        androidx.compose.material3.Icon(
+            imageVector = if (glyph == "+") PackIcons.Plus else PackIcons.Minus,
+            contentDescription = null,
+            modifier = Modifier.size(15.dp),
+            tint = if (enabled) Color(0xFF5C4A3A) else Color(0xFFC3B0A0),
         )
     }
 }
