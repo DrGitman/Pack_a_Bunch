@@ -2,13 +2,12 @@
 
 **Know what fits. See where it goes.**
 
-An Android app for packing things into a space. You scan or measure the space, add
-your items, and the app suggests an arrangement and walks you through placing it one
-item at a time.
+An Android app for packing things into a space. You measure the space, add your items, and
+the app works out an arrangement and walks you through placing it one piece at a time.
 
-Status: **engine built, no screens yet.** The packing engine and the UI foundation
-are done and tested; none of the 65 designed screens are built, so the app does not
-run beyond a placeholder.
+Status: **the app runs end to end on a phone.** Onboarding, accounts, the packing engine,
+the plan and the packing guide all work, and packs sync to the account. What is left before
+a Play release is listed at the bottom.
 
 ---
 
@@ -23,7 +22,8 @@ run beyond a placeholder.
    plainly what it couldn't place, and why.
 4. **Follow the pack** — numbered steps, one highlighted item at a time, bottom-up.
 
-Everything lives on the device. Projects, photos and dimensions are stored locally.
+Packs are stored on the phone and backed up to the signed-in account. Photos stay on the
+phone and are never uploaded.
 
 ## What it deliberately does not do
 
@@ -41,7 +41,7 @@ These are product decisions, not gaps to fill in later without a conversation:
 - It does not report an "optimisation percentage". The metric is **modelled fill**,
   with a stated basis.
 
-The full copy rules are in the UX spec and are requirements, not suggestions.
+The full copy rules are in `docs/UX.md` and are requirements, not suggestions.
 
 ## Stack
 
@@ -49,38 +49,45 @@ The full copy rules are in the UX spec and are requirements, not suggestions.
 |---|---|
 | UI | Kotlin, Jetpack Compose, Material 3, Navigation Compose |
 | State | ViewModel, StateFlow, coroutines |
-| Storage | Room for projects/items/plans, DataStore for settings, app-private files for photos |
+| Storage | Room for packs, SharedPreferences for settings, app-private files for photos |
+| Accounts and sync | Supabase auth and Postgres, with row level security |
 | Camera | CameraX for photos; ARCore (AR Optional) for measurement and scanning |
 | 3D | Compose Canvas isometric renderer, driven by real solver output |
+| Motion | Lottie for the designer's exported animations, Compose for everything else |
 | Packing engine | Pure Kotlin, no Android dependencies, unit-testable off-device |
 | Billing | Google Play Billing via RevenueCat |
 
-The packing engine stays free of Android imports so it can be tested without a
-device — that is a module boundary, so the compiler enforces it. Solver axes are
-X left→right, Y front→back, Z up; lengths are integer millimetres and are converted
-only at the UI boundary.
+The packing engine stays free of Android imports so it can be tested without a device —
+that is a module boundary, so the compiler enforces it. Solver axes are X left→right,
+Y front→back, Z up; lengths are integer millimetres and are converted only at the UI
+boundary.
 
 ## Layout
 
 ```
 Pack_a_bunch_App/
-├── packing/                    ← the engine. Pure Kotlin, 63 tests, no Android
+├── packing/                    ← the engine. Pure Kotlin, no Android
 ├── app/                        ← Compose UI, theme, components, renderer
+│   └── src/main/res/raw/       ← the designer's Lottie animations
+├── animations/                 ← Lottie sources and previews as exported from Figma
+├── supabase/
+│   ├── CLOUD-SETUP.md          ← what is deployed, and how to apply a migration
+│   └── migrations/             ← SQL, applied through the Supabase SQL editor
 ├── docs/
 │   ├── UX.md                   ← screen map, acceptance notes, copy rules
 │   ├── design-tokens.json      ← colour, type, spacing — source of truth
-│   └── PLAN.md                 ← the 5-day build & Play launch plan
-├── design/artboards/           ← 65 mockups, one .dc.html per screen
+│   └── PLAN.md                 ← the build and Play launch plan
+├── design/artboards/           ← mockups, one .dc.html per screen
 └── logos/                      ← official app mark and wordmark
 ```
 
 Read `docs/UX.md` before building a screen, and lift exact values from that screen's
-artboard rather than rounding them to a 4/8dp grid. Never hardcode a hex value in a
-composable — colour, type and spacing come from `app/.../ui/theme/`.
+artboard. Never hardcode a hex value in a composable — colour, type and spacing come from
+`app/.../ui/theme/`.
 
 ## Plans
 
-| | Free | Plus |
+| | Free | Pro |
 |---|---|---|
 | Pieces per pack | 20 | unlimited |
 | Saved packs | 1 | unlimited |
@@ -90,56 +97,40 @@ composable — colour, type and spacing come from `app/.../ui/theme/`.
 | Plan comparison | — | ✓ |
 
 "Unlimited" means no *product* limit. The engine can only search about 400 pieces, and
-that ceiling applies to everyone — it must never be left out when describing Plus.
+that ceiling applies to everyone — it must never be left out when describing Pro.
 
-Tier limits live in `TierLimits`, deliberately outside the solver: the engine produces
-the same arrangement whatever anyone paid, and there is a test asserting it.
-
-## Built so far
-
-- **The engine.** Deterministic bounded heuristic, six orientations, support rules, an
-  independent validator every plan must pass before it can be shown, and honest reasons
-  for anything it couldn't place. Handles rectangular crates exactly and scanned
-  irregular spaces as an occupancy grid, including obstructions, unseen patches, and
-  whether an item will fit through the opening at all.
-- **The UI foundation.** Theme and real fonts, motion system, icon set lifted from the
-  artboard SVGs, component library, isometric renderer, and the app icon.
-
-## Not built yet
-
-- All 65 screens, and navigation between them.
-- Persistence. Room is a dependency with no entities — nothing saves.
-- Camera, ARCore scanning, billing, accounts.
+Tier limits live in `TierLimits`, deliberately outside the solver: the engine produces the
+same arrangement whatever anyone paid, and there is a test asserting it.
 
 ## Getting started
 
+```bash
+export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
+
+./gradlew :packing:test          # engine tests, no device needed
+./gradlew :app:installDebug      # debug build: RevenueCat test purchases work here
+./gradlew :app:installStaging    # optimised build: judge animations and speed here
 ```
-./gradlew :packing:test        # engine tests, no device needed
-./gradlew :app:assembleDebug   # build the app
-```
 
-Gradle runs on the Android Studio JBR:
-`export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"`.
+**Use `staging` to judge how the app feels.** Debug builds of Compose drop frames on older
+phones, which makes good motion look broken. Staging is the release build signed with the
+debug key, so it installs directly.
 
-Build screens in this order: the manual flow first (create space → items), then the
-packing engine's result screens, then billing, then the camera. Recovery states belong
-with the screen they attach to, not batched at the end — most of the real work hides there.
+Configuration lives in `local.properties`, which is never committed. See
+`local.properties.example` for the keys: the Supabase URL and publishable key, the Google
+web client id, and the RevenueCat key. A `test_` RevenueCat key works only in debug builds;
+RevenueCat shuts the app down if one reaches a release build.
 
-## Open decisions
+## Before a Play release
 
-- **Accounts.** `docs/UX.md` Band 1 requires them; `docs/PLAN.md` says no signup wall.
-  Accounts pull in a backend, a privacy policy covering personal data, a matching Data
-  safety form, and a web-reachable deletion route Play requires.
-- **Sign-in merge.** `LogIn` promises local packs merge into the account. Merge, replace,
-  or ask?
-- **Accounts** (above) is the one that blocks Band 1. Everything else here is smaller.
-- **Application id.** `com.packabunch` is a placeholder; it is permanent once uploaded.
-- **Brand colour.** The logo brown (`#5C2626`) is not the token primary (`#A65C34`).
-  The mark uses its own colour; the app interior uses the tokens.
-
-## Release notes to self
-
-- Target Android 16 / API 36 for new submissions.
-- Play Billing Library 8+ — check what RevenueCat actually resolves to.
-- Verify 16 KB page-size compatibility; AR and rendering SDKs ship native libraries.
-- Keep signing keys and service-account credentials out of this repo.
+- **A privacy policy and terms at a public URL.** Both exist in the app
+  (`ui/screens/LegalScreens.kt`) but Play needs a web address as well.
+- **Account deletion.** Play requires it in-app and on the web; deleting the account row
+  needs a Supabase edge function.
+- **Your own email sender.** Supabase's built-in mail sends about two messages an hour,
+  which will not survive real sign-ups. Set SMTP in the Supabase dashboard.
+- **Measurement accuracy.** The tape-measure check needs a phone that supports ARCore
+  Depth; the P30 Lite used for testing does not.
+- **The application id** `com.packabunch` is permanent once uploaded. Confirm it first.
+- Target Android 16 / API 36, verify 16 KB page-size compatibility, and keep signing keys
+  and service-account credentials out of this repo.

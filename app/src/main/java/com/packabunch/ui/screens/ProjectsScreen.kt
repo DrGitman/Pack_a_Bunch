@@ -16,8 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -35,6 +38,7 @@ import com.packabunch.ui.components.BrandMark
 import com.packabunch.ui.components.DimensionChip
 import com.packabunch.ui.components.NavDestination
 import com.packabunch.ui.components.NavPillClearance
+import com.packabunch.ui.components.popIn
 import com.packabunch.ui.components.PackAppBar
 import com.packabunch.ui.components.PackIconButton
 import com.packabunch.ui.components.PackIcons
@@ -81,14 +85,11 @@ fun ProjectsScreen(
     refreshing: Boolean = false,
     onRefresh: () -> Unit = {},
     greet: Boolean = false,
+    /** A pack just deleted from its own page, so the undo window appears where the list is. */
+    deleted: Project? = null,
 ) {
-    // The three data states live here together because they are one flow: open the menu,
-    // confirm the delete, then get a window to take it back.
-    var menuFor by remember { mutableStateOf<Project?>(null) }
-    var confirmFor by remember { mutableStateOf<Project?>(null) }
-    var justDeleted by remember { mutableStateOf<Project?>(null) }
-    var renameFor by remember { mutableStateOf<Project?>(null) }
-    var newName by remember { mutableStateOf("") }
+    // A pack deleted on its own page lands back here with a window to take it back.
+    var justDeleted by remember(deleted?.id) { mutableStateOf(deleted) }
     var searchOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     var filter by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("All") }
@@ -102,26 +103,17 @@ fun ProjectsScreen(
             (filter == "All" || (filter == "Packed" && packed) || (filter == "In progress" && !packed))
     }.let { if (alphabetical) it.sortedBy { p -> p.name.lowercase() } else it.sortedByDescending { p -> p.updatedAtMillis } }
 
-    renameFor?.let { project ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { renameFor = null },
-            title = { Text("Rename pack") },
-            text = { androidx.compose.material3.OutlinedTextField(value = newName,
-                onValueChange = { newName = it }, label = { Text("Pack name") }, singleLine = true) },
-            confirmButton = { androidx.compose.material3.TextButton(enabled = newName.isNotBlank(),
-                onClick = { onRename(project, newName.trim()); renameFor = null }) { Text("Save") } },
-            dismissButton = { androidx.compose.material3.TextButton(onClick = { renameFor = null }) { Text("Cancel") } },
-        )
-    }
-
     Box(modifier.fillMaxSize()) {
         ScreenScaffold {
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 10.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Projects", Modifier.weight(1f), color = TextPrimary, fontFamily = UiFamily,
                     fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.7).sp)
-                if (projects.isNotEmpty()) PackIconButton(PackIcons.Search, "Search packs", { searchOpen = !searchOpen; if (!searchOpen) query = "" },
-                    modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)))
+                if (projects.isNotEmpty()) PackIconButton(
+                    PackIcons.Search, "Search packs",
+                    { searchOpen = !searchOpen; if (!searchOpen) query = "" },
+                    modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)),
+                )
                 Box {
                     com.packabunch.ui.components.LottieTapIcon(
                         animation = com.packabunch.R.raw.icon_filter,
@@ -183,27 +175,49 @@ fun ProjectsScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    itemsIndexed(visibleProjects, key = { _, p -> p.id }) { index, project ->
-                        ProjectCard(
-                            project = project,
-                            unit = unit,
-                            onClick = { onOpen(project.id) },
-                            onMenu = { menuFor = project },
-                            modifier = Modifier.animateItem(),
-                        )
+                    // Grouped the way the artboard groups them: what you touched today, what
+                    // came before, and the made-up pack we ship, kept apart from real work.
+                    // One running index across headings and cards, so the pop-in reads as a
+                    // single ripple down the page rather than restarting at each section.
+                    var row = 0
+                    groupedProjects(visibleProjects).forEach { (heading, group) ->
+                        val headingIndex = row++
+                        item(key = "heading-$heading") {
+                            Text(
+                                text = heading,
+                                color = TextTertiary,
+                                fontFamily = UiFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                                letterSpacing = 1.sp,
+                                modifier = Modifier.padding(top = 6.dp, bottom = 2.dp).animateItem()
+                                    .popIn(headingIndex),
+                            )
+                        }
+                        group.forEachIndexed { indexInGroup, project ->
+                            val cardIndex = row++
+                            item(key = project.id) {
+                                ProjectCard(
+                                    project = project,
+                                    unit = unit,
+                                    onClick = { onOpen(project.id) },
+                                    modifier = Modifier.animateItem()
+                                        .popIn(cardIndex),
+                                )
+                            }
+                        }
                     }
                 }
                 }
             }
         }
 
-com.packabunch.ui.components.PackNavBar(
-            destinations = com.packabunch.ui.components.PackDestinations,
-            selected = 0,
-            onSelect = { index -> if (index != 0) onSettings() },
-            fabAnimation = com.packabunch.R.raw.icon_plus,
-            onFabClick = onNewPack,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+com.packabunch.ui.components.PackBar(
+            here = com.packabunch.ui.components.NavSlots.Projects,
+            onProjects = {},
+            onSettings = onSettings,
+            onNewPack = onNewPack,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
         )
 
         DeletedProjectBar(
@@ -218,36 +232,30 @@ com.packabunch.ui.components.PackNavBar(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
         )
 
-        menuFor?.let { project ->
-            ProjectMenuSheet(
-                project = project,
-                unit = unit,
-                onRename = { newName = project.name; renameFor = project; menuFor = null },
-                onDuplicate = { onDuplicate(project); menuFor = null },
-                onRemeasure = { onRemeasure(project); menuFor = null },
-                onShare = { onShare(project); menuFor = null },
-                onDelete = {
-                    confirmFor = project
-                    menuFor = null
-                },
-                onDismiss = { menuFor = null },
-            )
-        }
+    }
+}
 
-        confirmFor?.let { project ->
-            DeleteConfirmDialog(
-                packName = project.name,
-                itemCount = project.items.size,
-                photoCount = 0,
-                onConfirm = {
-                    onDelete(project)
-                    // Held so the undo bar has something to put back.
-                    justDeleted = project
-                    confirmFor = null
-                },
-                onCancel = { confirmFor = null },
-            )
-        }
+/** The artboard's three groups, in its order. Empty groups are left out entirely. */
+private fun groupedProjects(projects: List<Project>): List<Pair<String, List<Project>>> {
+    val dayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
+    val samples = projects.filter { it.id == "sample" }
+    val real = projects.filter { it.id != "sample" }
+    return listOf(
+        "TODAY" to real.filter { it.updatedAtMillis >= dayAgo },
+        "EARLIER" to real.filter { it.updatedAtMillis < dayAgo },
+        "SAMPLES" to samples,
+    ).filter { (_, group) -> group.isNotEmpty() }
+}
+
+/** "2 h ago", the way the artboard writes it. Anything older than a week is just the day count. */
+private fun timeAgo(millis: Long): String? {
+    if (millis <= 0L) return null
+    val minutes = (System.currentTimeMillis() - millis) / 60_000
+    return when {
+        minutes < 1 -> "just now"
+        minutes < 60 -> "$minutes min ago"
+        minutes < 60 * 24 -> "${minutes / 60} h ago"
+        else -> "${minutes / (60 * 24)} d ago"
     }
 }
 
@@ -256,7 +264,6 @@ private fun ProjectCard(
     project: Project,
     unit: LengthUnit,
     onClick: () -> Unit,
-    onMenu: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(24.dp)
@@ -268,76 +275,107 @@ private fun ProjectCard(
             .pressScale(pressedScale = 0.97f)
             .warmShadow(8.dp, shape)
             .background(Color.White, shape)
-            .clickable(onClick = onClick)
+            .clip(shape).clickable(onClick = onClick)
             .padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        MiniCratePreview(
-            items = project.items,
-            specOrder = project.items.map { it.id },
-            space = project.space,
-            placements = plan?.placements.orEmpty(),
-            modifier = Modifier.size(68.dp),
-        )
+        Box(
+            Modifier.size(58.dp).background(Color(0xFFF7E4D3), RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            MiniCratePreview(
+                items = project.items,
+                specOrder = project.items.map { it.id },
+                space = project.space,
+                placements = plan?.placements.orEmpty(),
+                modifier = Modifier.size(42.dp),
+            )
+        }
 
         Column(Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = project.name.ifEmpty { "Untitled pack" },
+                    color = TextPrimary,
+                    fontFamily = UiFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                )
+                if (project.id == "sample") {
+                    Text(
+                        text = "SAMPLE",
+                        color = Color(0xFF9B8877),
+                        fontFamily = UiFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                        letterSpacing = 0.6.sp,
+                        modifier = Modifier
+                            .background(Color(0xFFF0E9E1), RoundedCornerShape(5.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                    )
+                }
+            }
             Text(
-                text = project.name.ifEmpty { "Untitled pack" },
-                color = TextPrimary,
-                fontFamily = UiFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-            )
-            Text(
-                text = "${project.pieceCount} " +
-                    if (project.pieceCount == 1) "piece" else "pieces",
+                // The artboard's line: what the space is, how much is in it, and how long ago.
+                text = listOfNotNull(
+                    project.space.name.takeIf { it.isNotBlank() && !it.equals(project.name, ignoreCase = true) },
+                    "${project.pieceCount} " + if (project.pieceCount == 1) "piece" else "pieces",
+                    timeAgo(project.updatedAtMillis),
+                ).joinToString(" · "),
                 color = TextSecondary,
                 fontFamily = UiFamily,
                 fontSize = 12.5f.sp,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),
             )
 
             Spacer(Modifier.height(8.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                DimensionChip(text = formatDimensions(project.space.dimensions, unit))
-            }
-
-            if (plan != null) {
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            // One wrapping row: a long "1 not placed" used to be squeezed into a vertical column.
+            androidx.compose.foundation.layout.FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                DimensionChip(text = com.packabunch.ui.format.formatDimensionsCompact(project.space.dimensions, unit), compact = true)
+                if (plan != null) {
                     DimensionChip(
-                        text = "${plan.metrics.modelledFillPercent}% modelled fill",
+                        text = "${plan.metrics.modelledFillPercent}% fill",
                         background = SuccessTint,
                         contentColor = Color(0xFF2F5C45),
+                        compact = true,
                     )
                     if (plan.metrics.unplacedInstanceCount > 0) {
                         DimensionChip(
                             text = "${plan.metrics.unplacedInstanceCount} not placed",
                             background = Color(0xFFFBE4DF),
                             contentColor = Color(0xFF8E3322),
+                            compact = true,
                         )
                     }
+                } else if (project.isPlanStale) {
+                    // The plan no longer matches the items, so it is not shown at all rather
+                    // than shown against numbers it was never solved from.
+                    DimensionChip(
+                        text = "needs planning again",
+                        background = Color(0xFFFAEEDA),
+                        contentColor = Color(0xFF6E4708),
+                        compact = true,
+                    )
                 }
-            } else if (project.isPlanStale) {
-                // The plan no longer matches the items, so it is not shown at all rather
-                // than shown against numbers it was never solved from.
-                Spacer(Modifier.height(6.dp))
-                DimensionChip(
-                    text = "needs planning again",
-                    background = Color(0xFFFAEEDA),
-                    contentColor = Color(0xFF6E4708),
-                )
             }
         }
 
-        PackIconButton(
-            icon = PackIcons.MoreVertical,
-            contentDescription = "More",
-            onClick = onMenu,
-            tint = Color(0xFF8A7565),
-            size = 40.dp,
-            iconSize = 19.dp,
+        // Opening the pack is the only thing this card does now; renaming, duplicating and
+        // deleting live on the pack's own page, where there is room to explain them.
+        Icon(
+            PackIcons.Forward,
+            contentDescription = null,
+            modifier = Modifier.align(Alignment.CenterVertically).size(20.dp),
+            tint = Color(0xFFB9A491),
         )
     }
 }

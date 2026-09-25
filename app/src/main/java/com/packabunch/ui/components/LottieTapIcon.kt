@@ -14,6 +14,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
@@ -26,24 +31,30 @@ import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 
 /*
- * Icons drawn by Lottie files exported from the real artwork in Figma ("Icon … · Motion" on the
+ * Icons drawn by Lottie files exported from the artwork in Figma ("Icon … · Motion" on the
  * Animations page), so frame 0 is pixel-identical to the static icon each one replaces.
  *
- * LottieTapIcon plays once, from the start, on every tap, and is perfectly still the rest of the
- * time. EmptyCrate draws itself in once and then breathes for as long as the screen is empty.
+ * The single-colour icons (gear, account, bell, package, restore, info, the Projects mark) are
+ * exported in one flat colour and recoloured here with [tint], so the same file serves the cream
+ * version in the bar and the terracotta version inside the white pill, and can cross-fade between
+ * them. Leave [tint] null for multi-colour files like the orange + button.
  */
 
 @Composable
 fun LottieTapIcon(
     @RawRes animation: Int,
     contentDescription: String?,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     size: Dp = 24.dp,
+    tint: Color? = null,
     enabled: Boolean = true,
+    interactionSource: MutableInteractionSource? = null,
+    /** Play once as soon as it appears, as well as on tap. Used when an icon swaps into the pill. */
+    playOnAppear: Boolean = false,
 ) {
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(animation))
-    var playing by remember { mutableStateOf(false) }
+    var playing by remember { mutableStateOf(playOnAppear) }
 
     val progress by animateLottieCompositionAsState(
         composition = composition,
@@ -55,25 +66,37 @@ fun LottieTapIcon(
         if (playing && progress >= 1f) playing = false     // settle back on the resting frame
     }
 
-    val interaction = remember { MutableInteractionSource() }
+    val ownSource = remember { MutableInteractionSource() }
+    val interaction = interactionSource ?: ownSource
+    val clicks = if (onClick == null) Modifier else Modifier.clickable(
+        interactionSource = interaction,
+        indication = LocalIndication.current,
+        enabled = enabled,
+    ) {
+        playing = true
+        onClick()
+    }
+
     Box(
         modifier = modifier
             .size(size)
-            .clickable(
-                interactionSource = interaction,
-                indication = LocalIndication.current,
-                enabled = enabled,
-            ) {
-                playing = true
-                onClick()
-            }
+            .then(clicks)
             .semantics { contentDescription?.let { this.contentDescription = it } },
         contentAlignment = Alignment.Center,
     ) {
         LottieAnimation(
             composition = composition,
             progress = { if (playing) progress else 0f },
-            modifier = Modifier.size(size),
+            modifier = Modifier
+                .size(size)
+                .then(
+                    if (tint == null) Modifier else Modifier
+                        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(tint, blendMode = BlendMode.SrcIn)
+                        },
+                ),
         )
     }
 }

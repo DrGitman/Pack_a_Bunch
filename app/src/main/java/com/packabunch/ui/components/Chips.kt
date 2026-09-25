@@ -89,14 +89,17 @@ fun DimensionChip(
     modifier: Modifier = Modifier,
     background: Color = SurfaceMuted,
     contentColor: Color = Color(0xFF5C4A3A),
+    /** Tighter, for the pack cards, where two chips have to share one line on a narrow phone. */
+    compact: Boolean = false,
 ) {
     Text(
         text = text,
-        style = NumeralChip,
+        style = if (compact) NumeralChip.copy(fontSize = 11.5.sp) else NumeralChip,
         color = contentColor,
+        maxLines = 1,
         modifier = modifier
             .background(background, RoundedCornerShape(999.dp))
-            .padding(horizontal = 13.dp, vertical = 7.dp),
+            .padding(horizontal = if (compact) 9.dp else 13.dp, vertical = if (compact) 5.dp else 7.dp),
     )
 }
 

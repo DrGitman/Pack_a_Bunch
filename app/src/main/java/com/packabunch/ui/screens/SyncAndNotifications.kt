@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -158,7 +159,7 @@ private fun VersionCard(version: PackVersion, selected: Boolean, onClick: () -> 
             .pressScale(pressedScale = 0.97f)
             .background(if (selected) BrandTint else Color.White, shape)
             .border(if (selected) 2.dp else 1.dp, if (selected) Primary else Outline, shape)
-            .clickable(onClick = onClick)
+            .clip(shape).clickable(onClick = onClick)
             .padding(Spacing.base),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -342,7 +343,7 @@ private fun NotificationRow(notification: AppNotification, onClick: () -> Unit) 
             .fillMaxWidth()
             .pressScale(pressedScale = 0.97f)
             .background(if (notification.unread) BrandTint else Color.White, shape)
-            .clickable(onClick = onClick)
+            .clip(shape).clickable(onClick = onClick)
             .padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -485,7 +486,7 @@ private fun FixRow(
             .fillMaxWidth()
             .pressScale(pressedScale = 0.97f)
             .background(Color.White, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick)
             .padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {

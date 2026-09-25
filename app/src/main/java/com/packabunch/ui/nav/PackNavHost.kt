@@ -17,7 +17,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -105,6 +110,9 @@ object Routes {
     const val ITEM_PHOTO = "itemPhoto"             // ItemPhoto.dc.html
     const val TERMS = "terms"
     const val PRIVACY = "privacy"
+    const val INFO = "info"                        // Privacy, terms and help
+    const val RESTORE = "restore"
+    const val PACK_PLAN = "packPlan"
 }
 
 /**
@@ -163,6 +171,55 @@ private fun openPlaySubscriptions(context: android.content.Context) {
     runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri)) }
 }
 
+/**
+ * A page that keeps the nav bar, with the right-hand slot renamed to wherever you are.
+ *
+ * The page gets bottom room for the bar rather than sitting under it, so nothing a person needs
+ * to tap ends up behind it.
+ */
+@Composable
+private fun WithNavBar(
+    here: com.packabunch.ui.components.NavSlot,
+    onProjects: () -> Unit,
+    onSettings: () -> Unit,
+    onNewPack: () -> Unit,
+    content: @Composable (Modifier) -> Unit,
+) {
+    Box(Modifier.fillMaxSize()) {
+        content(Modifier.padding(bottom = com.packabunch.ui.components.NavPillClearance))
+        com.packabunch.ui.components.PackBar(
+            here = here,
+            onProjects = onProjects,
+            onSettings = onSettings,
+            onNewPack = onNewPack,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
+        )
+    }
+}
+
+/** The plain-text summary a pack shares: what it is, how big, and everything in it. */
+private fun shareSummary(project: com.packabunch.data.Project, unit: com.packabunch.ui.format.LengthUnit): String =
+    buildString {
+        appendLine(project.name)
+        appendLine(formatDimensions(project.space.dimensions, unit))
+        appendLine(if (project.space.measurementSource == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE) "Camera estimate" else "Typed in")
+        project.items.forEachIndexed { index, item ->
+            appendLine("${index + 1}. ${item.name} × ${item.quantity}: ${formatDimensions(item.dimensions, unit)} " +
+                if (item.measurementSource == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE) "Camera estimate" else "Typed in")
+        }
+    }
+
+private fun sharePack(context: android.content.Context, project: com.packabunch.data.Project, unit: com.packabunch.ui.format.LengthUnit) {
+    context.startActivity(
+        android.content.Intent.createChooser(
+            android.content.Intent(android.content.Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(android.content.Intent.EXTRA_TEXT, shareSummary(project, unit)),
+            "Share pack",
+        ),
+    )
+}
+
 private val TabRoutes = setOf(Routes.PROJECTS, Routes.SETTINGS)
 
 private fun AnimatedContentTransitionScope<androidx.navigation.NavBackStackEntry>.isTabSwitch() =
@@ -195,6 +252,10 @@ fun PackNavHost(
         )
     }
     var editItemId by rememberSaveable { mutableStateOf<String?>(null) }
+    var packMenuOpen by rememberSaveable { mutableStateOf(false) }
+    var renamePack by remember { mutableStateOf<com.packabunch.data.Project?>(null) }
+    var confirmDeletePack by remember { mutableStateOf<com.packabunch.data.Project?>(null) }
+    var deletedForUndo by remember { mutableStateOf<com.packabunch.data.Project?>(null) }
     // Onboarding runs before sign-in (RequiredAccount), so a signed-in person always lands on their packs.
     val startRoute = Routes.PROJECTS
     fun home() = navController.navigate(Routes.PROJECTS) {
@@ -275,7 +336,14 @@ fun PackNavHost(
         }
 
         composable(Routes.PROFILE) {
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.Account,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+            ) { pageModifier ->
             ProfileScreen(
+                modifier = pageModifier,
                 email = account.email,
                 tier = settings.tier,
                 savedPackCount = projects.size,
@@ -304,7 +372,8 @@ fun PackNavHost(
                 onDeleteAccount = { notice = "Account deletion is not connected yet. Deleting local packs does not delete your Supabase account." },
                 onBack = { navController.popBackStack() },
             )
-        }
+                    }
+}
 
         composable(Routes.ACCOUNT_DELETE) {
             AccountDeleteScreen(
@@ -336,6 +405,7 @@ fun PackNavHost(
             val greet = remember { com.packabunch.auth.JustSignedIn.consume() }
             ProjectsScreen(
                 greet = greet,
+                deleted = deletedForUndo,
                 refreshing = sync.running,
                 onRefresh = viewModel::syncNow,
                 loading = projectsLoading,
@@ -350,26 +420,14 @@ fun PackNavHost(
                 },
                 onBack = { navController.popBackStack() },
                 onDelete = { viewModel.deleteProject(it.id) },
-                onRestore = { viewModel.restoreProject(it) },
+                onRestore = { viewModel.restoreProject(it); deletedForUndo = null },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
                 onRename = viewModel::renameProject,
                 onDuplicate = viewModel::duplicateProject,
                 onRemeasure = { project ->
                     viewModel.openPack(project.id) { navController.navigate(Routes.MEASURE_REVIEW) }
                 },
-                onShare = { project ->
-                    val summary = buildString {
-                        appendLine(project.name)
-                        appendLine(formatDimensions(project.space.dimensions, settings.unit))
-                        appendLine(if (project.space.measurementSource == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE) "Camera estimate" else "Typed in")
-                        project.items.forEachIndexed { index, item ->
-                            appendLine("${index + 1}. ${item.name} × ${item.quantity}: ${formatDimensions(item.dimensions, settings.unit)} " +
-                                if (item.measurementSource == com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE) "Camera estimate" else "Typed in")
-                        }
-                    }
-                    context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND)
-                        .setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT, summary), "Share pack"))
-                },
+                onShare = { project -> sharePack(context, project, settings.unit) },
             )
         }
 
@@ -616,8 +674,65 @@ fun PackNavHost(
                 },
                 onEditItems = { navController.popBackStack() },
                 onShowLayers = { navController.navigate(Routes.PLAN_LAYERS) },
+                onMenu = { packMenuOpen = true },
                 onBack = { navController.popBackStack() },
             )
+
+            renamePack?.let { pack ->
+                var newName by remember(pack.id) { mutableStateOf(pack.name) }
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { renamePack = null },
+                    title = { androidx.compose.material3.Text("Rename pack") },
+                    text = {
+                        androidx.compose.material3.OutlinedTextField(newName, { newName = it }, singleLine = true)
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(
+                            enabled = newName.isNotBlank(),
+                            onClick = { viewModel.renameProject(pack, newName.trim()); renamePack = null },
+                        ) { androidx.compose.material3.Text("Save") }
+                    },
+                    dismissButton = {
+                        androidx.compose.material3.TextButton(onClick = { renamePack = null }) {
+                            androidx.compose.material3.Text("Cancel")
+                        }
+                    },
+                )
+            }
+
+            confirmDeletePack?.let { pack ->
+                com.packabunch.ui.screens.DeleteConfirmDialog(
+                    packName = pack.name,
+                    itemCount = pack.items.size,
+                    photoCount = 0,
+                    onConfirm = {
+                        confirmDeletePack = null
+                        viewModel.deleteProject(pack.id)
+                        deletedForUndo = pack
+                        home()
+                    },
+                    onCancel = { confirmDeletePack = null },
+                )
+            }
+
+            // Rename, duplicate, remeasure, share and delete: one sheet, opened from the pack's
+            // own page rather than from a menu button on every card in the list.
+            val pack = projects.firstOrNull { it.id == editor.projectId }
+            if (packMenuOpen && pack != null) {
+                com.packabunch.ui.screens.ProjectMenuSheet(
+                    project = pack,
+                    unit = settings.unit,
+                    onRename = { packMenuOpen = false; renamePack = pack },
+                    onDuplicate = { packMenuOpen = false; viewModel.duplicateProject(pack) },
+                    onRemeasure = {
+                        packMenuOpen = false
+                        viewModel.openPack(pack.id) { navController.navigate(Routes.CREATE_SPACE) }
+                    },
+                    onShare = { packMenuOpen = false; sharePack(context, pack, settings.unit) },
+                    onDelete = { packMenuOpen = false; confirmDeletePack = pack },
+                    onDismiss = { packMenuOpen = false },
+                )
+            }
         }
 
         composable(Routes.PLAN_LAYERS) {
@@ -650,7 +765,14 @@ fun PackNavHost(
         }
 
         composable(Routes.NOTIFICATION_SETTINGS) {
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.Notifications,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+            ) { pageModifier ->
             NotificationSettingsScreen(
+                modifier = pageModifier,
                 preferences = settings.notifications,
                 systemNotificationsAllowed = androidx.core.app.NotificationManagerCompat.from(context).areNotificationsEnabled(),
                 onPreferencesChange = viewModel::setNotificationPreferences,
@@ -661,7 +783,8 @@ fun PackNavHost(
                 onTurnEverythingOff = viewModel::turnAllNotificationsOff,
                 onBack = { navController.popBackStack() },
             )
-        }
+                    }
+}
 
         composable(Routes.PACKING_GUIDE) {
             PackingGuideScreen(
@@ -713,31 +836,101 @@ fun PackNavHost(
                 email = account.email,
                 onCameraMeasuringChange = viewModel::setCameraMeasuring,
                 onDefaultEdgeGapChange = viewModel::setDefaultEdgeGap,
-                onManageSubscription = { openPlaySubscriptions(context) },
-                onRestorePurchases = {
-                    viewModel.restorePurchases { restored ->
-                        notice = if (restored) "Pack a Bunch Pro restored." else
-                            "No active Pack a Bunch Pro on this Google account."
-                    }
-                },
+                onManageSubscription = { navController.navigate(Routes.PACK_PLAN) },
+                onRestorePurchases = { navController.navigate(Routes.RESTORE) },
                 onNotifications = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
                 onDeleteAllData = viewModel::deleteAllLocalData,
                 onPrivacy = { navController.navigate(Routes.PRIVACY) },
                 onTerms = { navController.navigate(Routes.TERMS) },
-                onSupport = { notice = "A support address has not been configured for this preview." },
+                onSupport = { navController.navigate(Routes.INFO) },
                 onBack = { navController.popBackStack() },
             )
         }
 
-        composable(Routes.TERMS) {
-            com.packabunch.ui.screens.TermsScreen(onBack = { navController.popBackStack() })
+        composable(Routes.INFO) {
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.Info,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+            ) { pageModifier ->
+                com.packabunch.ui.screens.InfoScreen(
+                    modifier = pageModifier,
+                    version = "Pack a Bunch " + com.packabunch.BuildConfig.VERSION_NAME +
+                        " (" + com.packabunch.BuildConfig.VERSION_CODE + ")",
+                    onPrivacy = { navController.navigate(Routes.PRIVACY) },
+                    onTerms = { navController.navigate(Routes.TERMS) },
+                    onSupport = { notice = "Support: " + com.packabunch.ui.screens.SUPPORT_EMAIL },
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
+
+        composable(Routes.RESTORE) {
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.Restore,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+            ) { pageModifier ->
+                com.packabunch.ui.screens.RestorePurchasesScreen(
+                    modifier = pageModifier,
+                    onRestore = { done -> viewModel.restorePurchases(done) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+
+        composable(Routes.PACK_PLAN) {
+            val plusPackage by viewModel.plusPackage.collectAsStateWithLifecycle()
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.PackPlan,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+            ) { pageModifier ->
+                com.packabunch.ui.screens.PackPlanScreen(
+                    modifier = pageModifier,
+                    tier = settings.tier,
+                    price = plusPackage?.product?.price?.formatted,
+                    onUpgrade = { navController.navigate(Routes.UPGRADE) },
+                    onManageInPlay = { openPlaySubscriptions(context) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+        }
+
+        composable(Routes.TERMS) {
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.Info,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+            ) { pageModifier ->
+            com.packabunch.ui.screens.TermsScreen(
+                modifier = pageModifier,onBack = { navController.popBackStack() })
+                    }
+}
 
         composable(Routes.PRIVACY) {
-            com.packabunch.ui.screens.PrivacyPolicyScreen(onBack = { navController.popBackStack() })
-        }
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.Info,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+            ) { pageModifier ->
+            com.packabunch.ui.screens.PrivacyPolicyScreen(
+                modifier = pageModifier,onBack = { navController.popBackStack() })
+                    }
+}
 
         composable(Routes.UPGRADE) {
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.PackPlan,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+            ) { pageModifier ->
             val plusPackage by viewModel.plusPackage.collectAsStateWithLifecycle()
             val outcome by viewModel.purchaseOutcome.collectAsStateWithLifecycle()
             val activity = androidx.compose.ui.platform.LocalContext.current as android.app.Activity
@@ -751,9 +944,10 @@ fun PackNavHost(
                     onTryAgain = { viewModel.clearPurchaseOutcome(); viewModel.subscribe(activity) },
                     onContactSupport = { viewModel.clearPurchaseOutcome() },
                 )
-                return@composable
+                return@WithNavBar
             }
             UpgradeScreen(
+                modifier = pageModifier,
                 // Google Play's localised price, or null — never a price we invented.
                 price = plusPackage?.product?.price?.formatted,
                 period = "a month",
@@ -770,7 +964,8 @@ fun PackNavHost(
                 onCompare = { navController.navigate(Routes.PLAN_COMPARISON) },
                 onBack = { navController.popBackStack() },
             )
-        }
+                    }
+}
     }
 }
 

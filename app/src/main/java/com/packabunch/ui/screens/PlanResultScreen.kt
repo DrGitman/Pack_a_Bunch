@@ -67,6 +67,7 @@ fun PlanResultScreen(
     onStartPacking: () -> Unit,
     onEditItems: () -> Unit,
     onShowLayers: () -> Unit = {},
+    onMenu: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -81,8 +82,8 @@ fun PlanResultScreen(
             actions = {
                 PackIconButton(
                     icon = PackIcons.MoreVertical,
-                    contentDescription = "More",
-                    onClick = {},
+                    contentDescription = "Rename, duplicate, share or delete this pack",
+                    onClick = onMenu,
                     tint = Color(0xFF5C4A3A),
                 )
             },

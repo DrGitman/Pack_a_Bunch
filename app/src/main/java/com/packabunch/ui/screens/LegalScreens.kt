@@ -28,7 +28,8 @@ import com.packabunch.ui.theme.UiFamily
  * TODO before the first Play release, these three must be true, not placeholders:
  */
 private const val PUBLISHER = "Pack a Bunch"
-private const val CONTACT = "support@packabunch.app"
+const val SUPPORT_EMAIL = "support@packabunch.app"
+private const val CONTACT = SUPPORT_EMAIL
 private const val COUNTRY = "Namibia"
 private const val LAST_UPDATED = "23 September 2026"
 

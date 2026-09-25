@@ -9,12 +9,20 @@ import androidx.compose.runtime.Composable
  * generated from. There is no dynamic colour: the item identity colours and the
  * provenance badges have to stay exactly as specified or they stop meaning anything.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun PackABunchTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = PackABunchColors,
         typography = PackABunchTypography,
         shapes = PackABunchShapes,
-        content = content,
-    )
+    ) {
+        // Android's default press ripple is grey, which reads as a dirty box on a cream ground.
+        // Set once here so every tappable thing in the app presses in the brand's terracotta.
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.material3.LocalRippleConfiguration provides
+                androidx.compose.material3.RippleConfiguration(color = Primary),
+            content = content,
+        )
+    }
 }

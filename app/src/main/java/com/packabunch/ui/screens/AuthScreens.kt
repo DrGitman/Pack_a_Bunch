@@ -180,8 +180,11 @@ private fun AuthField(label: String, value: String, onChange: (String) -> Unit,
                 keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else KeyboardType.Email),
                 decorationBox = { inner -> Box { if (value.isEmpty()) AuthText(if (password) "Your password" else "you@example.com", 16f, color = TextTertiary); inner() } })
             if (password) {
-                TextButton(onClick = { visible = !visible }, contentPadding = PaddingValues(0.dp),
-                    modifier = Modifier.height(24.dp)) { Text(if (visible) "Hide" else "Show", color = Primary, fontSize = 12.sp) }
+                com.packabunch.ui.components.PasswordVisibilityToggle(
+                    visible = visible,
+                    onToggle = { visible = !visible },
+                    modifier = Modifier.padding(start = 6.dp),
+                )
             }
         }
         if (strength) {

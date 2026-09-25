@@ -41,6 +41,17 @@ fun formatEditableLength(mm: Int, unit: LengthUnit): String =
         .stripTrailingZeros().toPlainString()
 
 /** The "58.4 × 39.6 × 35.0 cm" line. Multiplication sign, not the letter x. */
+/**
+ * The short form the pack cards use: "58×40×35 cm", whole numbers, no spaces around the ×.
+ *
+ * A card has room for two chips side by side only if this stays short; the full figures are
+ * one tap away on the pack itself, where precision actually matters.
+ */
+fun formatDimensionsCompact(dimensions: Dimensions, unit: LengthUnit): String {
+    fun short(mm: Int) = Math.round(if (unit == LengthUnit.INCHES) mm / 25.4 else mm / 10.0).toString()
+    return "${short(dimensions.widthMm)}×${short(dimensions.depthMm)}×${short(dimensions.heightMm)} ${unit.shortLabel}"
+}
+
 fun formatDimensions(dimensions: Dimensions, unit: LengthUnit): String = buildString {
     append(formatLength(dimensions.widthMm, unit))
     append(" × ")

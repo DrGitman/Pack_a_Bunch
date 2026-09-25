@@ -48,15 +48,8 @@ fun SettingsScreen(
     onCameraMeasuringChange: (Boolean) -> Unit = {},
     onDefaultEdgeGapChange: (Int) -> Unit = {},
 ) {
-    var showHelp by rememberSaveable { mutableStateOf(false) }
     var showDelete by rememberSaveable { mutableStateOf(false) }
     var showGap by rememberSaveable { mutableStateOf(false) }
-    if (showHelp) AlertDialog(onDismissRequest = { showHelp = false }, title = { Text("Privacy, terms and help") },
-        text = { Column {
-            TextButton(onClick = { showHelp = false; onPrivacy() }) { Text("Privacy policy") }
-            TextButton(onClick = { showHelp = false; onTerms() }) { Text("Terms") }
-            TextButton(onClick = { showHelp = false; onSupport() }) { Text("Support") }
-        } }, confirmButton = { TextButton(onClick = { showHelp = false }) { Text("Close") } })
     if (showDelete) AlertDialog(onDismissRequest = { showDelete = false }, title = { Text("Delete all saved packs?") },
         text = { Text("This removes this account's $savedPackCount saved packs from this phone and marks them deleted in your cloud account when sync completes. Your sign-in account is not deleted.") },
         confirmButton = { TextButton(onClick = { showDelete = false; onDeleteAllData() }) { Text("Delete saved packs", color = ErrorRed) } },
@@ -120,13 +113,13 @@ fun SettingsScreen(
                 }
                 SettingsHeading("APP", 18)
                 SettingsGroup {
-                    SettingsAction(PackIcons.Bell, "Notifications", onNotifications)
+                    SettingsAction(PackIcons.Bell, "Notifications", onNotifications, motion = com.packabunch.R.raw.icon_bell)
                     SettingsDivider()
-                    SettingsAction(PackIcons.Cube, "Manage Pack a Bunch Pro", onManageSubscription)
+                    SettingsAction(PackIcons.Cube, "Manage Pack a Bunch Pro", onManageSubscription, motion = com.packabunch.R.raw.icon_package)
                     SettingsDivider()
-                    SettingsAction(PackIcons.Undo, "Restore purchases", onRestorePurchases)
+                    SettingsAction(PackIcons.Undo, "Restore purchases", onRestorePurchases, motion = com.packabunch.R.raw.icon_restore)
                     SettingsDivider()
-                    SettingsAction(PackIcons.Info, "Privacy, terms and help", { showHelp = true })
+                    SettingsAction(PackIcons.Info, "Privacy, terms and help", onSupport, motion = com.packabunch.R.raw.icon_info)
                     SettingsDivider()
                     SettingsAction(PackIcons.Trash, "Delete all saved packs", { showDelete = true }, ErrorRed)
                 }
@@ -135,13 +128,12 @@ fun SettingsScreen(
                     fontFamily = NumericFamily, fontSize = 12.sp)
             }
         }
-com.packabunch.ui.components.PackNavBar(
-            destinations = com.packabunch.ui.components.PackDestinations,
-            selected = 1,
-            onSelect = { index -> if (index != 1) onNavigate(NavDestination.Projects) },
-            fabAnimation = com.packabunch.R.raw.icon_plus,
-            onFabClick = onNewPack,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+com.packabunch.ui.components.PackBar(
+            here = com.packabunch.ui.components.NavSlots.Settings,
+            onProjects = { onNavigate(NavDestination.Projects) },
+            onSettings = {},
+            onNewPack = onNewPack,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp),
         )
     }
 }
@@ -157,10 +149,12 @@ com.packabunch.ui.components.PackNavBar(
 @Composable private fun SettingsLabel(text: String, modifier: Modifier = Modifier, color: Color = TextPrimary) {
     Text(text, modifier, color = color, fontFamily = UiFamily, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
 }
-@Composable private fun SettingsAction(icon: ImageVector, label: String, onClick: () -> Unit, tint: Color = TextSecondary) {
+@Composable private fun SettingsAction(icon: ImageVector, label: String, onClick: () -> Unit,
+    tint: Color = TextSecondary, @androidx.annotation.RawRes motion: Int? = null) {
     Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f).clickable(onClick = onClick).padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-        Icon(icon, null, Modifier.size(20.dp), tint = tint)
+        if (motion != null) LottieTapIcon(motion, null, onClick = onClick, size = 20.dp)
+        else Icon(icon, null, Modifier.size(20.dp), tint = tint)
         SettingsLabel(label, Modifier.weight(1f), if (tint == ErrorRed) ErrorRed else TextPrimary)
         if (tint != ErrorRed) Icon(PackIcons.Forward, null, Modifier.size(19.dp), tint = TextTertiary)
     }

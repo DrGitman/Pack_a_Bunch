@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -203,7 +204,7 @@ private fun ViewToggle(text: String, selected: Boolean, onClick: () -> Unit) {
         Modifier
             .pressScale(pressedScale = 0.96f)
             .background(background, RoundedCornerShape(999.dp))
-            .clickable(onClick = onClick)
+            .clip(RoundedCornerShape(999.dp)).clickable(onClick = onClick)
             .padding(horizontal = 15.dp, vertical = 8.dp),
     ) {
         Text(

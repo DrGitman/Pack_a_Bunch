@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -181,7 +182,7 @@ private fun KindCard(
             .warmShadow(if (selected) 8.dp else 4.dp, shape)
             .background(Color.White, shape)
             .border(if (selected) 2.dp else 1.dp, border, shape)
-            .clickable(enabled = enabled, onClick = onClick)
+            .clip(shape).clickable(enabled = enabled, onClick = onClick)
             .padding(Spacing.base),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
