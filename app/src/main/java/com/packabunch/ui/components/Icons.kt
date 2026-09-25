@@ -119,6 +119,14 @@ object PackIcons {
         circle(12f, 13.4f, 3.2f),
     )
 
+    /** The camera with a line struck through it — `design/artboards/CameraDenied.dc.html`. */
+    val CameraOff: ImageVector = strokeIcon(
+        "CameraOff",
+        "M4 8h3l1.4-2h7.2L17 8h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z",
+        circle(12f, 13.4f, 3.2f),
+        "M3 3l18 18",
+    )
+
     val Ruler: ImageVector = strokeIcon(
         "Ruler",
         "M3 14.5L14.5 3l6.5 6.5L9.5 21z",

@@ -114,14 +114,14 @@ fun ProjectsScreen(
                     animation = com.packabunch.R.raw.icon_search,
                     contentDescription = "Search packs",
                     onClick = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
-                    size = 44.dp,
+                    size = 52.dp,
                 )
                 Box {
                     com.packabunch.ui.components.LottieTapIcon(
                         animation = com.packabunch.R.raw.icon_filter,
                         contentDescription = "Sort packs",
                         onClick = { sortOpen = true },
-                        size = 44.dp,
+                        size = 52.dp,
                     )
                     androidx.compose.material3.DropdownMenu(sortOpen, { sortOpen = false }) {
                         androidx.compose.material3.DropdownMenuItem(text = { Text("Recently edited") }, onClick = { alphabetical = false; sortOpen = false })

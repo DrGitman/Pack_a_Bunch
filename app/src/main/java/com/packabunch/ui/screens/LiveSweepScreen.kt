@@ -41,16 +41,49 @@ fun DepthCaptureGate(onManual: () -> Unit, onBack: () -> Unit, content: @Composa
         }
     }
     if (permission && support == ArSupport.Ready && depth == true) { content(); return }
+
+    // The permission belongs to the install, not the account, so "have we asked before" is
+    // kept per phone. Android cannot answer this itself: shouldShowRequestPermissionRationale
+    // reads false both before the first ask and after a permanent no.
+    if (!permission) {
+        val asks = remember { context.getSharedPreferences("camera_prompt", android.content.Context.MODE_PRIVATE) }
+        // Held in Compose state as well as on disk. Denying the prompt leaves `permission`
+        // false, so nothing else here changes and the screen would never swap over.
+        var asked by remember { mutableStateOf(asks.getBoolean("asked", false)) }
+        if (asked) {
+            CameraDeniedScreen(
+                onTypeInstead = onManual,
+                onOpenSettings = {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.fromParts("package", context.packageName, null),
+                        ),
+                    )
+                },
+                onBack = onBack,
+            )
+        } else {
+            CameraRationaleSheet(
+                onContinue = {
+                    asks.edit().putBoolean("asked", true).apply()
+                    asked = true
+                    launcher.launch(Manifest.permission.CAMERA)
+                },
+                onNotNow = onManual,
+            )
+        }
+        return
+    }
+
     ScreenScaffold {
         PackAppBar(title = "Camera scan", onBack = onBack)
         Note(text = when {
-            !permission -> "Allow the camera to scan your space or items. Scans stay on this phone."
             support == ArSupport.NeedsInstall -> "Install or update Google Play Services for AR to scan."
             support == ArSupport.Checking || depth == null && support == ArSupport.Ready -> "Checking depth scanning support…"
             else -> "Depth scanning is unavailable on this phone. You can still enter measurements."
         })
-        if (!permission) PrimaryButton(text = "Allow camera", onClick = { launcher.launch(Manifest.permission.CAMERA) })
-        else if (support == ArSupport.NeedsInstall) PrimaryButton(text = "Install AR services", onClick = {
+        if (support == ArSupport.NeedsInstall) PrimaryButton(text = "Install AR services", onClick = {
             (context as? Activity)?.let { ArAvailability.requestInstall(it, true) }; refresh++
         })
         SecondaryButton(text = "Type measurements instead", onClick = onManual)
