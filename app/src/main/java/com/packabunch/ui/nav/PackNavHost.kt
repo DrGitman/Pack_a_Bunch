@@ -413,6 +413,27 @@ fun PackNavHost(
                 onManageSubscription = { openPlaySubscriptions(context) },
                 onSignOut = onSignOut,
                 onDeleteAccount = { navController.navigate(Routes.ACCOUNT_DELETE) },
+                onDownloadData = {
+                    // Everything this account holds, as plain text somebody can actually read.
+                    val everything = buildString {
+                        appendLine("Pack a Bunch, data for " + (account.email ?: "this account"))
+                        appendLine(projects.size.toString() + " packs")
+                        appendLine()
+                        projects.forEach { pack ->
+                            appendLine(shareSummary(pack, settings.unit))
+                            appendLine()
+                        }
+                    }
+                    context.startActivity(
+                        android.content.Intent.createChooser(
+                            android.content.Intent(android.content.Intent.ACTION_SEND)
+                                .setType("text/plain")
+                                .putExtra(android.content.Intent.EXTRA_TITLE, "pack-a-bunch-data.txt")
+                                .putExtra(android.content.Intent.EXTRA_TEXT, everything),
+                            "Your Pack a Bunch data",
+                        ),
+                    )
+                },
                 onBack = { navController.popBackStack() },
             )
                     }

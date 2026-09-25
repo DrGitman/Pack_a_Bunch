@@ -73,6 +73,7 @@ fun ProfileScreen(
     onManageSubscription: () -> Unit,
     onSignOut: () -> Unit,
     onDeleteAccount: () -> Unit,
+    onDownloadData: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     completedPacks: Int = 0,
@@ -147,37 +148,49 @@ fun ProfileScreen(
             Spacer(Modifier.height(10.dp))
 
             Column(Modifier.fillMaxWidth().background(com.packabunch.ui.theme.Surface, RoundedCornerShape(22.dp))
-                .padding(horizontal = 16.dp, vertical = 6.dp)) {
-                AccountRow(PackIcons.Mail, "Change email", onChangeEmail)
-                androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
-                AccountRow(PackIcons.Lock, "Change password", onChangePassword)
-                androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
-                AccountRow(PackIcons.Cube, "Manage Pack a Bunch Pro", onManageSubscription)
+                .padding(horizontal = 16.dp, vertical = 4.dp)) {
+                AccountRow("Change email", onChangeEmail)
+                RowDivider()
+                AccountRow("Change password", onChangePassword)
+                RowDivider()
+                AccountRow(
+                    title = if (tier == Tier.PLUS) "Manage Pack a Bunch Pro" else "Get Pack a Bunch Pro",
+                    onClick = onManageSubscription,
+                    subtitle = if (tier == Tier.PLUS) "Billed in Google Play" else "One pack at a time on the free plan",
+                    trailing = PackIcons.External,
+                )
+                RowDivider()
+                AccountRow("Download my data", onDownloadData)
             }
 
-            Spacer(Modifier.height(Spacing.lg))
+            Spacer(Modifier.height(14.dp))
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                SecondaryButton(text = "Sign out", onClick = onSignOut)
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    PackTextButton(
-                        text = "Delete my account",
-                        onClick = onDeleteAccount,
-                        color = ErrorRed,
-                    )
-                }
+            // The two ways out live together, away from the settings above them, so neither is
+            // ever tapped by accident while changing something small.
+            Column(Modifier.fillMaxWidth().background(com.packabunch.ui.theme.Surface, RoundedCornerShape(22.dp))
+                .padding(horizontal = 16.dp, vertical = 4.dp)) {
+                AccountRow("Sign out", onSignOut, trailing = PackIcons.SignOut)
+                RowDivider()
+                AccountRow("Delete account", onDeleteAccount, trailing = PackIcons.Trash, destructive = true)
             }
 
-            Spacer(Modifier.height(Spacing.xxl))
+            Spacer(Modifier.height(Spacing.base))
         }
     }
 }
 
 @Composable
+private fun RowDivider() {
+    androidx.compose.material3.HorizontalDivider(color = com.packabunch.ui.theme.Divider)
+}
+
+@Composable
 private fun AccountRow(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     onClick: () -> Unit,
+    subtitle: String? = null,
+    trailing: androidx.compose.ui.graphics.vector.ImageVector = PackIcons.Forward,
+    destructive: Boolean = false,
 ) {
     Row(
         Modifier
@@ -188,38 +201,33 @@ private fun AccountRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = title,
-            color = TextPrimary,
-            fontFamily = UiFamily,
-            fontWeight = FontWeight.SemiBold,
-            fontSize = 15.sp,
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = if (destructive) ErrorRed else TextPrimary,
+                fontFamily = UiFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 15.5.sp,
+            )
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    modifier = Modifier.padding(top = 2.dp),
+                    color = TextSecondary,
+                    fontFamily = UiFamily,
+                    fontSize = 12.5.sp,
+                )
+            }
+        }
         Icon(
-            PackIcons.Forward,
+            trailing,
             contentDescription = null,
-            tint = Color(0xFFC3B0A0),
-            modifier = Modifier.size(18.dp),
+            modifier = Modifier.size(19.dp),
+            tint = if (destructive) ErrorRed else TextTertiary,
         )
     }
 }
 
-/**
- * Delete account — `design/artboards/AccountDelete.dc.html`.
- *
- * Two things this screen has to get right, both of which Google Play cares about and both
- * of which matter more than that:
- *
- *  - **It says what does *not* go.** A Play subscription is not cancelled by deleting an
- *    account, and somebody who assumes otherwise keeps being charged. It is named, with the
- *    route to actually cancel it.
- *  - **Typed confirmation, not a checkbox.** This is irreversible and takes every pack and
- *    every photo with it, so it asks for the email to be typed out.
- *
- * Note Play also requires a *web-reachable* deletion route. This screen does not satisfy
- * that on its own — that is still outstanding and belongs with the accounts decision.
- */
 @Composable
 fun AccountDeleteScreen(
     email: String,

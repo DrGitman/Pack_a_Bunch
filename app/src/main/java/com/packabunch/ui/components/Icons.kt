@@ -91,6 +91,17 @@ object PackIcons {
 
     val Plus: ImageVector = strokeIcon("Plus", "M12 5v14M5 12h14", strokeWidth = 2.3f)
     val Minus: ImageVector = strokeIcon("Minus", "M5 12h14", strokeWidth = 2.3f)
+
+    /** Opens something outside the app, such as Google Play. */
+    val External: ImageVector = strokeIcon(
+        "External", "M14 4h6v6", "M20 4l-9 9", "M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5",
+        strokeWidth = 1.9f,
+    )
+
+    val SignOut: ImageVector = strokeIcon(
+        "SignOut", "M15 4h4a1 1 0 011 1v14a1 1 0 01-1 1h-4", "M10 16l4-4-4-4", "M14 12H3",
+        strokeWidth = 1.9f,
+    )
     val Search: ImageVector = strokeIcon("Search", circle(11f, 11f, 7f), "M20 20l-3.6-3.6")
 
     val Settings: ImageVector = strokeIcon(
