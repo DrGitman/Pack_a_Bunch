@@ -189,8 +189,8 @@ fun ScreenHeading(text: String, modifier: Modifier = Modifier) {
 enum class NavDestination { Projects, Settings }
 
 /** Standard bottom padding so content clears the floating nav pill. */
-// The bar is 64dp tall, sits 10dp up, and clears the phone's own buttons on top of that.
-val NavPillClearance = 140.dp
+// The bar is 74dp tall, sits 10dp up, and clears the phone's own buttons on top of that.
+val NavPillClearance = 150.dp
 
 @Composable
 fun ScreenBottomBar(

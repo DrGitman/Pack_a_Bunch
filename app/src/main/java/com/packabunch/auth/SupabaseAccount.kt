@@ -44,6 +44,35 @@ class SupabaseAccount(context: Context) {
         if (result.has("access_token") && !result.isNull("access_token")) { save(result); true } else false
     }
 
+    /**
+     * Asks Supabase to change the address on this account.
+     *
+     * Supabase writes nothing until the person clicks the link it emails to the new address, so
+     * the app says "check your email" rather than claiming the change is done.
+     */
+    suspend fun changeEmail(newEmail: String) = mutex.withLock {
+        check(configured) { "Account service is not configured." }
+        request("/auth/v1/user", JSONObject().put("email", newEmail.trim()), accessTokenNow(), "PUT")
+    }
+
+    /**
+     * Deletes this account and everything owned by it, through the delete_account function in
+     * the database. Signing out afterwards is the caller's job.
+     */
+    suspend fun deleteAccount() = mutex.withLock {
+        check(configured) { "Account service is not configured." }
+        request("/rest/v1/rpc/delete_account", JSONObject(), accessTokenNow())
+    }
+
+    private suspend fun accessTokenNow(): String {
+        val current = session ?: error("Sign in to your account first.")
+        if (current.optLong("expires_at") <= System.currentTimeMillis() / 1000 + 60) {
+            save(request("/auth/v1/token?grant_type=refresh_token",
+                JSONObject().put("refresh_token", current.getString("refresh_token"))))
+        }
+        return session!!.getString("access_token")
+    }
+
     suspend fun sendRecovery(email: String) {
         request("/auth/v1/recover", JSONObject().put("email", email.trim()))
     }
@@ -106,11 +135,11 @@ class SupabaseAccount(context: Context) {
         session = response
     }
 
-    private suspend fun request(path: String, body: JSONObject, token: String? = null): JSONObject =
+    private suspend fun request(path: String, body: JSONObject, token: String? = null, method: String = "POST"): JSONObject =
         withContext(Dispatchers.IO) {
             val connection = URL(BuildConfig.SUPABASE_URL.trimEnd('/') + path).openConnection() as HttpsURLConnection
             try {
-                connection.requestMethod = "POST"
+                connection.requestMethod = method
                 connection.instanceFollowRedirects = false
                 connection.connectTimeout = 15_000
                 connection.readTimeout = 20_000

@@ -241,6 +241,49 @@ fun PackNavHost(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var notice by remember { mutableStateOf<String?>(null) }
+    var changeEmailOpen by rememberSaveable { mutableStateOf(false) }
+    if (changeEmailOpen) {
+        var newEmail by remember { mutableStateOf("") }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { changeEmailOpen = false },
+            title = { androidx.compose.material3.Text("Change your email") },
+            text = {
+                androidx.compose.foundation.layout.Column {
+                    androidx.compose.material3.Text(
+                        "We send a link to the new address. The change happens when you open it.",
+                    )
+                    androidx.compose.foundation.layout.Spacer(Modifier.padding(4.dp))
+                    androidx.compose.material3.OutlinedTextField(
+                        value = newEmail,
+                        onValueChange = { newEmail = it },
+                        singleLine = true,
+                        label = { androidx.compose.material3.Text("New email") },
+                    )
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(
+                    enabled = newEmail.contains('@') && newEmail.length > 3,
+                    onClick = {
+                        val address = newEmail.trim()
+                        changeEmailOpen = false
+                        scope.launch {
+                            notice = runCatching { account.changeEmail(address) }.fold(
+                                { "Check " + address + " for the link that finishes the change." },
+                                { it.message ?: "Couldn't start the change. Try again." },
+                            )
+                        }
+                    },
+                ) { androidx.compose.material3.Text("Send the link") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { changeEmailOpen = false }) {
+                    androidx.compose.material3.Text("Cancel")
+                }
+            },
+        )
+    }
+
     notice?.let { message ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { notice = null },
@@ -358,7 +401,7 @@ fun PackNavHost(
                 syncMessage = syncState.message,
                 syncRunning = syncState.running,
                 onSync = viewModel::syncNow,
-                onChangeEmail = { notice = "Email changes are not connected in this build yet." },
+                onChangeEmail = { changeEmailOpen = true },
                 onChangePassword = {
                     val email = account.email
                     if (email == null) notice = "Your account has no email address to send a reset link to."
@@ -369,7 +412,7 @@ fun PackNavHost(
                 },
                 onManageSubscription = { openPlaySubscriptions(context) },
                 onSignOut = onSignOut,
-                onDeleteAccount = { notice = "Account deletion is not connected yet. Deleting local packs does not delete your Supabase account." },
+                onDeleteAccount = { navController.navigate(Routes.ACCOUNT_DELETE) },
                 onBack = { navController.popBackStack() },
             )
                     }
@@ -380,9 +423,18 @@ fun PackNavHost(
                 email = account.email.orEmpty(),
                 hasActiveSubscription = settings.tier == com.packabunch.packing.Tier.PLUS,
                 onConfirmDelete = {
-                    notice = "Account deletion is not connected yet. No data has been deleted."
+                    scope.launch {
+                        val problem = runCatching { account.deleteAccount() }.exceptionOrNull()
+                        if (problem != null) {
+                            notice = "Couldn't delete the account. " +
+                                (problem.message ?: "Try again when you have a connection.")
+                        } else {
+                            viewModel.deleteAllLocalData()
+                            onSignOut()
+                        }
+                    }
                 },
-                onManageSubscription = {},
+                onManageSubscription = { openPlaySubscriptions(context) },
                 onBack = { navController.popBackStack() },
             )
         }
@@ -394,7 +446,7 @@ fun PackNavHost(
                     viewModel.resumeGuide()
                     navController.navigate(Routes.PACKING_GUIDE)
                 },
-                onFixOpening = {},
+                onFixOpening = { navController.navigate(Routes.CREATE_SPACE) },
                 onBack = { navController.popBackStack() },
             )
         }
