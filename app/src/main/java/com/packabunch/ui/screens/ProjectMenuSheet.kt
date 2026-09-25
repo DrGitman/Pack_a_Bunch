@@ -1,5 +1,6 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.components.swallowTaps
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -76,6 +77,7 @@ fun ProjectMenuSheet(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(Color.White, RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                .swallowTaps()
                 .padding(horizontal = Spacing.gutter)
                 .padding(top = 14.dp, bottom = 30.dp),
         ) {

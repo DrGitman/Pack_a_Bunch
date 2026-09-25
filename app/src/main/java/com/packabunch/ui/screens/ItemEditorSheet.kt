@@ -1,6 +1,10 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.components.swallowTaps
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import com.packabunch.ui.motion.pressScale
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -81,14 +85,30 @@ fun ItemEditorSheet(
     var height by remember(existing) {
         mutableStateOf(existing?.dimensions?.heightMm?.let { formatLength(it, unit) } ?: "")
     }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val itemId = remember(existing) { existing?.id ?: "item-${System.currentTimeMillis()}" }
+    var photoPath by remember(itemId) { mutableStateOf(com.packabunch.data.ItemPhotos.pathFor(context, itemId)) }
+    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+    ) { picked ->
+        if (picked != null) scope.launch {
+            photoPath = com.packabunch.data.ItemPhotos.store(context, itemId, picked)
+        }
+    }
+
+    // Set here for this item only. The account's own unit is what the sheet opens in.
+    var entryUnit by remember(existing) { mutableStateOf(unit) }
     var quantity by remember(existing) { mutableStateOf(existing?.quantity ?: 1) }
     var keepUpright by remember(existing) { mutableStateOf(existing?.keepUpright ?: false) }
     var nothingOnTop by remember(existing) { mutableStateOf(existing?.maySupportItems == false) }
 
-    val widthMm = parseLengthToMm(width, unit)
-    val depthMm = parseLengthToMm(depth, unit)
-    val heightMm = parseLengthToMm(height, unit)
-    val valid = name.isNotBlank() && widthMm != null && depthMm != null && heightMm != null
+    val widthMm = parseLengthToMm(width, entryUnit)
+    val depthMm = parseLengthToMm(depth, entryUnit)
+    val heightMm = parseLengthToMm(height, entryUnit)
+    // The name is not required: leaving it blank saves as "Item 3", which is what the
+    // placeholder has been promising all along. Only the three sizes actually gate saving.
+    val valid = widthMm != null && depthMm != null && heightMm != null
 
     Box(modifier.fillMaxSize()) {
         // Scrim. Tapping it dismisses, which is the Android expectation for a sheet.
@@ -106,6 +126,7 @@ fun ItemEditorSheet(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(Color.White, RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                .swallowTaps()
                 .padding(horizontal = Spacing.gutter)
                 .padding(top = 14.dp, bottom = 30.dp),
         ) {
@@ -143,34 +164,73 @@ fun ItemEditorSheet(
             Spacer(Modifier.height(Spacing.base))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Column(
+                Box(
                     modifier = Modifier
                         .size(96.dp)
                         .background(
                             ItemTints[nextIndex % ItemTints.size],
                             RoundedCornerShape(20.dp),
                         )
-                        .border(
-                            1.5.dp,
-                            Color(0xFFD3BEA6),
-                            RoundedCornerShape(20.dp),
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
-                    horizontalAlignment = Alignment.CenterHorizontally,
+                        .border(1.5.dp, Color(0xFFD3BEA6), RoundedCornerShape(20.dp))
+                        .clip(RoundedCornerShape(20.dp))
+                        .pressScale(pressedScale = 0.96f)
+                        .clickable {
+                            pickPhoto.launch(
+                                androidx.activity.result.PickVisualMediaRequest(
+                                    androidx.activity.result.contract.ActivityResultContracts
+                                        .PickVisualMedia.ImageOnly,
+                                ),
+                            )
+                        },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        PackIcons.Camera,
-                        contentDescription = null,
-                        tint = Primary,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Text(
-                        "Photo",
-                        color = Color(0xFF7C4223),
-                        fontFamily = UiFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.5f.sp,
-                    )
+                    if (photoPath != null) {
+                        coil3.compose.AsyncImage(
+                            model = photoPath,
+                            contentDescription = "Change the photo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        )
+                        // Small, in the corner, so it cannot be hit while aiming for the photo.
+                        Box(
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(6.dp)
+                                .size(24.dp)
+                                .background(Color(0xCC2B1D14), RoundedCornerShape(12.dp))
+                                .clickable {
+                                    com.packabunch.data.ItemPhotos.remove(photoPath)
+                                    photoPath = null
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                PackIcons.Close,
+                                contentDescription = "Remove the photo",
+                                tint = Color.White,
+                                modifier = Modifier.size(13.dp),
+                            )
+                        }
+                    } else {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                PackIcons.Camera,
+                                contentDescription = null,
+                                tint = Primary,
+                                modifier = Modifier.size(24.dp),
+                            )
+                            Text(
+                                "Photo",
+                                color = Color(0xFF7C4223),
+                                fontFamily = UiFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5f.sp,
+                            )
+                        }
+                    }
                 }
 
                 Column(
@@ -218,7 +278,20 @@ fun ItemEditorSheet(
                     fontSize = 15.sp,
                     modifier = Modifier.weight(1f),
                 )
-                UnitToggle(unit = unit, onUnitChange = {}, compact = true)
+                UnitToggle(
+                    unit = entryUnit,
+                    onUnitChange = { picked ->
+                        // Carry the numbers over rather than reinterpreting them: 30 cm
+                        // typed in must not silently become 30 inches.
+                        fun convert(text: String): String =
+                            parseLengthToMm(text, entryUnit)?.let { formatLength(it, picked) } ?: text
+                        width = convert(width)
+                        depth = convert(depth)
+                        height = convert(height)
+                        entryUnit = picked
+                    },
+                    compact = true,
+                )
             }
 
             Spacer(Modifier.height(11.dp))
@@ -307,7 +380,7 @@ fun ItemEditorSheet(
                     onClick = {
                         onSave(
                             ItemSpec(
-                                id = existing?.id ?: "item-${System.currentTimeMillis()}",
+                                id = itemId,
                                 name = name.ifBlank { "Item ${nextIndex + 1}" },
                                 dimensions = Dimensions(widthMm ?: 0, depthMm ?: 0, heightMm ?: 0),
                                 quantity = quantity,

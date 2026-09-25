@@ -260,12 +260,27 @@ private fun ItemRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Box(Modifier.size(46.dp)) {
+            // The photo if there is one, since recognising the thing is the point of taking it.
+            val photo = com.packabunch.data.ItemPhotos.pathFor(
+                androidx.compose.ui.platform.LocalContext.current,
+                item.id,
+            )
             Box(
                 Modifier.size(42.dp).align(Alignment.BottomEnd)
-                    .background(itemColor(index).copy(alpha = 0.16f), RoundedCornerShape(14.dp)),
+                    .background(itemColor(index).copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(PackIcons.Cube, null, Modifier.size(22.dp), tint = itemColor(index))
+                if (photo != null) {
+                    coil3.compose.AsyncImage(
+                        model = photo,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    )
+                } else {
+                    Icon(PackIcons.Cube, null, Modifier.size(22.dp), tint = itemColor(index))
+                }
             }
             // The number rides the corner of the tile rather than replacing the picture.
             Box(

@@ -5,6 +5,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -226,6 +228,7 @@ fun LabelledTextField(
     focused: Boolean = false,
     password: Boolean = false,
 ) {
+    val focusRequester = remember { FocusRequester() }
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -237,6 +240,10 @@ fun LabelledTextField(
                 if (focused) Modifier.border(BorderStroke(1.5.dp, Primary), RoundedCornerShape(16.dp))
                 else Modifier,
             )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { focusRequester.requestFocus() }
             .padding(horizontal = 14.dp, vertical = 11.dp),
     ) {
         Text(text = label.uppercase(), style = FieldLabel, color = Color(0xFF8A7565))
@@ -254,7 +261,8 @@ fun LabelledTextField(
             visualTransformation = if (password) androidx.compose.ui.text.input.PasswordVisualTransformation()
                 else androidx.compose.ui.text.input.VisualTransformation.None,
             keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else KeyboardType.Text),
-            modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 3.dp)
+                .focusRequester(focusRequester),
             decorationBox = { inner ->
                 if (value.isEmpty() && placeholder.isNotEmpty()) {
                     Text(
@@ -338,6 +346,7 @@ fun StackedDimensionField(
     modifier: Modifier = Modifier,
     error: Boolean = false,
 ) {
+    val focusRequester = remember { FocusRequester() }
     Column(
         modifier = modifier
             .validationShake(error)
@@ -346,6 +355,10 @@ fun StackedDimensionField(
                 BorderStroke(1.5.dp, if (error) ErrorRed else Outline),
                 RoundedCornerShape(16.dp),
             )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { focusRequester.requestFocus() }
             .padding(horizontal = 12.dp, vertical = 11.dp),
     ) {
         Text(
@@ -362,7 +375,8 @@ fun StackedDimensionField(
             cursorBrush = SolidColor(Primary),
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                .focusRequester(focusRequester),
         )
     }
 }

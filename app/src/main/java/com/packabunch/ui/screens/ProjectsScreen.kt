@@ -1,6 +1,11 @@
 package com.packabunch.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.border
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -88,6 +93,13 @@ fun ProjectsScreen(
     greet: Boolean = false,
     /** A pack just deleted from its own page, so the undo window appears where the list is. */
     deleted: Project? = null,
+    /** Called when the undo window closes, so the pack is not offered back again later. */
+    onDeletedExpired: () -> Unit = {},
+    onResumePacking: (Project) -> Unit = {},
+    onStartOver: (Project) -> Unit = {},
+    /** Swiped off the list for good, so the reminder is not offered for that pack again. */
+    onDismissResume: (Project) -> Unit = {},
+    dismissedResumes: Set<String> = emptySet(),
 ) {
     // A pack deleted on its own page lands back here with a window to take it back.
     var justDeleted by remember(deleted?.id) { mutableStateOf(deleted) }
@@ -103,6 +115,21 @@ fun ProjectsScreen(
         project.name.contains(query, ignoreCase = true) &&
             (filter == "All" || (filter == "Packed" && packed) || (filter == "In progress" && !packed))
     }.let { if (alphabetical) it.sortedBy { p -> p.name.lowercase() } else it.sortedByDescending { p -> p.updatedAtMillis } }
+
+    // Started but not finished: some pieces in, and at least one still to place. Whichever is
+    // furthest along is the one the packing was actually interrupted on.
+    val resumable = projects
+        .filter { project ->
+            val placements = project.currentPlan?.placements.orEmpty()
+            project.id !in dismissedResumes &&
+                project.packedInstanceIds.isNotEmpty() &&
+                placements.isNotEmpty() &&
+                placements.any { it.instanceId !in project.packedInstanceIds }
+        }
+        .maxByOrNull { project ->
+            project.packedInstanceIds.size.toFloat() /
+                project.currentPlan!!.placements.size.toFloat()
+        }
 
     Box(modifier.fillMaxSize()) {
         ScreenScaffold {
@@ -203,6 +230,41 @@ fun ProjectsScreen(
                     // One running index across headings and cards, so the pop-in reads as a
                     // single ripple down the page rather than restarting at each section.
                     var row = 0
+
+                    // Left mid-pack: the one nearest the end is the one worth offering, and
+                    // only that one, so returning doesn't turn into a list of unfinished jobs.
+                    if (resumable != null) {
+                        item(key = "resume-${resumable.id}") {
+                            Column(Modifier.animateItem().popIn(row++)) {
+                                SwipeAwayCard(onSwiped = { onDismissResume(resumable) }) {
+                                InterruptedSessionCard(
+                                    packName = resumable.name.ifEmpty { "this pack" },
+                                    step = com.packabunch.ui.nav.nextPackingStep(
+                                        resumable.currentPlan?.placements.orEmpty(),
+                                        resumable.packedInstanceIds,
+                                    ) + 1,
+                                    totalSteps = resumable.currentPlan?.placements?.size ?: 0,
+                                    piecesIn = resumable.packedInstanceIds.size,
+                                    onCarryOn = { onResumePacking(resumable) },
+                                    onStartOver = { onStartOver(resumable) },
+                                )
+                                }
+                                Spacer(Modifier.height(10.dp))
+                            }
+                        }
+                    }
+
+                    // The gap the deleted pack left, for as long as taking it back is still
+                    // on offer. It goes when the bar goes, and then the pack really is gone.
+                    if (justDeleted != null) {
+                        item(key = "deleted-slot") {
+                            com.packabunch.ui.components.DeletedSpaceSlot(
+                                label = "${justDeleted!!.name.ifEmpty { "That pack" }} was here",
+                                modifier = Modifier.animateItem(),
+                            )
+                        }
+                    }
+
                     groupedProjects(visibleProjects).forEach { (heading, group) ->
                         val headingIndex = row++
                         item(key = "heading-$heading") {
@@ -250,8 +312,11 @@ com.packabunch.ui.components.PackBar(
             onUndo = {
                 justDeleted?.let(onRestore)
                 justDeleted = null
+                onDeletedExpired()
             },
-            onExpired = { justDeleted = null },
+            // Once the window shuts the pack is gone for good, so the offer must not come
+            // back the next time this page is opened.
+            onExpired = { justDeleted = null; onDeletedExpired() },
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp),
         )
 
@@ -519,3 +584,41 @@ private fun ProjectsPreview() {
     }
 }
 
+
+/**
+ * Drag right to be rid of it. Past a third of the width it carries on off the screen by
+ * itself; short of that it springs back, so a half-hearted drag never loses the card.
+ */
+@Composable
+private fun SwipeAwayCard(
+    onSwiped: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val offset = remember { androidx.compose.animation.core.Animatable(0f) }
+    var width by remember { mutableStateOf(1f) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+    Box(
+        modifier
+            .onSizeChanged { width = it.width.toFloat().coerceAtLeast(1f) }
+            .offset { androidx.compose.ui.unit.IntOffset(offset.value.toInt(), 0) }
+            .graphicsLayer { alpha = 1f - (offset.value / width).coerceIn(0f, 1f) }
+            .draggable(
+                orientation = androidx.compose.foundation.gestures.Orientation.Horizontal,
+                state = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+                    scope.launch { offset.snapTo((offset.value + delta).coerceAtLeast(0f)) }
+                },
+                onDragStopped = {
+                    scope.launch {
+                        if (offset.value > width / 3f) {
+                            offset.animateTo(width, androidx.compose.animation.core.tween(180))
+                            onSwiped()
+                        } else {
+                            offset.animateTo(0f, androidx.compose.animation.core.spring())
+                        }
+                    }
+                },
+            ),
+    ) { content() }
+}

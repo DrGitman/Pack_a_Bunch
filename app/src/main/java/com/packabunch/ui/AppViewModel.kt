@@ -506,6 +506,26 @@ class AppViewModel(
 
     fun setGuideStep(step: Int) = _editor.update { it.copy(guideStep = step) }
 
+    /**
+     * Packs whose "carry on packing" reminder has been swiped away. Swiping is a decision,
+     * not a postponement, so it is kept against the account and the card does not return.
+     */
+    private val _dismissedResumes =
+        MutableStateFlow(preferences.getStringSet("resumeDismissed", emptySet()).orEmpty())
+    val dismissedResumes: StateFlow<Set<String>> = _dismissedResumes.asStateFlow()
+
+    fun dismissResume(id: String) {
+        val next = _dismissedResumes.value + id
+        preferences.edit().putStringSet("resumeDismissed", next).apply()
+        _dismissedResumes.value = next
+    }
+
+    /** Back to the first step with nothing ticked off. The plan itself is left alone. */
+    fun restartPacking() {
+        _editor.update { it.copy(packedInstanceIds = emptySet(), guideStep = 0) }
+        save()
+    }
+
     fun resumeGuide() = _editor.update {
         it.copy(guideStep = com.packabunch.ui.nav.nextPackingStep(it.plan?.placements.orEmpty(), it.packedInstanceIds))
     }

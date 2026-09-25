@@ -119,6 +119,32 @@ object PackIcons {
         circle(12f, 13.4f, 3.2f),
     )
 
+    /** A phone with a line struck through it — `design/artboards/ArUnavailable.dc.html`. */
+    val PhoneOff: ImageVector = strokeIcon(
+        "PhoneOff",
+        "M6 2.5h12a2.6 2.6 0 012.6 2.6v13.8A2.6 2.6 0 0118 21.5H6a2.6 2.6 0 01-2.6-2.6V5.1A2.6 2.6 0 016 2.5z",
+        "M10 18.5h4",
+        "M3 3l18 18",
+        strokeWidth = 1.6f,
+    )
+
+    /** Download, for the AR services the phone hasn't got yet. */
+    val Download: ImageVector = strokeIcon(
+        "Download",
+        "M12 3v12",
+        "M7.5 10.5L12 15l4.5-4.5",
+        "M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2",
+        strokeWidth = 1.7f,
+    )
+
+    /** The Play store's triangle, for the listing card. */
+    val PlayStore: ImageVector = strokeIcon(
+        "PlayStore",
+        "M4 3l13 9-13 9z",
+        strokeWidth = 1.7f,
+        cap = StrokeCap.Butt,
+    )
+
     /** The camera with a line struck through it — `design/artboards/CameraDenied.dc.html`. */
     val CameraOff: ImageVector = strokeIcon(
         "CameraOff",

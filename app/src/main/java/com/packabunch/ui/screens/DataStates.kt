@@ -1,7 +1,9 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.components.swallowTaps
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,10 +36,14 @@ import com.packabunch.ui.components.PrimaryButton
 import com.packabunch.ui.components.SecondaryButton
 import com.packabunch.ui.components.StatTile
 import com.packabunch.ui.components.warmShadow
+import com.packabunch.ui.motion.pressScale
 import com.packabunch.ui.nav.sheetEnter
 import com.packabunch.ui.nav.sheetExit
 import com.packabunch.ui.theme.BrandTint
+import com.packabunch.ui.theme.Accent
 import com.packabunch.ui.theme.Chrome
+import com.packabunch.ui.theme.HeroBody
+import com.packabunch.ui.theme.HeroEyebrow
 import com.packabunch.ui.theme.ErrorRed
 import com.packabunch.ui.theme.ErrorTint
 import com.packabunch.ui.theme.Ground
@@ -175,7 +182,20 @@ fun DeletedProjectBar(
                     fontSize = 12.5f.sp,
                 )
             }
-            PackTextButton(text = "Undo", onClick = onUndo, color = Color(0xFFE08A46))
+            // A filled pill, not a word: taking the pack back is the whole point of the bar,
+            // and it has only a few seconds to be noticed.
+            Text(
+                text = "Undo",
+                color = Chrome,
+                fontFamily = UiFamily,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 14.5f.sp,
+                modifier = Modifier
+                    .pressScale(pressedScale = 0.94f)
+                    .background(Accent, RoundedCornerShape(999.dp))
+                    .clickable(onClick = onUndo)
+                    .padding(horizontal = 22.dp, vertical = 13.dp),
+            )
         }
     }
 }
@@ -197,57 +217,112 @@ fun InterruptedSessionCard(
     onStartOver: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxWidth()) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .background(Chrome, RoundedCornerShape(28.dp))
+            .padding(Spacing.lg),
+    ) {
+        Row(
+            Modifier
+                .background(Color(0x2EE08A46), RoundedCornerShape(999.dp))
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            androidx.compose.material3.Icon(
+                PackIcons.Clock,
+                contentDescription = null,
+                tint = HeroEyebrow,
+                modifier = Modifier.size(14.dp),
+            )
+            Text(
+                text = "PICK UP WHERE YOU LEFT OFF",
+                color = HeroEyebrow,
+                fontFamily = UiFamily,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 11.sp,
+                letterSpacing = 0.6.sp,
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
+
         Text(
-            text = "PICK UP WHERE YOU LEFT OFF",
-            color = com.packabunch.ui.theme.TextTertiary,
+            text = "You were half way through $packName",
+            modifier = Modifier.widthIn(max = 250.dp),
+            color = Ground,
             fontFamily = UiFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 11.5f.sp,
-            letterSpacing = 0.8.sp,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            letterSpacing = (-0.5).sp,
         )
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(9.dp))
 
-        PackCard(elevation = 10.dp, contentPadding = Spacing.base, background = BrandTint) {
+        Text(
+            text = "The app closed during packing. Everything up to step $step was saved.",
+            modifier = Modifier.widthIn(max = 250.dp),
+            color = HeroBody,
+            fontFamily = UiFamily,
+            fontSize = 14.sp,
+            lineHeight = 21.sp,
+        )
+
+        Spacer(Modifier.height(14.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DarkChip("Step $step of $totalSteps")
+            DarkChip("$piecesIn ${if (piecesIn == 1) "piece" else "pieces"} in")
+        }
+
+        Spacer(Modifier.height(18.dp))
+
+        Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             Text(
-                text = "You were half way through $packName",
-                color = TextPrimary,
+                text = "Carry on packing",
+                modifier = Modifier
+                    .weight(1f)
+                    .pressScale(pressedScale = 0.96f)
+                    .background(Accent, RoundedCornerShape(25.dp))
+                    .clickable(onClick = onCarryOn)
+                    .padding(vertical = 16.dp),
+                color = Chrome,
                 fontFamily = UiFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 15.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            Spacer(Modifier.height(4.dp))
             Text(
-                text = "The app closed during packing. Everything up to step $step was saved.",
-                color = TextSecondary,
+                text = "Start over",
+                modifier = Modifier
+                    .pressScale(pressedScale = 0.96f)
+                    .border(1.5.dp, Color(0x47F7EFE6), RoundedCornerShape(25.dp))
+                    .clickable(onClick = onStartOver)
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+                color = Color(0xFFE7D8C7),
                 fontFamily = UiFamily,
-                fontSize = 13.5f.sp,
-                lineHeight = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 14.5f.sp,
             )
-
-            Spacer(Modifier.height(12.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                StatTile(
-                    value = "$step/$totalSteps",
-                    caption = "step",
-                    modifier = Modifier.weight(1f),
-                )
-                StatTile(
-                    value = piecesIn.toString(),
-                    caption = if (piecesIn == 1) "piece in" else "pieces in",
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            Spacer(Modifier.height(12.dp))
-
-            PrimaryButton(text = "Carry on packing", onClick = onCarryOn)
-            Spacer(Modifier.height(8.dp))
-            SecondaryButton(text = "Start over", onClick = onStartOver)
         }
     }
+}
+
+/** The translucent cream pill that carries a number on the dark resume card. */
+@Composable
+private fun DarkChip(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier
+            .background(Color(0x24F7EFE6), RoundedCornerShape(999.dp))
+            .padding(horizontal = 11.dp, vertical = 6.dp),
+        color = Ground,
+        fontFamily = UiFamily,
+        fontWeight = FontWeight.Bold,
+        fontSize = 11.5f.sp,
+    )
 }
 
 /**
@@ -282,6 +357,7 @@ fun LimitSavedPacksSheet(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(Color.White, RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                .swallowTaps()
                 .padding(horizontal = Spacing.gutter)
                 .padding(top = 14.dp, bottom = 30.dp),
         ) {

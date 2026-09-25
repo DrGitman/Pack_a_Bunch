@@ -237,6 +237,7 @@ fun PackNavHost(
     val editor by viewModel.editor.collectAsStateWithLifecycle()
     val projects by viewModel.projects.collectAsStateWithLifecycle()
     val projectsLoading by viewModel.projectsLoading.collectAsStateWithLifecycle()
+    val dismissedResumes by viewModel.dismissedResumes.collectAsStateWithLifecycle()
     val syncState by viewModel.syncState.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -534,6 +535,21 @@ fun PackNavHost(
                     viewModel.openPack(project.id) { navController.navigate(Routes.MEASURE_REVIEW) }
                 },
                 onShare = { project -> sharePack(context, project, settings.unit) },
+                onDeletedExpired = { deletedForUndo = null },
+                onResumePacking = { project ->
+                    viewModel.openPack(project.id) {
+                        viewModel.resumeGuide()
+                        navController.navigate(Routes.PACKING_GUIDE)
+                    }
+                },
+                onStartOver = { project ->
+                    viewModel.openPack(project.id) {
+                        viewModel.restartPacking()
+                        navController.navigate(Routes.PACKING_GUIDE)
+                    }
+                },
+                onDismissResume = { viewModel.dismissResume(it.id) },
+                dismissedResumes = dismissedResumes,
             )
         }
 

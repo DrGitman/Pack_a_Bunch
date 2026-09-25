@@ -76,18 +76,28 @@ fun DepthCaptureGate(onManual: () -> Unit, onBack: () -> Unit, content: @Composa
         return
     }
 
-    ScreenScaffold {
-        PackAppBar(title = "Camera scan", onBack = onBack)
-        Note(text = when {
-            support == ArSupport.NeedsInstall -> "Install or update Google Play Services for AR to scan."
-            support == ArSupport.Checking || depth == null && support == ArSupport.Ready -> "Checking depth scanning support…"
-            else -> "Depth scanning is unavailable on this phone. You can still enter measurements."
-        })
-        if (support == ArSupport.NeedsInstall) PrimaryButton(text = "Install AR services", onClick = {
-            (context as? Activity)?.let { ArAvailability.requestInstall(it, true) }; refresh++
-        })
-        SecondaryButton(text = "Type measurements instead", onClick = onManual)
+    if (support == ArSupport.NeedsInstall) {
+        ArServicesInstallScreen(
+            onInstall = {
+                (context as? Activity)?.let { ArAvailability.requestInstall(it, true) }
+                refresh++
+            },
+            onTypeInstead = onManual,
+            onBack = onBack,
+        )
+        return
     }
+
+    // Still asking ARCore. Nothing to say yet, and a wrong answer here is worse than a wait.
+    if (support == ArSupport.Checking || (depth == null && support == ArSupport.Ready)) {
+        ScreenScaffold {
+            PackAppBar(title = "Measure with the camera", onBack = onBack)
+            Note(text = "Checking depth scanning support…")
+        }
+        return
+    }
+
+    ArUnavailableScreen(onTypeInstead = onManual, onBack = onBack)
 }
 
 @Composable

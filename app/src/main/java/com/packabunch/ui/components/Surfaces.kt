@@ -1,6 +1,8 @@
 package com.packabunch.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +55,19 @@ import com.packabunch.ui.theme.UiFamily
  * if the design ever wants them.
  */
 fun Modifier.warmShadow(elevation: Dp, shape: Shape): Modifier = this
+
+/**
+ * Swallows taps that land on the surface itself rather than on a control.
+ *
+ * A sheet is drawn over its own dismiss scrim, and a plain Column does not consume touches,
+ * so without this a tap on any blank part of a form fell straight through and shut it —
+ * halfway through typing an item, every time.
+ */
+@Composable
+fun Modifier.swallowTaps(): Modifier {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    return this.clickable(interactionSource = interaction, indication = null) {}
+}
 
 /** The standard white card: 22 dp corners, warm low shadow. */
 @Composable

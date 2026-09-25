@@ -1,11 +1,13 @@
 package com.packabunch.ui.screens
 
+import com.packabunch.ui.components.swallowTaps
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -40,6 +42,8 @@ import com.packabunch.ui.theme.Primary
 import com.packabunch.ui.theme.Spacing
 import com.packabunch.ui.theme.Success
 import com.packabunch.ui.theme.SurfaceField
+import com.packabunch.ui.theme.SurfaceSunken
+import com.packabunch.ui.theme.TextTertiary
 import com.packabunch.ui.theme.TextPrimary
 import com.packabunch.ui.theme.TextSecondary
 import com.packabunch.ui.theme.UiFamily
@@ -82,6 +86,7 @@ fun CameraRationaleSheet(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(Color.White, RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
+                .swallowTaps()
                 .navigationBarsPadding()
                 .padding(horizontal = Spacing.gutter)
                 .padding(top = 14.dp, bottom = 34.dp),
@@ -283,6 +288,237 @@ private fun ReassurancePoint(
             fontFamily = UiFamily,
             fontSize = 14.sp,
             lineHeight = 21.sp,
+        )
+    }
+}
+
+/**
+ * One more thing to install — `design/artboards/ArServicesInstall.dc.html`.
+ *
+ * A 100 MB download is a real thing to ask for, so the size is named and the way out is
+ * offered in the same breath rather than buried under the install button.
+ */
+@Composable
+fun ArServicesInstallScreen(
+    onInstall: () -> Unit,
+    onTypeInstead: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ScreenScaffold(modifier) {
+        PackAppBar(title = "Measure with the camera", onBack = onBack)
+
+        GateHeader(
+            icon = PackIcons.Download,
+            tint = Primary,
+            tile = BrandTint,
+            title = "One more thing to install",
+            body = "Camera measuring uses Google Play Services for AR. It's a free Google " +
+                "download and this phone doesn't have it yet.",
+            topGap = 56.dp,
+        )
+
+        Spacer(Modifier.height(26.dp))
+
+        Row(
+            Modifier
+                .padding(horizontal = Spacing.gutter)
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(22.dp))
+                .padding(Spacing.base),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
+        ) {
+            IconTile(
+                icon = PackIcons.PlayStore,
+                tint = BodyInk,
+                background = SurfaceSunken,
+                size = 46.dp,
+                iconSize = 24.dp,
+                cornerRadius = 15.dp,
+            )
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "Google Play Services for AR",
+                    color = TextPrimary,
+                    fontFamily = UiFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.5f.sp,
+                )
+                Text(
+                    text = "Made by Google · about 100 MB",
+                    modifier = Modifier.padding(top = 2.dp),
+                    color = Color(0xFF8A7565),
+                    fontFamily = UiFamily,
+                    fontSize = 12.5f.sp,
+                )
+            }
+        }
+
+        Spacer(Modifier.height(14.dp))
+
+        Text(
+            text = "You don't have to install anything. Typed measurements work right now and " +
+                "give you the same plan.",
+            modifier = Modifier
+                .padding(horizontal = Spacing.gutter)
+                .fillMaxWidth()
+                .background(SurfaceSunken, RoundedCornerShape(20.dp))
+                .padding(14.dp),
+            color = Color(0xFF6B5849),
+            fontFamily = UiFamily,
+            fontSize = 13.5f.sp,
+            lineHeight = 20.sp,
+        )
+
+        PushDown()
+
+        Column(
+            Modifier.padding(horizontal = Spacing.gutter),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            PrimaryButton(text = "Get it from Google Play", onClick = onInstall)
+            SecondaryButton(
+                text = "Type the measurements instead",
+                onClick = onTypeInstead,
+                backgroundColor = Color.Transparent,
+            )
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+    }
+}
+
+/**
+ * This phone can't measure by camera — `design/artboards/ArUnavailable.dc.html`.
+ *
+ * The only one of these three with nothing to try. It says the limit is the hardware so
+ * nobody goes looking for an update, then spends the rest of the page on what still works.
+ */
+@Composable
+fun ArUnavailableScreen(
+    onTypeInstead: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ScreenScaffold(modifier) {
+        PackAppBar(title = "Measure with the camera", onBack = onBack)
+
+        GateHeader(
+            icon = PackIcons.PhoneOff,
+            tint = Color(0xFF8A7565),
+            tile = SurfaceSunken,
+            title = "This phone can't measure by camera",
+            body = "Camera measuring needs depth sensing that this phone doesn't provide. " +
+                "That's a hardware limit, not something an update will fix.",
+            topGap = 54.dp,
+        )
+
+        Spacer(Modifier.height(26.dp))
+
+        Column(
+            Modifier
+                .padding(horizontal = Spacing.gutter)
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(22.dp))
+                .padding(18.dp),
+        ) {
+            Text(
+                text = "Everything else works normally",
+                color = TextPrimary,
+                fontFamily = UiFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.5f.sp,
+            )
+            Spacer(Modifier.height(12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                StillWorks("Typed measurements, in centimetres or inches")
+                StillWorks("Photos of your items")
+                StillWorks("The arrangement and the step-by-step packing guide")
+            }
+        }
+
+        PushDown()
+
+        Column(Modifier.padding(horizontal = Spacing.gutter)) {
+            PrimaryButton(text = "Type the measurements", onClick = onTypeInstead)
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = "We won't ask you about camera measuring again on this phone.",
+                modifier = Modifier.fillMaxWidth(),
+                color = TextTertiary,
+                fontFamily = UiFamily,
+                fontSize = 12.5f.sp,
+                textAlign = TextAlign.Center,
+            )
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+    }
+}
+
+/** A ticked line with no card of its own, for the list inside the "still works" card. */
+@Composable
+private fun StillWorks(text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+        Icon(
+            PackIcons.Check,
+            contentDescription = null,
+            tint = Success,
+            modifier = Modifier.size(19.dp).padding(top = 2.dp),
+        )
+        Text(
+            text = text,
+            color = BodyInk,
+            fontFamily = UiFamily,
+            fontSize = 14.sp,
+            lineHeight = 21.sp,
+        )
+    }
+}
+
+/** The tile, headline and paragraph every one of these gate pages opens with. */
+@Composable
+private fun ColumnScope.GateHeader(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    tile: Color,
+    title: String,
+    body: String,
+    topGap: androidx.compose.ui.unit.Dp,
+) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 28.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(topGap))
+        IconTile(
+            icon = icon,
+            tint = tint,
+            background = tile,
+            size = 96.dp,
+            iconSize = 44.dp,
+            cornerRadius = 32.dp,
+        )
+        Spacer(Modifier.height(26.dp))
+        Text(
+            text = title,
+            color = TextPrimary,
+            fontFamily = UiFamily,
+            fontWeight = FontWeight.ExtraBold,
+            fontSize = 25.sp,
+            lineHeight = 32.sp,
+            letterSpacing = (-0.6).sp,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(11.dp))
+        Text(
+            text = body,
+            color = TextSecondary,
+            fontFamily = UiFamily,
+            fontSize = 15.sp,
+            lineHeight = 23.sp,
+            textAlign = TextAlign.Center,
         )
     }
 }
