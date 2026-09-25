@@ -84,7 +84,9 @@ class CloudPackSync(private val repository: ProjectRepository, private val accou
                 else -> "Your packs are backed up to your account."
             },conflicts)
         } catch(e: CancellationException) { throw e }
-        catch(_: Exception) { _state.value=CloudSyncState(message="Couldn't sync. Your packs are safe on this phone; retry when connected.") }
+        // Logged, not shown: the reason is for whoever is debugging, not for the person packing.
+        catch(e: Exception) { android.util.Log.w("PackSync","sync failed",e)
+            _state.value=CloudSyncState(message="Couldn't sync. Your packs are safe on this phone; retry when connected.") }
     } }
 
     private suspend fun request(path: String, body: JSONObject?=null): String {

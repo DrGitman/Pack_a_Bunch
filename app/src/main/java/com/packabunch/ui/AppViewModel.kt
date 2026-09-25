@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -74,6 +75,9 @@ class AppViewModel(
 
     fun clearPurchaseOutcome() { _purchaseOutcome.value = null }
 
+    /** False until the first sync has been attempted. Nothing to wait for with no account. */
+    private val _firstSyncDone = MutableStateFlow(cloudSync == null)
+
     init {
         if (cloudSync != null) {
             viewModelScope.launch {
@@ -82,17 +86,25 @@ class AppViewModel(
             viewModelScope.launch {
                 while (true) {
                     cloudSync.sync()
+                    // Whether it worked or not, the packs have had their chance to turn up.
+                    _firstSyncDone.value = true
                     kotlinx.coroutines.delay(30_000)
                 }
             }
         }
     }
 
-    private val _projectsLoading = MutableStateFlow(true)
-    val projectsLoading = _projectsLoading.asStateFlow()
     val projects: StateFlow<List<Project>> = repository.projects
-        .onEach { _projectsLoading.value = false }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /**
+     * Room answers instantly, and on a fresh install its answer is "nothing" whatever the
+     * account actually has. Signing in on a new phone would then be met with the empty state,
+     * so an empty list only counts as empty once the packs have had their chance to arrive.
+     */
+    val projectsLoading: StateFlow<Boolean> =
+        combine(projects, _firstSyncDone) { list, synced -> list.isEmpty() && !synced }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
     private val _settings = MutableStateFlow(AppSettings(
         unit = LengthUnit.entries.firstOrNull { it.name == preferences.getString("unit", null) }

@@ -109,7 +109,8 @@ object CloudPackCodec {
             GeometryCodec.shape(geometry(i,"collision_geometry_id","collision_mask")),GeometryCodec.shape(geometry(i,"visual_geometry_id","visual_surface"))) }
         var project = Project(pack.getString("client_id"),pack.getString("name"),
             Space(s.getString("client_id"),s.getString("name"),dimensions(s),s.getInt("edge_gap_mm"),MeasurementSource.valueOf(s.getString("measurement_source")),scan),
-            items,updatedAtMillis=Instant.parse(pack.getString("updated_at")).toEpochMilli())
+            // Postgres writes the offset as "+00:00"; Instant.parse only accepts a bare "Z".
+            items,updatedAtMillis=java.time.OffsetDateTime.parse(pack.getString("updated_at")).toInstant().toEpochMilli())
         val planRow = rows(doc,"pack_plans").singleOrNull() ?: return project
         val ids = itemRows.associate { it.getString("id") to it.getString("client_id") }
         val instances = rows(doc,"pack_plan_instances").associate { it.getString("instance_id") to ids.getValue(it.getString("item_id")) }
