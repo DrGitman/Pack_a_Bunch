@@ -9,6 +9,15 @@ import androidx.compose.runtime.Composable
  * generated from. There is no dynamic colour: the item identity colours and the
  * provenance badges have to stay exactly as specified or they stop meaning anything.
  */
+/** Draws nothing when pressed. The motion is the feedback. */
+private object NoPressBox : androidx.compose.foundation.IndicationNodeFactory {
+    override fun create(interactionSource: androidx.compose.foundation.interaction.InteractionSource) =
+        object : androidx.compose.ui.Modifier.Node() {}
+
+    override fun hashCode() = -1
+    override fun equals(other: Any?) = other === this
+}
+
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun PackABunchTheme(content: @Composable () -> Unit) {
@@ -19,14 +28,12 @@ fun PackABunchTheme(content: @Composable () -> Unit) {
     ) {
         // Android's default press ripple is grey, which reads as a dirty box on a cream ground.
         // Set once here so every tappable thing in the app presses in the brand's terracotta.
-        // Two ripples exist: Material's, and the plain one every bare `clickable` uses. The
-        // second is grey and ignores the first's configuration, which is why presses kept
-        // showing a grey box. Both are set here so a press is terracotta everywhere.
+        // No ripple anywhere, on purpose. The feedback in this app is the press squash and the
+        // icon animations; a box lighting up underneath them only muddies both. Setting both
+        // locals turns off Material's ripple and the plain one every bare `clickable` uses.
         androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.material3.LocalRippleConfiguration provides
-                androidx.compose.material3.RippleConfiguration(color = Primary),
-            androidx.compose.foundation.LocalIndication provides
-                androidx.compose.material3.ripple(color = Primary),
+            androidx.compose.material3.LocalRippleConfiguration provides null,
+            androidx.compose.foundation.LocalIndication provides NoPressBox,
             content = content,
         )
     }
