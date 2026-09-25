@@ -109,7 +109,8 @@ class ProjectRepository(private val dao: ProjectDao) {
          */
         fun sampleProject(): Project = Project(
             id = "sample",
-            name = "Moving crate",
+            // Always the toolbox: the sample is a fixed thing people recognise across the app.
+            name = "Toolbox",
             space = Space(
                 id = "sample-space",
                 name = "Moving crate",

@@ -235,11 +235,14 @@ com.packabunch.ui.components.PackBar(
     }
 }
 
+/** The sample pack's id, fixed so every screen can recognise it. */
+const val SAMPLE_ID = "sample"
+
 /** The artboard's three groups, in its order. Empty groups are left out entirely. */
 private fun groupedProjects(projects: List<Project>): List<Pair<String, List<Project>>> {
     val dayAgo = System.currentTimeMillis() - 24 * 60 * 60 * 1000
-    val samples = projects.filter { it.id == "sample" }
-    val real = projects.filter { it.id != "sample" }
+    val samples = projects.filter { it.id == SAMPLE_ID }
+    val real = projects.filter { it.id != SAMPLE_ID }
     return listOf(
         "TODAY" to real.filter { it.updatedAtMillis >= dayAgo },
         "EARLIER" to real.filter { it.updatedAtMillis < dayAgo },
@@ -268,6 +271,7 @@ private fun ProjectCard(
 ) {
     val shape = RoundedCornerShape(24.dp)
     val plan = project.currentPlan
+    val sample = project.id == SAMPLE_ID
 
     Row(
         modifier = modifier
@@ -280,7 +284,8 @@ private fun ProjectCard(
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Box(
-            Modifier.size(58.dp).background(Color(0xFFF7E4D3), RoundedCornerShape(14.dp)),
+            Modifier.size(58.dp)
+                .background(if (sample) Color(0xFFEFE8DF) else Color(0xFFF7E4D3), RoundedCornerShape(14.dp)),
             contentAlignment = Alignment.Center,
         ) {
             MiniCratePreview(
@@ -304,7 +309,7 @@ private fun ProjectCard(
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                 )
-                if (project.id == "sample") {
+                if (sample) {
                     Text(
                         text = "SAMPLE",
                         color = Color(0xFF9B8877),
@@ -319,8 +324,8 @@ private fun ProjectCard(
                 }
             }
             Text(
-                // The artboard's line: what the space is, how much is in it, and how long ago.
-                text = listOfNotNull(
+                // The sample explains itself; a real pack says what is in it and when you touched it.
+                text = if (sample) "Try the whole flow with made-up items" else listOfNotNull(
                     project.space.name.takeIf { it.isNotBlank() && !it.equals(project.name, ignoreCase = true) },
                     "${project.pieceCount} " + if (project.pieceCount == 1) "piece" else "pieces",
                     timeAgo(project.updatedAtMillis),
@@ -328,15 +333,15 @@ private fun ProjectCard(
                 color = TextSecondary,
                 fontFamily = UiFamily,
                 fontSize = 12.5f.sp,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 2.dp),
             )
 
-            Spacer(Modifier.height(8.dp))
+            if (!sample) Spacer(Modifier.height(8.dp))
 
             // One wrapping row: a long "1 not placed" used to be squeezed into a vertical column.
-            androidx.compose.foundation.layout.FlowRow(
+            if (!sample) androidx.compose.foundation.layout.FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalArrangement = Arrangement.spacedBy(5.dp),
             ) {
