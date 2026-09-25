@@ -385,8 +385,36 @@ fun PackNavHost(
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
                 onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
             ) { pageModifier ->
+            // Android's own photo picker: no storage permission, and it only ever hands back
+            // the one picture the person chose.
+            val avatars = remember(account.userId) {
+                com.packabunch.data.cloud.CloudAvatar(account, account.userId.orEmpty())
+            }
+            val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
+            ) { picked ->
+                if (picked != null) scope.launch {
+                    val url = avatars.upload(context, picked)
+                    if (url != null) viewModel.setAvatar(url)
+                    else notice = "Couldn't upload that picture. Check your connection and try again."
+                }
+            }
             ProfileScreen(
                 modifier = pageModifier,
+                avatarUrl = settings.avatarUrl ?: account.providerPhoto,
+                onPickPhoto = {
+                    pickPhoto.launch(
+                        androidx.activity.result.PickVisualMediaRequest(
+                            androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly,
+                        ),
+                    )
+                },
+                onRemovePhoto = {
+                    scope.launch {
+                        avatars.remove()
+                        viewModel.setAvatar(null)
+                    }
+                },
                 email = account.email,
                 tier = settings.tier,
                 savedPackCount = projects.size,

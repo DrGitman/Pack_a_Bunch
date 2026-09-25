@@ -11,7 +11,7 @@ import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
 /** What the account remembers about how somebody measures. Null means "never saved". */
-data class RemoteSettings(val unit: String, val habit: String?)
+data class RemoteSettings(val unit: String, val habit: String?, val avatarUrl: String?)
 
 /**
  * The measuring preferences, kept against the account rather than the phone.
@@ -27,14 +27,18 @@ class CloudSettings(private val account: SupabaseAccount, private val owner: Str
 
     suspend fun load(): RemoteSettings? = runCatching {
         withContext(Dispatchers.IO) {
-            val rows = JSONArray(request("/rest/v1/user_settings?select=unit,habit&user_id=eq.$owner"))
+            val rows = JSONArray(request("/rest/v1/user_settings?select=unit,habit,avatar_url&user_id=eq.$owner"))
             if (rows.length() == 0) return@withContext null
             val row = rows.getJSONObject(0)
-            RemoteSettings(row.getString("unit"), row.optString("habit").takeIf { it.isNotBlank() })
+            RemoteSettings(
+                unit = row.getString("unit"),
+                habit = row.optString("habit").takeIf { it.isNotBlank() },
+                avatarUrl = row.optString("avatar_url").takeIf { it.isNotBlank() },
+            )
         }
     }.getOrNull()
 
-    suspend fun save(unit: String, habit: String?) {
+    suspend fun save(unit: String, habit: String?, avatarUrl: String? = null) {
         runCatching {
             withContext(Dispatchers.IO) {
                 request(
@@ -43,6 +47,7 @@ class CloudSettings(private val account: SupabaseAccount, private val owner: Str
                         .put("user_id", owner)
                         .put("unit", unit)
                         .put("habit", habit ?: JSONObject.NULL)
+                        .put("avatar_url", avatarUrl ?: JSONObject.NULL)
                         .put("updated_at", java.time.Instant.now().toString()),
                     // Upsert: the row is created the first time and replaced after that.
                     prefer = "resolution=merge-duplicates,return=minimal",

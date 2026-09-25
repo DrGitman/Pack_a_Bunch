@@ -100,6 +100,7 @@ class AppViewModel(
         packingHabit = PackingHabit.entries.firstOrNull { it.name == preferences.getString("habit", null) },
         cameraMeasuring = preferences.getBoolean("cameraMeasuring", true),
         defaultEdgeGapMm = preferences.getInt("defaultEdgeGapMm", 5).coerceIn(0, 50),
+        avatarUrl = preferences.getString("avatar", null),
     ))
 
     fun completeSetup() {
@@ -116,17 +117,21 @@ class AppViewModel(
         if (cloudSettings != null) viewModelScope.launch {
             val remote = cloudSettings.load()
             if (remote == null) {
-                cloudSettings.save(_settings.value.unit.name, _settings.value.packingHabit?.name)
+                cloudSettings.save(_settings.value.unit.name, _settings.value.packingHabit?.name,
+                    _settings.value.avatarUrl)
             } else {
                 LengthUnit.entries.firstOrNull { it.name == remote.unit }?.let(::setUnit)
                 PackingHabit.entries.firstOrNull { it.name == remote.habit }?.let(::setPackingHabit)
+                remote.avatarUrl?.let(::setAvatar)
             }
         }
     }
 
     private fun pushSettings() {
         val settings = cloudSettings ?: return
-        viewModelScope.launch { settings.save(_settings.value.unit.name, _settings.value.packingHabit?.name) }
+        viewModelScope.launch {
+            settings.save(_settings.value.unit.name, _settings.value.packingHabit?.name, _settings.value.avatarUrl)
+        }
     }
 
     // After _settings on purpose: RevenueCat may report cached entitlement synchronously.
@@ -176,6 +181,16 @@ class AppViewModel(
         require(mm in 0..50)
         preferences.edit().putInt("defaultEdgeGapMm", mm).apply()
         _settings.update { it.copy(defaultEdgeGapMm = mm) }
+    }
+
+    /** Remembers the photo on this phone and against the account. Null clears it. */
+    fun setAvatar(url: String?) {
+        preferences.edit().putString("avatar", url).apply()
+        _settings.update { it.copy(avatarUrl = url) }
+        val settings = cloudSettings ?: return
+        viewModelScope.launch {
+            settings.save(_settings.value.unit.name, _settings.value.packingHabit?.name, url)
+        }
     }
 
     fun setPackingHabit(habit: PackingHabit) {
@@ -526,6 +541,8 @@ data class AppSettings(
     val cameraMeasuring: Boolean = true,
     val defaultEdgeGapMm: Int = 5,
     val unit: LengthUnit = LengthUnit.CENTIMETRES,
+    /** The photo this account shows: the person's own, or the one their provider gave us. */
+    val avatarUrl: String? = null,
     val tier: Tier = Tier.FREE,
     val scansToday: Int = 0,
     val notifications: NotificationPreferences = NotificationPreferences(),

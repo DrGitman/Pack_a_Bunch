@@ -24,6 +24,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -74,6 +76,10 @@ fun ProfileScreen(
     onSignOut: () -> Unit,
     onDeleteAccount: () -> Unit,
     onDownloadData: () -> Unit = {},
+    /** The photo to show, whether the person picked it or their provider supplied it. */
+    avatarUrl: String? = null,
+    onPickPhoto: () -> Unit = {},
+    onRemovePhoto: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     completedPacks: Int = 0,
@@ -93,9 +99,56 @@ fun ProfileScreen(
 
             PackCard(shape = RoundedCornerShape(28.dp), elevation = 10.dp, contentPadding = 20.dp) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(15.dp)) {
-                    Box(Modifier.size(68.dp).background(Primary, RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
-                        Text(email?.firstOrNull()?.uppercase() ?: "P", color = com.packabunch.ui.theme.OnPrimary,
-                            fontFamily = UiFamily, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.5).sp)
+                    var photoMenu by remember { mutableStateOf(false) }
+                    Box(
+                        Modifier.size(68.dp)
+                            .pressScale(pressedScale = 0.95f)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(Primary)
+                            .clickable { photoMenu = true },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (avatarUrl != null) {
+                            coil3.compose.AsyncImage(
+                                model = avatarUrl,
+                                contentDescription = "Your photo",
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Text(email?.firstOrNull()?.uppercase() ?: "P", color = com.packabunch.ui.theme.OnPrimary,
+                                fontFamily = UiFamily, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.5).sp)
+                        }
+                        // A quiet hint that the picture is yours to change.
+                        Box(
+                            Modifier.align(Alignment.BottomEnd).size(24.dp)
+                                .background(com.packabunch.ui.theme.Surface, RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(PackIcons.Camera, null, Modifier.size(13.dp), tint = Primary)
+                        }
+                    }
+
+                    if (photoMenu) {
+                        androidx.compose.material3.AlertDialog(
+                            onDismissRequest = { photoMenu = false },
+                            title = { Text("Your photo") },
+                            text = { Text("Show a picture beside your name. It is stored with your account, so it follows you to another phone.") },
+                            confirmButton = {
+                                androidx.compose.material3.TextButton(onClick = { photoMenu = false; onPickPhoto() }) {
+                                    Text(if (avatarUrl == null) "Choose a photo" else "Change photo")
+                                }
+                            },
+                            dismissButton = {
+                                if (avatarUrl != null) {
+                                    androidx.compose.material3.TextButton(onClick = { photoMenu = false; onRemovePhoto() }) {
+                                        Text("Remove", color = ErrorRed)
+                                    }
+                                } else {
+                                    androidx.compose.material3.TextButton(onClick = { photoMenu = false }) { Text("Cancel") }
+                                }
+                            },
+                        )
                     }
                     Column(Modifier.weight(1f)) {
                         Text(email?.substringBefore('@') ?: "Your account", color = TextPrimary, fontFamily = UiFamily,
