@@ -4,6 +4,7 @@ import androidx.annotation.RawRes
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -68,6 +69,15 @@ fun LottieTapIcon(
 
     val ownSource = remember { MutableInteractionSource() }
     val interaction = interactionSource ?: ownSource
+
+    // An icon sitting inside a bigger tap target (a settings row, say) isn't clickable itself.
+    // It borrows the row's interaction source instead, so a touch anywhere on the row plays it.
+    if (onClick == null && interactionSource != null) {
+        LaunchedEffect(interaction) {
+            interaction.interactions.collect { if (it is PressInteraction.Press) playing = true }
+        }
+    }
+
     val clicks = if (onClick == null) Modifier else Modifier.clickable(
         interactionSource = interaction,
         indication = LocalIndication.current,

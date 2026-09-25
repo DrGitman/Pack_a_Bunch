@@ -3,6 +3,7 @@ package com.packabunch.ui.screens
 import com.packabunch.ui.motion.pressScale
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -135,8 +136,8 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsAction(PackIcons.Info, "Privacy, terms and help", onSupport, motion = com.packabunch.R.raw.icon_info)
                     SettingsDivider()
-                    SettingsAction(PackIcons.Trash, "Delete all saved packs", { showDelete = true }, ErrorRed,
-                        motion = com.packabunch.R.raw.icon_delete)
+                    SettingsAction(PackIcons.Trash, "Delete everything on this phone", { showDelete = true }, ErrorRed,
+                        motion = com.packabunch.R.raw.icon_bin)
                 }
                 Text("Pack a Bunch ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     Modifier.align(Alignment.CenterHorizontally).padding(top = 14.dp), color = TextDisabled,
@@ -166,9 +167,12 @@ com.packabunch.ui.components.PackBar(
 }
 @Composable private fun SettingsAction(icon: ImageVector, label: String, onClick: () -> Unit,
     tint: Color = TextSecondary, @androidx.annotation.RawRes motion: Int? = null) {
-    Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f).clickable(onClick = onClick).padding(vertical = 14.dp),
+    // One press shared by the row and its icon, so the motion plays wherever the row is touched.
+    val press = remember { MutableInteractionSource() }
+    Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f)
+        .clickable(interactionSource = press, indication = null, onClick = onClick).padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-        if (motion != null) LottieTapIcon(motion, null, onClick = onClick, size = 20.dp)
+        if (motion != null) LottieTapIcon(motion, null, onClick = null, size = 20.dp, interactionSource = press)
         else Icon(icon, null, Modifier.size(20.dp), tint = tint)
         SettingsLabel(label, Modifier.weight(1f), if (tint == ErrorRed) ErrorRed else TextPrimary)
         if (tint != ErrorRed) Icon(PackIcons.Forward, null, Modifier.size(19.dp), tint = TextTertiary)
