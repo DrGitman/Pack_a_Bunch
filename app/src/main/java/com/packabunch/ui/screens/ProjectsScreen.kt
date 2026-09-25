@@ -109,10 +109,11 @@ fun ProjectsScreen(
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Projects", Modifier.weight(1f), color = TextPrimary, fontFamily = UiFamily,
                     fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.7).sp)
-                if (projects.isNotEmpty()) PackIconButton(
-                    PackIcons.Search, "Search packs",
-                    { searchOpen = !searchOpen; if (!searchOpen) query = "" },
-                    modifier = Modifier.background(Color.White, RoundedCornerShape(22.dp)),
+                if (projects.isNotEmpty()) com.packabunch.ui.components.LottieTapIcon(
+                    animation = com.packabunch.R.raw.icon_search,
+                    contentDescription = "Search packs",
+                    onClick = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
+                    size = 44.dp,
                 )
                 Box {
                     com.packabunch.ui.components.LottieTapIcon(

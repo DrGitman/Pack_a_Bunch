@@ -104,7 +104,13 @@ fun PackAppBar(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (onBack != null) {
-            PackIconButton(PackIcons.Back, contentDescription = "Back", onClick = onBack)
+            // The designer's back animation, so every screen leaves the same way.
+            LottieTapIcon(
+                animation = com.packabunch.R.raw.icon_back,
+                contentDescription = "Back",
+                onClick = onBack,
+                size = 40.dp,
+            )
         } else {
             Spacer(Modifier.size(4.dp))
         }

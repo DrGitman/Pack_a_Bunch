@@ -274,6 +274,7 @@ fun CreateSpaceScreen(
                 text = "Measure with the camera",
                 onClick = onMeasureWithCamera,
                 icon = PackIcons.Camera,
+                motion = com.packabunch.R.raw.icon_camera,
             )
             Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

@@ -19,9 +19,14 @@ fun PackABunchTheme(content: @Composable () -> Unit) {
     ) {
         // Android's default press ripple is grey, which reads as a dirty box on a cream ground.
         // Set once here so every tappable thing in the app presses in the brand's terracotta.
+        // Two ripples exist: Material's, and the plain one every bare `clickable` uses. The
+        // second is grey and ignores the first's configuration, which is why presses kept
+        // showing a grey box. Both are set here so a press is terracotta everywhere.
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.material3.LocalRippleConfiguration provides
                 androidx.compose.material3.RippleConfiguration(color = Primary),
+            androidx.compose.foundation.LocalIndication provides
+                androidx.compose.material3.ripple(color = Primary),
             content = content,
         )
     }

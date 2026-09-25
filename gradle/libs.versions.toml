@@ -21,6 +21,7 @@ arcore = "1.56.0"
 camerax = "1.6.2"
 revenuecat = "10.22.1"
 lottie = "6.6.10"
+coil = "3.3.0"
 mlkitLabeling = "17.0.9"
 mlkitText = "16.0.1"
 mlkitBarcode = "17.3.0"
@@ -69,6 +70,10 @@ mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "m
 
 # Plays the designer's exported Lottie splash as vectors, so no frame images ship.
 lottie-compose = { module = "com.airbnb.android:lottie-compose", version.ref = "lottie" }
+
+# Loads the profile photo, whether it came from Google or from the person's own phone.
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = "coil" }
 
 # Wraps Google Play Billing; entitlements are verified server-side by RevenueCat.
 revenuecat = { module = "com.revenuecat.purchases:purchases", version.ref = "revenuecat" }

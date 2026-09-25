@@ -28,6 +28,15 @@ class SupabaseAccount(context: Context) {
         BuildConfig.SUPABASE_PUBLISHABLE_KEY.isNotBlank()
     val email: String? get() = session?.optJSONObject("user")?.optString("email")?.takeIf { it.isNotBlank() }
     val userId: String? get() = session?.optJSONObject("user")?.optString("id")?.takeIf { it.isNotBlank() }
+    /**
+     * The photo the sign-in provider already has, if any. Google supplies one; email sign-up
+     * does not. A photo the person picks themselves wins over this.
+     */
+    val providerPhoto: String? get() = session?.optJSONObject("user")
+        ?.optJSONObject("user_metadata")
+        ?.let { it.optString("avatar_url").ifBlank { it.optString("picture") } }
+        ?.takeIf { it.startsWith("http") }
+
     val hasSession: Boolean get() = userId != null && session?.optString("refresh_token")?.isNotBlank() == true
 
     suspend fun signInWithPassword(email: String, password: String) = mutex.withLock {

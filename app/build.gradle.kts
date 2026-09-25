@@ -117,6 +117,8 @@ dependencies {
     implementation(libs.arcore)
     implementation(libs.revenuecat)
     implementation(libs.lottie.compose)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network)
     implementation(libs.camerax.core)
     implementation(libs.camerax.camera2)
     implementation(libs.camerax.lifecycle)

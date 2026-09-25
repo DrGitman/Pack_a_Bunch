@@ -284,7 +284,12 @@ fun ForgotPasswordScreen(sent: Boolean = false, onSend: (String) -> Unit, onBack
         PackAppBar("Reset password", onBack)
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(88.dp).background(ItemTints.first(), RoundedCornerShape(30.dp)), contentAlignment = Alignment.Center) {
-                Icon(PackIcons.Mail, null, Modifier.size(42.dp), tint = Primary)
+                com.packabunch.ui.components.LottieTapIcon(
+                    animation = com.packabunch.R.raw.icon_reset_email,
+                    contentDescription = null,
+                    onClick = null,
+                    size = 46.dp,
+                )
             }
             Spacer(Modifier.height(22.dp))
             AuthText(if (sent) "Check your email" else "We'll email you a link", 26f, 33, TextPrimary,
