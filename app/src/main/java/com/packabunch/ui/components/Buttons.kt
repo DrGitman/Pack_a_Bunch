@@ -54,6 +54,8 @@ fun PrimaryButton(
     enabled: Boolean = true,
     icon: ImageVector? = null,
     height: Dp = 56.dp,
+    /** A quiet pill inside the button, for a count that belongs to the action. */
+    trailing: String? = null,
 ) {
     val interaction = remembered()
     val view = LocalView.current
@@ -92,6 +94,18 @@ fun PrimaryButton(
             fontWeight = FontWeight.Bold,
             fontSize = 16.sp,
         )
+        if (trailing != null) {
+            Text(
+                text = trailing,
+                color = content,
+                fontFamily = UiFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .background(Color(0x33FFFFFF), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
     }
 }
 

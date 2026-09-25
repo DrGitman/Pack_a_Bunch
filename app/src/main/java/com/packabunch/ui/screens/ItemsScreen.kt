@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -108,38 +109,46 @@ fun ItemsScreen(
                 title = "Items",
                 onBack = onBack,
                 actions = {
-                    CountPill(
-                        text = limits.maxPiecesPerPack?.let { "$pieces / $it" } ?: "$pieces",
+                    Text(
+                        text = limits.maxPiecesPerPack?.let { "$pieces of $it" } ?: "$pieces",
+                        color = TextTertiary,
+                        fontFamily = UiFamily,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(end = 8.dp),
                     )
                 },
             )
 
-            Spacer(Modifier.height(Spacing.md))
-            PrimaryButton(text = "Scan items together", onClick = onScan)
-            com.packabunch.ui.components.PackTextButton(text = "Item library", onClick = onLibrary)
+            Column(Modifier.padding(horizontal = Spacing.gutter, vertical = 10.dp)) {
+                com.packabunch.ui.components.StepProgress(step = 2, totalSteps = 3)
+            }
 
             if (state.space != null) {
                 Column(Modifier.padding(horizontal = Spacing.gutter)) {
-                    PackCard(contentPadding = 0.dp, elevation = 4.dp) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text(
-                                    text = state.name.ifEmpty { "This space" },
-                                    color = TextPrimary,
-                                    fontFamily = UiFamily,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.5f.sp,
-                                )
-                                Text(
-                                    text = formatDimensions(state.space.dimensions, unit),
-                                    style = NumeralChip,
-                                    color = TextTertiary,
-                                )
-                            }
-                        }
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .background(SurfaceMuted, RoundedCornerShape(16.dp))
+                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(PackIcons.Cube, null, Modifier.size(18.dp), tint = com.packabunch.ui.theme.Primary)
+                        Text(
+                            text = state.name.ifEmpty { "This space" },
+                            modifier = Modifier.weight(1f),
+                            color = TextPrimary,
+                            fontFamily = UiFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                        )
+                        Text(
+                            text = com.packabunch.ui.format.formatDimensionsCompact(state.space.dimensions, unit),
+                            style = NumeralChip,
+                            color = com.packabunch.ui.theme.BodyInk,
+                            modifier = Modifier
+                                .background(Color.White, RoundedCornerShape(999.dp))
+                                .padding(horizontal = 11.dp, vertical = 5.dp),
+                        )
                     }
                 }
                 Spacer(Modifier.height(Spacing.md))
@@ -175,6 +184,12 @@ fun ItemsScreen(
                     }
                 }
 
+                item {
+                    Box(Modifier.pressScale(pressedScale = 0.98f).clickable(onClick = onScan)) {
+                        DashedPlaceholder(text = "Scan items together")
+                    }
+                }
+
                 if (atLimit) {
                     item {
                         Note(
@@ -189,20 +204,11 @@ fun ItemsScreen(
             }
 
             Column(Modifier.padding(horizontal = Spacing.gutter)) {
-                Row(
-                    Modifier.fillMaxWidth().padding(bottom = 10.dp),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Text(
-                        text = if (pieces == 1) "1 piece" else "$pieces pieces",
-                        style = NumeralChip.copy(fontSize = 13.sp),
-                        color = TextTertiary,
-                    )
-                }
                 PrimaryButton(
                     text = "Plan the pack",
                     onClick = onPlan,
                     enabled = state.items.isNotEmpty() && state.hasUsableSpace,
+                    trailing = if (pieces == 1) "1 piece" else "$pieces pieces",
                 )
             }
 
@@ -251,7 +257,7 @@ private fun ItemRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ItemNumberTile(number = index + 1, color = itemColor(index), size = 38.dp, cornerRadius = 13.dp, fontSize = 15)
+        ItemNumberTile(number = index + 1, color = itemColor(index), size = 34.dp, cornerRadius = 12.dp, fontSize = 14)
 
         Column(Modifier.weight(1f)) {
             Text(
@@ -262,9 +268,10 @@ private fun ItemRow(
                 fontSize = 15.sp,
             )
             Text(
-                text = formatDimensions(item.dimensions, unit),
+                text = com.packabunch.ui.format.formatDimensionsCompact(item.dimensions, unit),
                 style = NumeralChip,
                 color = TextTertiary,
+                maxLines = 1,
                 modifier = Modifier.padding(top = 2.dp),
             )
             Text(
@@ -272,11 +279,12 @@ private fun ItemRow(
                 color = Color(0xFF8A7565),
                 fontFamily = UiFamily,
                 fontWeight = FontWeight.Medium,
-                fontSize = 12.sp,
+                fontSize = 11.5.sp,
+                maxLines = 1,
                 modifier = Modifier
                     .padding(top = 5.dp)
                     .background(SurfaceMuted, RoundedCornerShape(999.dp))
-                    .padding(horizontal = 9.dp, vertical = 3.dp),
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
             )
         }
 

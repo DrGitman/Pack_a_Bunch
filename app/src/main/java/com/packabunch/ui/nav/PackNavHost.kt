@@ -412,7 +412,12 @@ fun PackNavHost(
                 projects = projects,
                 unit = settings.unit,
                 onOpen = { id ->
-                    viewModel.openPack(id) { navController.navigate(Routes.ITEMS) }
+                    // A pack that has already been planned opens on its plan; one that has not
+                    // opens where the work is, on its items.
+                    val planned = projects.firstOrNull { it.id == id }?.currentPlan != null
+                    viewModel.openPack(id) {
+                        navController.navigate(if (planned) Routes.PLAN_RESULT else Routes.ITEMS)
+                    }
                 },
                 onNewPack = {
                     viewModel.startNewPack()
@@ -672,7 +677,9 @@ fun PackNavHost(
                     viewModel.resumeGuide()
                     navController.navigate(Routes.PACKING_GUIDE)
                 },
-                onEditItems = { navController.popBackStack() },
+                // Goes to the items list rather than back: a planned pack opens on its plan, so
+                // there is nothing underneath to pop to.
+                onEditItems = { navController.navigate(Routes.ITEMS) { launchSingleTop = true } },
                 onShowLayers = { navController.navigate(Routes.PLAN_LAYERS) },
                 onMenu = { packMenuOpen = true },
                 onBack = { navController.popBackStack() },

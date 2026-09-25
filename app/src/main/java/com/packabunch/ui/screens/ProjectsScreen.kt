@@ -235,6 +235,30 @@ com.packabunch.ui.components.PackBar(
     }
 }
 
+/**
+ * The closed greige box that stands for any sample: the same drawing every time, with nothing
+ * in it, so a made-up pack never looks like something somebody measured.
+ */
+@Composable
+private fun SampleCrateGlyph(modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        fun face(points: List<Pair<Float, Float>>, colour: Color) {
+            val path = androidx.compose.ui.graphics.Path().apply {
+                moveTo(points[0].first * w, points[0].second * h)
+                points.drop(1).forEach { lineTo(it.first * w, it.second * h) }
+                close()
+            }
+            drawPath(path, colour)
+        }
+        // Lid, then the two visible walls, lightest to darkest.
+        face(listOf(0.06f to 0.42f, 0.5f to 0.20f, 0.94f to 0.42f, 0.5f to 0.64f), Color(0xFFE7DED2))
+        face(listOf(0.06f to 0.42f, 0.5f to 0.64f, 0.5f to 0.84f, 0.06f to 0.62f), Color(0xFFD3C6B4))
+        face(listOf(0.94f to 0.42f, 0.5f to 0.64f, 0.5f to 0.84f, 0.94f to 0.62f), Color(0xFFC4B5A1))
+    }
+}
+
 /** The sample pack's id, fixed so every screen can recognise it. */
 const val SAMPLE_ID = "sample"
 
@@ -288,7 +312,9 @@ private fun ProjectCard(
                 .background(if (sample) Color(0xFFEFE8DF) else Color(0xFFF7E4D3), RoundedCornerShape(14.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            MiniCratePreview(
+            // A sample shows a plain closed box. Only a real pack draws what is actually in it.
+            if (sample) SampleCrateGlyph(Modifier.size(40.dp))
+            else MiniCratePreview(
                 items = project.items,
                 specOrder = project.items.map { it.id },
                 space = project.space,
