@@ -942,6 +942,7 @@ fun PackNavHost(
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
                 onAccount = { navController.navigate(Routes.PROFILE) },
                 email = account.email,
+                avatarUrl = settings.avatarUrl ?: account.providerPhoto,
                 onCameraMeasuringChange = viewModel::setCameraMeasuring,
                 onDefaultEdgeGapChange = viewModel::setDefaultEdgeGap,
                 onManageSubscription = { navController.navigate(Routes.PACK_PLAN) },

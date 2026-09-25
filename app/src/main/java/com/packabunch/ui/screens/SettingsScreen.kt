@@ -45,6 +45,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     email: String? = null,
+    /** The same photo the account page shows, so the two never disagree. */
+    avatarUrl: String? = null,
     onCameraMeasuringChange: (Boolean) -> Unit = {},
     onDefaultEdgeGapChange: (Int) -> Unit = {},
 ) {
@@ -77,9 +79,21 @@ fun SettingsScreen(
                 Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.97f).clip(RoundedCornerShape(22.dp)).background(Surface)
                     .clickable(onClick = onAccount).padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-                    Box(Modifier.size(46.dp).background(Primary, RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
-                        Text(email?.firstOrNull()?.uppercase() ?: "P", color = OnPrimary, fontFamily = UiFamily,
-                            fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                    Box(
+                        Modifier.size(46.dp).clip(RoundedCornerShape(16.dp)).background(Primary),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (avatarUrl != null) {
+                            coil3.compose.AsyncImage(
+                                model = avatarUrl,
+                                contentDescription = null,
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            Text(email?.firstOrNull()?.uppercase() ?: "P", color = OnPrimary, fontFamily = UiFamily,
+                                fontSize = 19.sp, fontWeight = FontWeight.ExtraBold)
+                        }
                     }
                     Column(Modifier.weight(1f)) {
                         Text(email?.substringBefore('@') ?: "Your account", color = TextPrimary, fontFamily = UiFamily,
