@@ -136,7 +136,7 @@ fun SettingsScreen(
                     SettingsDivider()
                     SettingsAction(PackIcons.Info, "Privacy, terms and help", onSupport, motion = com.packabunch.R.raw.icon_info)
                     SettingsDivider()
-                    SettingsAction(PackIcons.Trash, "Delete everything on this phone", { showDelete = true }, ErrorRed,
+                    SettingsAction(PackIcons.Trash, "Delete all saved packs", { showDelete = true }, ErrorRed,
                         motion = com.packabunch.R.raw.icon_bin)
                 }
                 Text("Pack a Bunch ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
