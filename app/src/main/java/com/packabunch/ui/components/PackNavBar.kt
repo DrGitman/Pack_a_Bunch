@@ -86,11 +86,11 @@ private val OnPillText = Color(0xFF2B1D14)
 private val OnPillIcon = Color(0xFFC2702F)
 private val OnBarIcon = Color(0xFFE6D7BE)
 
-private val BarHeight = 74.dp
-private val PillHeight = 50.dp
-private val BarPadding = 9.dp
-private val IconSize = 20.dp
-private val FabSize = 42.dp
+private val BarHeight = 74.dp     // artboard 54
+private val PillHeight = 53.dp    // artboard 39
+private val BarPadding = 10.dp    // artboard 7.5
+private val IconSize = 27.dp      // artboard 20
+private val FabSize = 58.dp       // artboard 42
 
 private val Standard = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 private const val LabelMillis = 280
@@ -299,7 +299,7 @@ private fun NavSlotItem(
                     Text(
                         text = text,
                         color = OnPillText,
-                        fontSize = 16.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                     )
