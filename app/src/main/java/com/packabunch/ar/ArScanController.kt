@@ -257,12 +257,20 @@ class ArScanController(
                     val plane = depth.planes[0]
                     val buffer = plane.buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
                     val world = FloatArray(3)
+                    // Every tracked surface, so the table can be subtracted from the scene.
+                    val surfaces = active.getAllTrackables(com.google.ar.core.Plane::class.java)
+                        .filter { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
+
                     for (v in 0 until depth.height step 3) for (u in 0 until depth.width step 3) {
                         val mm = buffer.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
-                        if (mm !in 150..5000) continue
+                        // Beyond about 1.5 m this sensor's depth is not worth believing, which
+                        // is the range Google's own raw-depth sample works in. The old 5 m
+                        // ceiling is where the far-away phantom geometry was coming from.
+                        if (mm !in 150..MAX_DEPTH_MM) continue
                         // Image +Y is down; ARCore camera +Y is up and forward is -Z.
                         val local = projection.point(u, v, mm)
                         pose.transformPoint(local, 0, world, 0)
+                        if (liesOnASurface(world, surfaces)) continue
                         builder.observe(pose.tx(), pose.ty(), pose.tz(), world[0], world[1], world[2], 1f)
                         added++
                     }
@@ -305,7 +313,7 @@ class ArScanController(
                     val minCells = (MIN_OBJECT_VOLUME_MM3 / cellVolumeMm3).toInt().coerceAtLeast(12)
                     tracker.update(
                         com.packabunch.packing.ObjectSegmentation.detect(
-                            grid, supportPlaneCellK = 0, minCells = minCells,
+                            grid, minCells = minCells,
                         ),
                         direction,
                     )
@@ -403,3 +411,40 @@ internal fun projectObject(
  * separate item somebody intends to pack.
  */
 private const val MIN_OBJECT_VOLUME_MM3 = 60_000L
+
+/** Depth past this is too unreliable on a phone without a depth sensor to build on. */
+private const val MAX_DEPTH_MM = 1_500
+
+/** Points this close to a tracked plane are that plane, not something standing on it. */
+private const val SURFACE_TOLERANCE_M = 0.03f
+
+/**
+ * Whether a world point belongs to a surface rather than to an object.
+ *
+ * Google's raw-depth sample does exactly this before clustering, and it is the step this
+ * scan was missing: without it the table top is simply the largest solid mass in the grid,
+ * so it gets segmented and measured as though it were something you could pack, and every
+ * object standing on it merges into that same blob.
+ *
+ * The polygon test matters as much as the distance one. A plane is infinite in its own
+ * mathematics but finite in reality, and skipping the bounds check would delete anything
+ * that happened to sit at table height anywhere in the room.
+ */
+private fun liesOnASurface(
+    world: FloatArray,
+    surfaces: List<com.google.ar.core.Plane>,
+): Boolean {
+    for (surface in surfaces) {
+        val centre = surface.centerPose
+        val normal = floatArrayOf(centre.yAxis[0], centre.yAxis[1], centre.yAxis[2])
+        val dx = world[0] - centre.tx()
+        val dy = world[1] - centre.ty()
+        val dz = world[2] - centre.tz()
+        val distance = kotlin.math.abs(dx * normal[0] + dy * normal[1] + dz * normal[2])
+        if (distance > SURFACE_TOLERANCE_M) continue
+
+        val pose = com.google.ar.core.Pose.makeTranslation(world[0], world[1], world[2])
+        if (surface.isPoseInPolygon(pose)) return true
+    }
+    return false
+}

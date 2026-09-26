@@ -92,17 +92,6 @@ fun SweepItemsScreen(
     Box(modifier.fillMaxSize().background(Color.Black)) {
         cameraPreview()
 
-        // A vignette, not a flat scrim: the middle stays clear to aim with, and the edges
-        // darken enough that a glowing box never competes with a bright window behind it.
-        Box(
-            Modifier.fillMaxSize().background(
-                androidx.compose.ui.graphics.Brush.radialGradient(
-                    0.45f to Color.Transparent,
-                    1f to Color(0x99000000),
-                ),
-            ),
-        )
-
         ScanOverlay(overlays, Modifier.fillMaxSize())
 
         Column(
