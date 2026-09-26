@@ -151,6 +151,12 @@ data class ItemSpec(
     val shape: ItemShape? = null,
     /** Observed surface for display; unseen interior is not evidence of empty collision space. */
     val visualShape: ItemShape.VoxelMask? = null,
+    /**
+     * How the item is drawn — a cup as a tapered cylinder, a ball as a ball. Display only:
+     * nothing in the engine or [PackingRequest.revision] reads it. Null means "work it out
+     * from the name" ([ItemForm.guess]), which is right for anything typed or photographed.
+     */
+    val form: ItemForm? = null,
 ) {
     val allowedOrientations: List<Orientation> get() = Orientation.allowedFor(keepUpright)
 

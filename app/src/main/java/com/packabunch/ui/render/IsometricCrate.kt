@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -77,6 +78,13 @@ fun IsometricCrate(
         val mask = item.visualShape ?: (item.shape as? com.packabunch.packing.ItemShape.VoxelMask)
         item.id to mask?.let { voxelSurface(it.countX, it.countY, it.countZ, it.resolutionMm, it::isOccupied) }
     } }
+    // Everything not scanned is drawn as its geometry family when its name or measured form
+    // says what it is — a sofa as a sofa, a bottle as a bottle — and as the plain box
+    // otherwise. Display only: see FamilyMeshes.
+    val context = LocalContext.current
+    val families = remember(items) { items.filter { surfaces[it.id] == null }.mapNotNull { item ->
+        FamilyMeshes.surfaceFor(context, item)?.let { item.id to it }
+    }.toMap() }
     val scannedSurface = remember(space.scan) { space.scan?.effectiveGrid?.let { grid ->
         voxelSurface(grid.countX, grid.countY, grid.countZ, grid.resolutionMm) { x,y,z ->
             grid.cellAt(x,y,z) == com.packabunch.packing.Cell.SOLID
@@ -121,7 +129,7 @@ fun IsometricCrate(
         val view = CrateView(space, size, yaw, camera)
 
         if (scannedSurface == null) drawCrateShell(view, front = false, seeThrough = seeThrough)
-        else drawSurface(view, scannedSurface, CrateBackLeft, if (seeThrough) 0.15f else 0.65f)
+        else drawSurface(view, scannedSurface, CrateBackLeft, if (seeThrough) 0.15f else 1f)
 
         val ordered = placements
             .sortedBy { it.sequenceIndex }
@@ -149,6 +157,7 @@ fun IsometricCrate(
                 dimmed = selectedInstanceId != null && placement.instanceId != selectedInstanceId,
                 textMeasurer = textMeasurer,
                 itemNumber = items.indexOfFirst { it.id == placement.specId }.takeIf { it >= 0 }?.plus(1) ?: placement.sequenceIndex + 1,
+                mesh = families[placement.specId],
             )
         }
 
@@ -268,7 +277,9 @@ private fun DrawScope.drawCrateShell(view: CrateView, front: Boolean, seeThrough
         .sortedBy { face -> face.points.sumOf { view.depth(it.x,it.y,it.z).toDouble() } }
         .forEach { face ->
             val p = face.points.map { view.project(it.x,it.y,it.z) }
-            quad(p[0],p[1],p[2],p[3], CrateBackLeft.copy(alpha = if (seeThrough) 0.08f else if (front) 0.22f else 1f))
+            // See-through off means solid: the near walls hide what is behind them, as the real
+            // box would. (They used to stay at 22 %, which read as see-through either way.)
+            quad(p[0],p[1],p[2],p[3], CrateBackLeft.copy(alpha = if (seeThrough) 0.08f else 1f))
             quadOutline(p[0],p[1],p[2],p[3], CrateEdge.copy(alpha = 0.65f), 1.4f)
         }
 }
@@ -278,7 +289,14 @@ private fun cuboidFaces(x0: Float, x1: Float, y0: Float, y1: Float, z0: Float, z
         SurfacePoint(x0 + p.x * (x1-x0), y0 + p.y * (y1-y0), z0 + p.z * (z1-z0))
     }) }
 
-/** One item: three visible faces plus its number, shaded so the form reads without an outline. */
+/**
+ * One item plus its number, shaded so the form reads without an outline.
+ *
+ * [mesh] is the item's geometry family in its own axes, when it has one; it is turned into
+ * the plan by the same [placed] transform as a scanned surface, so a bottle the solver laid on
+ * its side is drawn lying down, and it fills exactly the box the solver reserved. Without one
+ * the item is the plain box.
+ */
 private fun DrawScope.drawPlacement(
     view: CrateView,
     placement: Placement,
@@ -287,6 +305,7 @@ private fun DrawScope.drawPlacement(
     dimmed: Boolean,
     textMeasurer: TextMeasurer,
     itemNumber: Int,
+    mesh: List<SurfaceFace>? = null,
 ) {
     val box = placement.box
 
@@ -303,7 +322,13 @@ private fun DrawScope.drawPlacement(
 
     fun p(x: Float, y: Float, z: Float) = view.project(x, y, z)
 
-    drawSurface(view, cuboidFaces(x0,x1,y0,y1,z0,z1), base, alpha)
+    val faces = mesh?.map { face ->
+        face.copy(
+            points = face.points.map { it.placed(placement).let { q -> q.copy(z = q.z + dropMm) } },
+            normal = face.normal?.turned(placement),
+        )
+    } ?: cuboidFaces(x0,x1,y0,y1,z0,z1)
+    drawSurface(view, faces, base, alpha)
 
     if (dimmed || progress < 0.85f) return
 
@@ -352,13 +377,38 @@ private fun Color.darken(amount: Float) = Color(
     alpha = alpha,
 )
 
-/** Painter ordering with pale app-colour fills and dimension-drawing outlines. */
+/**
+ * Painter ordering with pale app-colour fills and dimension-drawing outlines.
+ *
+ * Each face is lightened by how it faces: 0.62 for a lid, 0.34 for a face across the width,
+ * 0.12 for one across the depth or underneath, blended for anything in between —
+ * `0.12 + 0.5·max(nz, 0) + 0.22·nx²`. For axis faces that gives exactly the three values the
+ * plan has always used, so scanned items and plain boxes look as they did; the geometry
+ * families' angled faces (a bottle's shoulder, a sofa's arm) fall between them.
+ *
+ * Only faces that carry a normal (the family meshes) are culled when they face away: they are
+ * closed shells, so their back faces are hidden anyway, and dropping them keeps a dimmed or
+ * fading item from showing its far side through its near one. Voxel faces are left exactly as
+ * they were drawn before.
+ */
 private fun DrawScope.drawSurface(view: CrateView, faces: List<SurfaceFace>, base: Color, alpha: Float) {
     fun depth(face: SurfaceFace): Float = face.points.sumOf { view.depth(it.x,it.y,it.z).toDouble() }.toFloat()
-    faces.sortedBy { depth(it) }.forEach { face ->
+    val o = view.depth(0f, 0f, 0f)
+    val towardViewer = floatArrayOf(view.depth(1f, 0f, 0f) - o, view.depth(0f, 1f, 0f) - o, view.depth(0f, 0f, 1f) - o)
+    faces.filter { face ->
+        val n = face.normal ?: return@filter true
+        n.x * towardViewer[0] + n.y * towardViewer[1] + n.z * towardViewer[2] > -1e-3f
+    }.sortedBy { depth(it) }.forEach { face ->
         val p = face.points.map { view.project(it.x,it.y,it.z) }
-        val fill = base.lighten(if (face.side == 5) 0.62f else if (face.side < 2) 0.34f else 0.12f).copy(alpha=alpha)
+        val n = face.normal ?: sideNormal(face.side)
+        val fill = base.lighten(0.12f + 0.5f * n.z.coerceAtLeast(0f) + 0.22f * n.x * n.x).copy(alpha=alpha)
         quad(p[0],p[1],p[2],p[3],fill)
         quadOutline(p[0],p[1],p[2],p[3],base.darken(0.28f).copy(alpha=alpha*0.4f),0.7f)
     }
+}
+
+/** The outward normal of a [voxelSurface] face: axis `side / 2`, positive when `side` is odd. */
+private fun sideNormal(side: Int): SurfacePoint {
+    val sign = if (side % 2 == 1) 1f else -1f
+    return when (side / 2) { 0 -> SurfacePoint(sign, 0f, 0f); 1 -> SurfacePoint(0f, sign, 0f); else -> SurfacePoint(0f, 0f, sign) }
 }

@@ -46,6 +46,15 @@ val ErrorText       = Color(0xFF8E3322)
 
 /** High-visibility accent for overlays drawn on the camera feed. */
 val OnCamera        = Color(0xFFF2A03D)
+/** Ink on an [OnCamera] pill — the "H" on the height label of a scanned object. */
+val OnCameraInk     = Color(0xFF6B4424)
+/**
+ * The glass behind every control on a camera screen: #1E1812 at 55 %, and 60 % once many
+ * objects are labelled (MultiScan). Deliberately each control's own background — there is no
+ * full-screen scrim or vignette over the camera.
+ */
+val ScanGlass       = Color(0x8C1E1812)
+val ScanGlassStrong = Color(0x991E1812)
 
 /**
  * Item identity colours. Always paired with the item's number AND name —

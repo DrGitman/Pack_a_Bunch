@@ -41,6 +41,20 @@ object ItemPhotos {
             }.getOrNull()
         }
 
+    /**
+     * Stores a picture the app took itself — the crop of an object from the item scan — as
+     * that item's photo. Same place and name as a picked photo, so everything that shows item
+     * photos picks it up without knowing where it came from.
+     */
+    suspend fun store(context: Context, itemId: String, bitmap: android.graphics.Bitmap): String? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val target = File(dir(context), "$itemId.jpg")
+                target.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }
+                target.absolutePath
+            }.getOrNull()
+        }
+
     /** Deletes the file behind a stored path. Missing files are not an error. */
     fun remove(path: String?) {
         if (path != null) runCatching { File(path).delete() }

@@ -165,6 +165,9 @@ object PackIcons {
         "M9 6h6",
     )
 
+    /** The torch on the scan screens (ItemScan · New, "Torch"). */
+    val Bolt: ImageVector = strokeIcon("Bolt", "M13.5 2.5L5.5 13.5h6l-1 8 8-11h-6l1-8z", strokeWidth = 1.8f)
+
     val Undo: ImageVector = strokeIcon("Undo", "M20 12a8 8 0 11-2.3-5.6", "M20 4v5h-5", strokeWidth = 2f)
 
     val Rotate: ImageVector = strokeIcon("Rotate", "M20 12a8 8 0 11-2.3-5.6", "M20 4v5h-5", strokeWidth = 2f)

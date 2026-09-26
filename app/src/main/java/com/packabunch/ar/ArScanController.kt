@@ -339,7 +339,19 @@ class ArScanController(
                         }
                     }
                     finder?.offer(image, cameraRotationDegrees) {
-                        _found.value = finder?.found.orEmpty().map { it.toViewSpace(frame) }
+                        val raw = finder?.found.orEmpty()
+                        _found.value = raw.map { it.toViewSpace(frame) }
+                        if (android.util.Log.isLoggable(SCAN_TAG, android.util.Log.DEBUG)) {
+                            raw.zip(_found.value).forEach { (before, after) ->
+                                android.util.Log.d(
+                                    SCAN_TAG,
+                                    "box ${before.trackingId} image=%.2f,%.2f-%.2f,%.2f view=%.2f,%.2f-%.2f,%.2f".format(
+                                        before.left, before.top, before.right, before.bottom,
+                                        after.left, after.top, after.right, after.bottom,
+                                    ),
+                                )
+                            }
+                        }
                     } ?: image.close()
                 } catch (_: com.google.ar.core.exceptions.NotYetAvailableException) {
                     // Nothing this frame. Normal, and not worth a log line at 30 Hz.
@@ -392,12 +404,37 @@ class ArScanController(
                     // cell count this grid needs to express it.
                     val cellVolumeMm3 = grid.resolutionMm.toLong() * grid.resolutionMm * grid.resolutionMm
                     val minCells = (MIN_OBJECT_VOLUME_MM3 / cellVolumeMm3).toInt().coerceAtLeast(12)
-                    tracker.update(
-                        com.packabunch.packing.ObjectSegmentation.detect(
-                            grid, minCells = minCells,
-                        ),
-                        direction,
+                    val blobs = com.packabunch.packing.ObjectSegmentation.detect(
+                        grid, minCells = minCells,
                     )
+                    tracker.update(blobs, direction)
+
+                    // Why a scan is or is not progressing, in one line per pass. Temporary,
+                    // and the only way to tell a depth problem from a settling-rule problem
+                    // without guessing at screenshots.
+                    if (android.util.Log.isLoggable(SCAN_TAG, android.util.Log.DEBUG)) {
+                        val solid = grid.let { g ->
+                            var n = 0
+                            for (i in 0 until g.countX) for (j in 0 until g.countY) for (k in 0 until g.countZ) {
+                                if (g.cellAt(i, j, k) == com.packabunch.packing.Cell.SOLID) n++
+                            }
+                            n
+                        }
+                        android.util.Log.d(
+                            SCAN_TAG,
+                            "pass solid=$solid minCells=$minCells blobs=${blobs.size} " +
+                                "sizes=${blobs.map { it.cellCount }} " +
+                                "dims=${blobs.map { "${it.dimensions.widthMm}x${it.dimensions.depthMm}x${it.dimensions.heightMm}" }}",
+                        )
+                        _objects.value.forEach { o ->
+                            android.util.Log.d(
+                                SCAN_TAG,
+                                "obj ${o.id} settled=${o.settled} views=${o.progress.viewpoints} " +
+                                    "stable=${o.progress.stableUpdates} axes=${o.progress.observedAxes.size} " +
+                                    "waiting='${o.waitingFor}'",
+                            )
+                        }
+                    }
                     // The cap belongs here rather than at review time: tracking objects the
                     // pack could never hold costs frames and clutters the screen with boxes
                     // the user will only be told about later.
@@ -612,3 +649,6 @@ private fun overlapOf(left: Float, top: Float, right: Float, bottom: Float, othe
         (other.right - other.left) * (other.bottom - other.top) - intersection
     return if (union <= 0f) 0f else intersection / union
 }
+
+/** Turn on with `adb shell setprop log.tag.PackScan DEBUG`. Off, none of this costs anything. */
+private const val SCAN_TAG = "PackScan"

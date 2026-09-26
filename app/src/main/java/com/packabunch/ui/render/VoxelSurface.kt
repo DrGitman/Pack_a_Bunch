@@ -3,7 +3,15 @@ package com.packabunch.ui.render
 import com.packabunch.packing.*
 
 data class SurfacePoint(val x: Float, val y: Float, val z: Float)
-data class SurfaceFace(val points: List<SurfacePoint>, val side: Int)
+/**
+ * One flat quad of a drawn surface.
+ *
+ * [side] is the axis face (0–5, as in [voxelSurface]) and is what voxel and cuboid faces are
+ * shaded by. [normal] is only set for the geometry-family meshes, whose faces are angled: they
+ * are shaded from it and turned away when they face away from the viewer. Leaving it null keeps
+ * every scanned item and every plain box drawn exactly as before the families existed.
+ */
+data class SurfaceFace(val points: List<SurfacePoint>, val side: Int, val normal: SurfacePoint? = null)
 
 /** Greedy meshing joins coplanar voxel faces into clean panels, preserving every boundary. */
 fun voxelSurface(nx: Int, ny: Int, nz: Int, resolution: Int,
@@ -44,4 +52,10 @@ fun SurfacePoint.placed(placement: Placement): SurfacePoint {
     fun along(axis: Axis) = when(axis) { Axis.WIDTH -> x; Axis.DEPTH -> y; Axis.HEIGHT -> z }
     return SurfacePoint(along(placement.orientation.alongX)+placement.xMm,
         along(placement.orientation.alongY)+placement.yMm, along(placement.orientation.alongZ)+placement.zMm)
+}
+
+/** A direction, turned the way [placed] turns a point but not moved: for face normals. */
+fun SurfacePoint.turned(placement: Placement): SurfacePoint {
+    fun along(axis: Axis) = when(axis) { Axis.WIDTH -> x; Axis.DEPTH -> y; Axis.HEIGHT -> z }
+    return SurfacePoint(along(placement.orientation.alongX), along(placement.orientation.alongY), along(placement.orientation.alongZ))
 }

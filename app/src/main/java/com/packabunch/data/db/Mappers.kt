@@ -40,6 +40,7 @@ fun StoredProject.toProject(): Project {
                 measurementSource = row.measurementSource.toMeasurementSource(),
                 shape = GeometryCodec.shape(row.shapeGeometry),
                 visualShape = GeometryCodec.shape(row.visualGeometry),
+                form = com.packabunch.packing.ItemForm.decode(row.visualForm),
             )
         }
 
@@ -121,6 +122,7 @@ fun Project.toItemEntities(): List<ItemEntity> = items.mapIndexed { index, spec 
         position = index,
         shapeGeometry = GeometryCodec.shape(spec.shape),
         visualGeometry = GeometryCodec.shape(spec.visualShape),
+        visualForm = spec.form?.encode(),
     )
 }
 

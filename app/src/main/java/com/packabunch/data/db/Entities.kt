@@ -69,6 +69,8 @@ data class ItemEntity(
     val position: Int,
     val shapeGeometry: ByteArray? = null,
     val visualGeometry: ByteArray? = null,
+    /** How the item is drawn ([com.packabunch.packing.ItemForm.encode]). Display only; schema 5. */
+    val visualForm: String? = null,
 )
 
 /**

@@ -493,6 +493,38 @@ class AppViewModel(
         return true
     }
 
+    /**
+     * Items measured by the item scan ([com.packabunch.ui.screens.ItemScanScreen]).
+     *
+     * Each arrives with its id already chosen, because its photo was written under that id
+     * before this was called — photos live beside the item by id, never in a column.
+     *
+     * The dimensions are the fitted bounding box: what the solver needs, and all it is given.
+     * The object's recognised name and shape are for the person reading the plan, and nothing
+     * here lets either change a size. Round and irregular objects keep "nothing on top", as
+     * scanned items always have — the scan saw their outside, not whether their top is flat
+     * and firm. A box measured on every side has a flat top by definition, so it may carry
+     * things, the same default a typed-in item gets.
+     */
+    fun importScannedItems(scanned: List<Pair<String, com.packabunch.ar.ScannedItemResult>>): Boolean {
+        if (scanned.isEmpty()) return true
+        if (!limits.allowsPieces(_editor.value.pieceCount + scanned.size)) return false
+        val initialCount = _editor.value.items.size
+        val additions = scanned.mapIndexed { index, (id, result) ->
+            ItemSpec(
+                id = id,
+                name = result.name ?: "Scanned item ${initialCount + index + 1}",
+                dimensions = result.dimensions.asDimensions(),
+                measurementSource = MeasurementSource.CAMERA_ESTIMATE,
+                maySupportItems = result.shape == com.packabunch.packing.ShapeFamily.BOX,
+                form = com.packabunch.packing.ItemForm.fromFit(result.fit),
+            )
+        }
+        _editor.update { it.copy(items = it.items + additions, plan = null) }
+        autosave()
+        return true
+    }
+
     fun renameProject(project: Project, name: String) {
         viewModelScope.launch { repository.upsert(project.copy(name = name, space = project.space.copy(name = name))) }
     }

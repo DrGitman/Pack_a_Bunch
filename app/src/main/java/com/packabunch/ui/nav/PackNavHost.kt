@@ -599,6 +599,8 @@ fun PackNavHost(
                 },
                 onTypeInstead = { navController.navigate(Routes.CREATE_SPACE) },
                 onBack = { navController.popBackStack() },
+                spaceName = editor.space?.name?.takeIf { it.isNotBlank() },
+                unit = settings.unit,
             )
         }
 
@@ -702,21 +704,33 @@ fun PackNavHost(
         }
 
         composable(Routes.SWEEP_ITEMS) {
-            var names by androidx.compose.runtime.remember {
-                androidx.compose.runtime.mutableStateOf(emptyMap<String, String>())
-            }
-            com.packabunch.ui.screens.LiveSweepScreen(settings.unit,
-                onNames = { names = it },
-                // What this pack can still take. Past it the sweep stops noticing things,
-                // rather than measuring twenty more and refusing them at the review step.
-                maxObjects = (viewModel.limits.maxPiecesPerPack ?: Int.MAX_VALUE)
+            // The item scan: outlines on the objects, measured where they stand. What it
+            // hands back already carries each object's crop; the photo is written under the
+            // new item's id first, so the items list shows it the moment the item appears.
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            val planLimit = viewModel.limits.maxPiecesPerPack
+            com.packabunch.ui.screens.ItemScanScreen(
+                unit = settings.unit,
+                // What this pack can still take. Past it the scan stops starting new objects,
+                // rather than measuring twenty more and refusing them at the end.
+                maxItems = (planLimit ?: com.packabunch.packing.PackingEngine.MAX_INSTANCE_COUNT)
                     .minus(editor.pieceCount).coerceAtLeast(0),
-                onDone = { scanned ->
-                    if (viewModel.importSweptItems(scanned, names)) navController.popBackStack()
-                    else notice = "These items exceed this pack's piece limit. Review the current items first."
+                planLimit = planLimit,
+                alreadyInPack = editor.pieceCount,
+                onDone = { results ->
+                    scope.launch {
+                        val withIds = results.map { java.util.UUID.randomUUID().toString() to it }
+                        for ((id, result) in withIds) {
+                            result.photo?.let { com.packabunch.data.ItemPhotos.store(context, id, it) }
+                        }
+                        if (viewModel.importScannedItems(withIds)) navController.popBackStack()
+                        else notice = "These items exceed this pack's piece limit. Review the current items first."
+                    }
                 },
                 onManual = { navController.popBackStack() },
-                onBack = { navController.popBackStack() })
+                onBack = { navController.popBackStack() },
+            )
         }
 
         composable(Routes.MEASURE_REVIEW) {
