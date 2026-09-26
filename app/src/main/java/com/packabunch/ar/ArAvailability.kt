@@ -30,6 +30,20 @@ sealed interface ArSupport {
     data class Unknown(val reason: String) : ArSupport
 }
 
+/**
+ * The Activity behind a Compose context.
+ *
+ * `LocalContext.current` is not always the Activity — it can be a `ContextWrapper` around it,
+ * and on some devices it is. A plain `context as? Activity` then yields null, and because the
+ * callers guarded with `?.let { }` the ARCore install flow simply never ran: the button
+ * fired its haptic and did nothing, with no exception to find in the log.
+ */
+tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
 object ArAvailability {
 
     /**
@@ -103,5 +117,39 @@ object ArAvailability {
             ArCoreApk.InstallStatus.INSTALL_REQUESTED
     } catch (t: Throwable) {
         false
+    }
+
+    /** The Play listing for ARCore, which serves both a fresh install and an update. */
+    private const val AR_CORE_PACKAGE = "com.google.ar.core"
+
+    /**
+     * Get ARCore, one way or another.
+     *
+     * [requestInstall] is the official route and is tried first, because it knows which
+     * version this build needs. It is also allowed to quietly decide it has nothing to do —
+     * it returns `INSTALLED` when the APK is merely older than the SDK, and it throws when
+     * the user declined once before. Either way the button would appear dead, which is what
+     * happened on a Galaxy A35 carrying ARCore 1.50 against an app built on 1.56.
+     *
+     * So when the managed flow does not start, the Play listing is opened directly. That
+     * always leads somewhere the user can act: **Update** if it is stale, **Install** if it
+     * is missing.
+     */
+    fun getArCore(activity: Activity): Boolean {
+        if (requestInstall(activity, true)) return true
+
+        val market = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse("market://details?id=$AR_CORE_PACKAGE"),
+        )
+        val web = android.content.Intent(
+            android.content.Intent.ACTION_VIEW,
+            android.net.Uri.parse("https://play.google.com/store/apps/details?id=$AR_CORE_PACKAGE"),
+        )
+        // The Play app first, the browser only if this phone has no Play app at all.
+        for (intent in listOf(market, web)) {
+            if (runCatching { activity.startActivity(intent); true }.getOrDefault(false)) return true
+        }
+        return false
     }
 }

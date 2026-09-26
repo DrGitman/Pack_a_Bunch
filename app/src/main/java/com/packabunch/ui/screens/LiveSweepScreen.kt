@@ -79,7 +79,7 @@ fun DepthCaptureGate(onManual: () -> Unit, onBack: () -> Unit, content: @Composa
     if (support == ArSupport.NeedsInstall) {
         ArServicesInstallScreen(
             onInstall = {
-                (context as? Activity)?.let { ArAvailability.requestInstall(it, true) }
+                context.findActivity()?.let { ArAvailability.getArCore(it) }
                 refresh++
             },
             onTypeInstead = onManual,
@@ -93,6 +93,24 @@ fun DepthCaptureGate(onManual: () -> Unit, onBack: () -> Unit, content: @Composa
         ScreenScaffold {
             PackAppBar(title = "Measure with the camera", onBack = onBack)
             Note(text = "Checking depth scanning support…")
+        }
+        return
+    }
+
+    // Asking ARCore failed rather than answering "no". Saying "this phone can't measure by
+    // camera" here would be a permanent, unfixable-sounding verdict on what may be a
+    // temporary fault — the exact mistake ArSupport was split into four cases to avoid.
+    (support as? ArSupport.Unknown)?.let { unknown ->
+        ScreenScaffold {
+            PackAppBar(title = "Measure with the camera", onBack = onBack)
+            Note(
+                title = "Couldn't check camera measuring",
+                text = "Something went wrong asking this phone whether it can measure by " +
+                    "camera (${unknown.reason}). Typed measurements work either way.",
+                tone = NoteTone.Caution,
+            )
+            PrimaryButton(text = "Try again", onClick = { refresh++ })
+            SecondaryButton(text = "Type the measurements", onClick = onManual)
         }
         return
     }

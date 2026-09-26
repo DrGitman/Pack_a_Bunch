@@ -43,6 +43,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.packabunch.ar.findActivity
 import com.packabunch.ar.ArAvailability
 import com.packabunch.ar.ArMeasureController
 import com.packabunch.ar.ArSupport
@@ -88,7 +89,7 @@ fun MeasureScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val activity = context as? Activity
+    val activity = context.findActivity()
 
     var hasCameraPermission by remember {
         mutableStateOf(
@@ -130,7 +131,7 @@ fun MeasureScreen(
         support is ArSupport.NeedsInstall -> ArNeedsInstall(
             onInstall = {
                 activity?.let {
-                    ArAvailability.requestInstall(it, !installRequested)
+                    ArAvailability.getArCore(it)
                     installRequested = true
                     support = ArSupport.Checking
                 }
