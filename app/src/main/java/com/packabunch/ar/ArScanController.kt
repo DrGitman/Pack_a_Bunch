@@ -47,13 +47,29 @@ data class ArScanState(
  * mid-scan would silently smear earlier observations across the grid, which is the kind of
  * bug that produces a confident, wrong map.
  */
-class ArScanController(private val context: Context, private val trackItems: Boolean = false) : GLSurfaceView.Renderer {
+class ArScanController(
+    private val context: Context,
+    private val trackItems: Boolean = false,
+    /** How many objects this pack can still take. Scanning stops noticing beyond it. */
+    private val maxObjects: Int = Int.MAX_VALUE,
+) : GLSurfaceView.Renderer {
 
     private val _state = MutableStateFlow(ArScanState())
     val state: StateFlow<ArScanState> = _state.asStateFlow()
     private val tracker = com.packabunch.packing.SweepTracker()
     private val _objects = MutableStateFlow<List<com.packabunch.packing.SweptObject>>(emptyList())
     val objects = _objects.asStateFlow()
+
+    private val _overlays = MutableStateFlow<List<ObjectOverlay>>(emptyList())
+
+    /**
+     * Where each measured object sits on the screen, refreshed every frame.
+     *
+     * The projection maths lives here rather than in the UI because this is the only place
+     * that holds the camera. What comes out is already in 0..1 screen space, so the overlay
+     * is a dumb line drawing that cannot disagree with where the camera is actually pointing.
+     */
+    val overlays = _overlays.asStateFlow()
     private var lastDepthTimestamp = 0L
     private var lastProcessedTimestamp = 0L
     private var lastSegmentationTimestamp = 0L
@@ -203,12 +219,28 @@ class ArScanController(private val context: Context, private val trackItems: Boo
                 _state.value = _state.value.copy(status = TrackingStatus.INITIALISING)
                 return
             }
+            // A space and a kettle need completely different grids.
+            //
+            // A car boot is metres across and its walls are centimetres thick, so 40 mm cells
+            // over a 2.4 m box are right. An item is the opposite: a mug is 80 mm wide, which
+            // at 40 mm is two cells — indistinguishable from noise — and a phone is thinner
+            // than one cell, so it cannot be represented at all. That is why scanning small
+            // things produced nothing usable, and no amount of sweeping would have helped.
+            //
+            // Item mode therefore trades reach for detail: a 1.2 m box at 10 mm. Cell counts
+            // stay comparable (about 1.2M either way) so memory and segmentation cost do not
+            // blow up.
+            val reachM = if (trackItems) 0.6f else 1.2f
             val builder = accumulator ?: ScanAccumulator(
                 // Origin is placed a little behind and below the camera's first tracked
                 // position, so the space in front of the phone falls inside the grid.
-                originXM = pose.tx() - 1.2f,
+                originXM = pose.tx() - reachM,
                 originYM = requireNotNull(floor).centerPose.ty(),
-                originZM = pose.tz() + 1.2f,
+                originZM = pose.tz() + reachM,
+                resolutionMm = if (trackItems) 10 else 40,
+                widthMm = if (trackItems) 1_200 else 2_400,
+                depthMm = if (trackItems) 1_200 else 2_400,
+                heightMm = if (trackItems) 800 else 1_600,
             ).also { accumulator = it }
 
             var added = 0L
@@ -238,6 +270,24 @@ class ArScanController(private val context: Context, private val trackItems: Boo
             } catch (_: com.google.ar.core.exceptions.NotYetAvailableException) {
                 return // No depth yet is not an empty scene or a completed measurement.
             }
+            if (trackItems) {
+                val view = FloatArray(16)
+                val projection = FloatArray(16)
+                val viewProjection = FloatArray(16)
+                camera.getViewMatrix(view, 0)
+                camera.getProjectionMatrix(projection, 0, 0.05f, 20f)
+                android.opengl.Matrix.multiplyMM(viewProjection, 0, projection, 0, view, 0)
+                _overlays.value = _objects.value.mapNotNull { swept ->
+                    projectObject(
+                        detected = swept.detected,
+                        originXM = builder.originXM,
+                        originYM = builder.originYM,
+                        originZM = builder.originZM,
+                        viewProjection = viewProjection,
+                    )?.let { ObjectOverlay(swept.id, swept.settled, it) }
+                }
+            }
+
             if (frame.timestamp - lastSegmentationTimestamp >= 500_000_000L) {
                 val grid = builder.toVoxelGrid()
                 finishedGrid = grid
@@ -245,7 +295,10 @@ class ArScanController(private val context: Context, private val trackItems: Boo
                     val direction = Math.toDegrees(kotlin.math.atan2(
                         -pose.zAxis[0].toDouble(), -pose.zAxis[2].toDouble())).toInt()
                     tracker.update(com.packabunch.packing.ObjectSegmentation.detect(grid, supportPlaneCellK = 0), direction)
-                    _objects.value = tracker.objects()
+                    // The cap belongs here rather than at review time: tracking objects the
+                    // pack could never hold costs frames and clutters the screen with boxes
+                    // the user will only be told about later.
+                    _objects.value = tracker.objects().take(maxObjects)
                 }
                 lastSegmentationTimestamp = frame.timestamp
             }
@@ -264,4 +317,66 @@ class ArScanController(private val context: Context, private val trackItems: Boo
             Log.e(AR_TAG, "Scan frame failed", t)
         }
     }
+}
+
+/**
+ * One measured object, ready to draw over the camera.
+ *
+ * [corners] are the eight corners of its box in 0..1 screen space, ordered base first then
+ * top, anticlockwise from the minimum corner. Anything behind the camera is dropped upstream,
+ * so a box that appears here is genuinely in view.
+ */
+data class ObjectOverlay(
+    val id: String,
+    val settled: Boolean,
+    val corners: List<Pair<Float, Float>>,
+)
+
+/**
+ * Projects a detected object's box into screen space.
+ *
+ * The grid's axes are not the world's — grid +Y runs along world −Z and grid Z is up — so the
+ * inverse of `ScanAccumulator.worldToCell` is applied here and nowhere else. Getting it wrong
+ * draws a box that tracks the camera convincingly and sits in the wrong place.
+ */
+internal fun projectObject(
+    detected: com.packabunch.packing.DetectedObject,
+    originXM: Float,
+    originYM: Float,
+    originZM: Float,
+    viewProjection: FloatArray,
+): List<Pair<Float, Float>>? {
+    val halfW = detected.dimensions.widthMm / 2_000f
+    val halfD = detected.dimensions.depthMm / 2_000f
+    val heightM = detected.dimensions.heightMm / 1_000f
+
+    val centreX = originXM + detected.centroidXMm / 1_000f
+    val centreZ = originZM - detected.centroidYMm / 1_000f
+
+    // The tightest box was found at this yaw, so the drawn box has to share it.
+    val yaw = Math.toRadians(detected.yawDegrees.toDouble())
+    val cos = kotlin.math.cos(yaw).toFloat()
+    val sin = kotlin.math.sin(yaw).toFloat()
+
+    val footprint = listOf(
+        -halfW to -halfD, halfW to -halfD, halfW to halfD, -halfW to halfD,
+    )
+    val out = ArrayList<Pair<Float, Float>>(8)
+    val point = FloatArray(4)
+
+    for (level in listOf(0f, heightM)) {
+        for ((dx, dz) in footprint) {
+            point[0] = centreX + dx * cos - dz * sin
+            point[1] = originYM + level
+            point[2] = centreZ + dx * sin + dz * cos
+            point[3] = 1f
+
+            val clip = FloatArray(4)
+            android.opengl.Matrix.multiplyMV(clip, 0, viewProjection, 0, point, 0)
+            // Behind the camera. One corner off-screen is fine; behind it is not drawable.
+            if (clip[3] <= 0.0001f) return null
+            out += ((clip[0] / clip[3]) * 0.5f + 0.5f) to (0.5f - (clip[1] / clip[3]) * 0.5f)
+        }
+    }
+    return out
 }

@@ -28,11 +28,11 @@ import kotlin.math.sqrt
  * millimetres with its own origin, and [worldToCell] is the only place the two meet.
  */
 class ScanAccumulator(
-    /** World-space corner of the grid, in metres. */
-    private val originXM: Float,
-    private val originYM: Float,
-    private val originZM: Float,
-    private val resolutionMm: Int = 40,
+    /** World-space corner of the grid, in metres. Read back to place the grid on screen. */
+    val originXM: Float,
+    val originYM: Float,
+    val originZM: Float,
+    val resolutionMm: Int = 40,
     widthMm: Int = 2_400,
     depthMm: Int = 2_400,
     heightMm: Int = 1_600,

@@ -119,13 +119,21 @@ fun DepthCaptureGate(onManual: () -> Unit, onBack: () -> Unit, content: @Composa
 }
 
 @Composable
-fun LiveSweepScreen(unit: LengthUnit, onDone: (List<SweptObject>) -> Unit, onManual: () -> Unit, onBack: () -> Unit) {
+fun LiveSweepScreen(
+    unit: LengthUnit,
+    onDone: (List<SweptObject>) -> Unit,
+    onManual: () -> Unit,
+    onBack: () -> Unit,
+    /** Room left in this pack. Scanning stops noticing objects past it. */
+    maxObjects: Int = Int.MAX_VALUE,
+) {
     DepthCaptureGate(onManual, onBack) {
         val context = LocalContext.current
         val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-        val controller = remember { ArScanController(context, trackItems = true) }
+        val controller = remember(maxObjects) { ArScanController(context, trackItems = true, maxObjects = maxObjects) }
         val state by controller.state.collectAsStateWithLifecycle()
         val objects by controller.objects.collectAsStateWithLifecycle()
+        val overlays by controller.overlays.collectAsStateWithLifecycle()
         var error by remember { mutableStateOf<String?>(null) }
         val view = remember { GLSurfaceView(context).apply {
             preserveEGLContextOnPause = true
@@ -151,6 +159,7 @@ fun LiveSweepScreen(unit: LengthUnit, onDone: (List<SweptObject>) -> Unit, onMan
             SecondaryButton(text = "Type measurements instead", onClick = onManual)
         } else SweepItemsScreen(objects, unit, state.status == TrackingStatus.TRACKING,
             fallbackFor = { null }, onDone = onDone, onAddManually = onManual, onBack = onBack,
-            cameraPreview = { AndroidView(factory = { view }, modifier = Modifier.fillMaxSize()) })
+            cameraPreview = { AndroidView(factory = { view }, modifier = Modifier.fillMaxSize()) },
+            overlays = overlays)
     }
 }

@@ -76,11 +76,15 @@ fun SweepItemsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     cameraPreview: @Composable () -> Unit = {},
+    /** Screen-space boxes for what the camera can currently see, refreshed every frame. */
+    overlays: List<com.packabunch.ar.ObjectOverlay> = emptyList(),
 ) {
     val settled = objects.count { it.settled }
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
         cameraPreview()
+
+        ScanOverlay(overlays, Modifier.fillMaxSize())
 
         Column(
             Modifier
@@ -242,6 +246,59 @@ private fun SweptRow(
                 tint = Success,
                 modifier = Modifier.size(19.dp),
             )
+        }
+    }
+}
+
+/**
+ * The boxes drawn over the camera while sweeping.
+ *
+ * Without these the screen is a live camera feed with a counter on it, and nothing tells you
+ * the app can see anything — which reads as broken even when the measurement is going fine.
+ *
+ * Still measuring is amber and thin; measured is the app's green, thicker, with its corners
+ * picked out. The corner ticks matter more than they look: a full wireframe over a busy
+ * kitchen bench turns into visual soup, while corners read as a box at a glance.
+ */
+@Composable
+private fun ScanOverlay(
+    overlays: List<com.packabunch.ar.ObjectOverlay>,
+    modifier: Modifier = Modifier,
+) {
+    // Each box fades in rather than appearing, so a flickering detection does not strobe.
+    androidx.compose.foundation.Canvas(modifier) {
+        overlays.forEach { overlay ->
+            val p = overlay.corners.map {
+                androidx.compose.ui.geometry.Offset(it.first * size.width, it.second * size.height)
+            }
+            if (p.size != 8) return@forEach
+
+            val colour = if (overlay.settled) Color(0xFF3F7A5A) else Color(0xFFE08A46)
+            val width = if (overlay.settled) 3.5f else 2f
+
+            fun edge(a: Int, b: Int, alpha: Float = 1f) = drawLine(
+                color = colour.copy(alpha = alpha),
+                start = p[a],
+                end = p[b],
+                strokeWidth = width,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+
+            // A soft wash inside a measured box, so a finished one reads as solid.
+            if (overlay.settled) {
+                val path = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(p[4].x, p[4].y)
+                    for (i in 5..7) lineTo(p[i].x, p[i].y)
+                    close()
+                }
+                drawPath(path, colour.copy(alpha = 0.16f))
+            }
+
+            for (i in 0 until 4) {
+                edge(i, (i + 1) % 4, 0.55f)          // base
+                edge(4 + i, 4 + (i + 1) % 4)          // top
+                edge(i, i + 4, 0.75f)                 // uprights
+            }
         }
     }
 }
