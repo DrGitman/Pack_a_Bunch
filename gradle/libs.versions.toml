@@ -25,6 +25,7 @@ coil = "3.3.0"
 mlkitLabeling = "17.0.9"
 mlkitText = "16.0.1"
 mlkitBarcode = "17.3.0"
+mlkitObjects = "17.0.2"
 
 junit = "4.13.2"
 kotlinTest = "2.2.20"
@@ -67,6 +68,7 @@ camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax"
 mlkit-image-labeling = { module = "com.google.mlkit:image-labeling", version.ref = "mlkitLabeling" }
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
 mlkit-barcode = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
+mlkit-objects = { module = "com.google.mlkit:object-detection", version.ref = "mlkitObjects" }
 
 # Plays the designer's exported Lottie splash as vectors, so no frame images ship.
 lottie-compose = { module = "com.airbnb.android:lottie-compose", version.ref = "lottie" }

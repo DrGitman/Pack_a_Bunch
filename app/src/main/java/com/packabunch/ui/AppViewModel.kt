@@ -462,15 +462,31 @@ class AppViewModel(
         viewModelScope.launch { repository.restore(project) }
     }
 
-    fun importSweptItems(objects: List<com.packabunch.packing.SweptObject>): Boolean {
+    /**
+     * @param namesById what the recogniser made of each object, keyed by its swept id. A
+     *   missing entry just means nothing was confident enough, and the numbered fallback
+     *   stands.
+     */
+    fun importSweptItems(
+        objects: List<com.packabunch.packing.SweptObject>,
+        namesById: Map<String, String> = emptyMap(),
+    ): Boolean {
         val measured = objects.filter { it.settled && it.detected.observedShape != null }
         if (!limits.allowsPieces(_editor.value.pieceCount + measured.size)) return false
         val initialCount = _editor.value.items.size
         val additions = measured.mapIndexed { index, obj ->
             val surface = requireNotNull(obj.detected.observedShape)
-            ItemSpec(id = java.util.UUID.randomUUID().toString(), name = "Scanned item ${initialCount + index + 1}",
-                dimensions = surface.boundsMm, measurementSource = MeasurementSource.CAMERA_ESTIMATE,
-                maySupportItems = false, visualShape = surface)
+            ItemSpec(
+                id = java.util.UUID.randomUUID().toString(),
+                // A recognised name beats a serial number by a mile: "Coffee cup" tells you
+                // which row is which in the packing guide, "Scanned item 3" never does. It
+                // stays editable, and it is a label rather than a claim about the product.
+                name = namesById[obj.id] ?: "Scanned item ${initialCount + index + 1}",
+                dimensions = surface.boundsMm,
+                measurementSource = MeasurementSource.CAMERA_ESTIMATE,
+                maySupportItems = false,
+                visualShape = surface,
+            )
         }
         _editor.update { it.copy(items = it.items + additions, plan = null) }
         autosave()

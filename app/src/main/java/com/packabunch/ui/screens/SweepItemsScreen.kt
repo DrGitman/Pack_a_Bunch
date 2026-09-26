@@ -81,8 +81,8 @@ fun SweepItemsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     cameraPreview: @Composable () -> Unit = {},
-    /** Screen-space boxes for what the camera can currently see, refreshed every frame. */
-    overlays: List<com.packabunch.ar.ObjectOverlay> = emptyList(),
+    /** What the detector can see right now, in 0..1 image space. */
+    found: List<com.packabunch.ar.FoundObject> = emptyList(),
 ) {
     val settled = objects.count { it.settled }
     // Collapsed by default: while sweeping, seeing the thing you are pointing at matters more
@@ -92,7 +92,7 @@ fun SweepItemsScreen(
     Box(modifier.fillMaxSize().background(Color.Black)) {
         cameraPreview()
 
-        ScanOverlay(overlays, Modifier.fillMaxSize())
+        ScanOverlay(found, Modifier.fillMaxSize())
 
         Column(
             Modifier
@@ -276,93 +276,68 @@ private fun SweptRow(
 }
 
 /**
- * The boxes drawn over the camera while sweeping.
+ * The brackets drawn around each object the detector can see.
  *
- * Without these the screen is a live camera feed with a counter on it, and nothing tells you
- * the app can see anything — which reads as broken even when the measurement is going fine.
+ * These are flat rectangles in image space, not projected cubes. That is a deliberate step
+ * back: the cubes were geometrically honest about a cluster of depth noise, which meant they
+ * were confidently wrong — boxes over bare floor, one mug split into fragments. A bracket
+ * around something a trained detector has actually identified is worth more than a cube
+ * around something nothing can vouch for.
  *
- * The glow is done by stroking each edge three times at falling alpha and rising width rather
- * than by an emissive shader. On a camera feed at these line weights the result is the same
- * bloom, and it costs a few draw calls instead of a renderer.
- *
- * Amber while measuring, the app's green once measured. Corners are picked out heavier than
- * the edges between them: over a busy bench a full even wireframe turns into visual soup,
- * while bracketed corners still read as a box at a glance.
+ * The glow is three strokes at falling alpha rather than an emissive shader. At these line
+ * weights over a camera feed the result is the same bloom for a few draw calls instead of a
+ * whole renderer.
  */
 @Composable
 private fun ScanOverlay(
-    overlays: List<com.packabunch.ar.ObjectOverlay>,
+    found: List<com.packabunch.ar.FoundObject>,
     modifier: Modifier = Modifier,
 ) {
-    // One slow sweep, shared by every box, so the screen reads as alive while it works.
     val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "scan")
     val phase by pulse.animateFloat(
         initialValue = 0f,
         targetValue = 1f,
         animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            androidx.compose.animation.core.tween(1_800, easing = androidx.compose.animation.core.LinearEasing),
+            androidx.compose.animation.core.tween(1_600, easing = androidx.compose.animation.core.LinearEasing),
         ),
         label = "phase",
     )
 
     androidx.compose.foundation.Canvas(modifier) {
-        overlays.forEach { overlay ->
-            val p = overlay.corners.map {
-                androidx.compose.ui.geometry.Offset(it.first * size.width, it.second * size.height)
-            }
-            if (p.size != 8) return@forEach
+        found.forEach { item ->
+            val l = item.left * size.width
+            val t = item.top * size.height
+            val r = item.right * size.width
+            val b = item.bottom * size.height
+            if (r <= l || b <= t) return@forEach
 
-            val colour = if (overlay.settled) Color(0xFF6FE3A8) else Color(0xFFFFB259)
+            val colour = Color(0xFFFFB259)
+            // A quarter of the shorter side, so brackets stay proportionate on any box.
+            val arm = kotlin.math.min(r - l, b - t) * 0.24f
 
-            // Three passes: a wide dim halo, a mid pass, then the bright core on top.
-            fun glowLine(a: androidx.compose.ui.geometry.Offset, b: androidx.compose.ui.geometry.Offset, core: Float) {
-                drawLine(colour.copy(alpha = 0.10f), a, b, core * 5f, androidx.compose.ui.graphics.StrokeCap.Round)
-                drawLine(colour.copy(alpha = 0.28f), a, b, core * 2.4f, androidx.compose.ui.graphics.StrokeCap.Round)
-                drawLine(colour, a, b, core, androidx.compose.ui.graphics.StrokeCap.Round)
-            }
-
-            // A measured box gets a faint lid, which is what makes it read as solid.
-            if (overlay.settled) {
-                val lid = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(p[4].x, p[4].y)
-                    for (i in 5..7) lineTo(p[i].x, p[i].y)
-                    close()
-                }
-                drawPath(lid, colour.copy(alpha = 0.14f))
+            fun glow(ax: Float, ay: Float, bx: Float, by: Float) {
+                val a = androidx.compose.ui.geometry.Offset(ax, ay)
+                val c = androidx.compose.ui.geometry.Offset(bx, by)
+                drawLine(colour.copy(alpha = 0.10f), a, c, 14f, androidx.compose.ui.graphics.StrokeCap.Round)
+                drawLine(colour.copy(alpha = 0.30f), a, c, 7f, androidx.compose.ui.graphics.StrokeCap.Round)
+                drawLine(colour, a, c, 3f, androidx.compose.ui.graphics.StrokeCap.Round)
             }
 
-            // Corner brackets: a short stub along each of the three edges meeting a corner.
-            for (i in 0 until 4) {
-                val base = p[i]
-                val top = p[i + 4]
-                val nextBase = p[(i + 1) % 4]
-                val prevBase = p[(i + 3) % 4]
-                fun stub(from: androidx.compose.ui.geometry.Offset, to: androidx.compose.ui.geometry.Offset) =
-                    glowLine(from, androidx.compose.ui.geometry.lerp(from, to, 0.28f), 3f)
-                stub(base, nextBase)
-                stub(base, prevBase)
-                stub(base, top)
-                stub(top, p[4 + (i + 1) % 4])
-                stub(top, p[4 + (i + 3) % 4])
-                stub(top, base)
-            }
+            // Corner brackets only. A full rectangle over a busy surface reads as clutter.
+            glow(l, t, l + arm, t); glow(l, t, l, t + arm)
+            glow(r, t, r - arm, t); glow(r, t, r, t + arm)
+            glow(l, b, l + arm, b); glow(l, b, l, b - arm)
+            glow(r, b, r - arm, b); glow(r, b, r, b - arm)
 
-            // The faint full outline behind the brackets, so the shape is still readable.
-            for (i in 0 until 4) {
-                drawLine(colour.copy(alpha = 0.22f), p[i], p[(i + 1) % 4], 1.5f)
-                drawLine(colour.copy(alpha = 0.32f), p[4 + i], p[4 + (i + 1) % 4], 1.5f)
-                drawLine(colour.copy(alpha = 0.22f), p[i], p[i + 4], 1.5f)
-            }
-
-            // A light sweeping up an unfinished box: the app is still working on this one.
-            if (!overlay.settled) {
-                val t = phase
-                val left = androidx.compose.ui.geometry.lerp(p[0], p[4], t)
-                val right = androidx.compose.ui.geometry.lerp(p[1], p[5], t)
-                val fade = kotlin.math.sin(t * Math.PI).toFloat()
-                drawLine(colour.copy(alpha = 0.55f * fade), left, right, 2.5f)
-                drawLine(colour.copy(alpha = 0.18f * fade), left, right, 9f)
-            }
+            // A light travelling down the box: the app is working on this one.
+            val y = t + (b - t) * phase
+            val fade = kotlin.math.sin(phase * Math.PI).toFloat()
+            drawLine(
+                colour.copy(alpha = 0.45f * fade),
+                androidx.compose.ui.geometry.Offset(l, y),
+                androidx.compose.ui.geometry.Offset(r, y),
+                2.5f,
+            )
         }
     }
 }

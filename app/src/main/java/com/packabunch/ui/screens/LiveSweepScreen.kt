@@ -126,6 +126,8 @@ fun LiveSweepScreen(
     onBack: () -> Unit,
     /** Room left in this pack. Scanning stops noticing objects past it. */
     maxObjects: Int = Int.MAX_VALUE,
+    /** Recognised names by swept object id, reported up so the import can use them. */
+    onNames: (Map<String, String>) -> Unit = {},
 ) {
     DepthCaptureGate(onManual, onBack) {
         val context = LocalContext.current
@@ -133,7 +135,9 @@ fun LiveSweepScreen(
         val controller = remember(maxObjects) { ArScanController(context, trackItems = true, maxObjects = maxObjects) }
         val state by controller.state.collectAsStateWithLifecycle()
         val objects by controller.objects.collectAsStateWithLifecycle()
-        val overlays by controller.overlays.collectAsStateWithLifecycle()
+        val found by controller.found.collectAsStateWithLifecycle()
+        val names by controller.names.collectAsStateWithLifecycle()
+        androidx.compose.runtime.LaunchedEffect(names) { onNames(names) }
         var error by remember { mutableStateOf<String?>(null) }
         val view = remember { GLSurfaceView(context).apply {
             preserveEGLContextOnPause = true
@@ -160,6 +164,6 @@ fun LiveSweepScreen(
         } else SweepItemsScreen(objects, unit, state.status == TrackingStatus.TRACKING,
             fallbackFor = { null }, onDone = onDone, onAddManually = onManual, onBack = onBack,
             cameraPreview = { AndroidView(factory = { view }, modifier = Modifier.fillMaxSize()) },
-            overlays = overlays)
+            found = found)
     }
 }

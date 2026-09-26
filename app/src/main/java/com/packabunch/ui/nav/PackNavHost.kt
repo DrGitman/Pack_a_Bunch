@@ -702,13 +702,17 @@ fun PackNavHost(
         }
 
         composable(Routes.SWEEP_ITEMS) {
+            var names by androidx.compose.runtime.remember {
+                androidx.compose.runtime.mutableStateOf(emptyMap<String, String>())
+            }
             com.packabunch.ui.screens.LiveSweepScreen(settings.unit,
+                onNames = { names = it },
                 // What this pack can still take. Past it the sweep stops noticing things,
                 // rather than measuring twenty more and refusing them at the review step.
                 maxObjects = (viewModel.limits.maxPiecesPerPack ?: Int.MAX_VALUE)
                     .minus(editor.pieceCount).coerceAtLeast(0),
                 onDone = { scanned ->
-                    if (viewModel.importSweptItems(scanned)) navController.popBackStack()
+                    if (viewModel.importSweptItems(scanned, names)) navController.popBackStack()
                     else notice = "These items exceed this pack's piece limit. Review the current items first."
                 },
                 onManual = { navController.popBackStack() },

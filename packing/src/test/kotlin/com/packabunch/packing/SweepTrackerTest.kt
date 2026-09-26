@@ -31,6 +31,56 @@ class SweepTrackerTest {
     }
 
     @Test
+    fun `a blob that stops being detected is forgotten`() {
+        val tracker = SweepTracker()
+
+        // A patch of depth noise resolves as an object for one pass and never again.
+        tracker.update(listOf(obj(1), obj(2)), viewDirectionDegrees = 0)
+        assertEquals(2, tracker.objects().size)
+
+        repeat(3) { tracker.update(listOf(obj(1)), viewDirectionDegrees = 0) }
+
+        assertEquals(
+            1,
+            tracker.objects().size,
+            "an unmatched candidate must expire rather than accumulate for the whole sweep",
+        )
+    }
+
+    @Test
+    fun `a brief occlusion does not lose the object`() {
+        val tracker = SweepTracker()
+
+        tracker.update(listOf(obj(1), obj(2)), viewDirectionDegrees = 0)
+        // A hand passes over it for one pass, then it is back.
+        tracker.update(listOf(obj(1)), viewDirectionDegrees = 0)
+        tracker.update(listOf(obj(1), obj(2)), viewDirectionDegrees = 45)
+
+        assertEquals(2, tracker.objects().size)
+    }
+
+    @Test
+    fun `a measured object survives being walked away from`() {
+        val tracker = SweepTracker()
+
+        // Enough viewpoints and stable passes for it to settle.
+        repeat(6) { pass ->
+            tracker.update(listOf(obj(1)), viewDirectionDegrees = pass * 60)
+        }
+        val settled = tracker.objects().single()
+        assertTrue(settled.settled, "test needs a settled object to be meaningful")
+
+        // Now it leaves the frame entirely, for far longer than the forget window.
+        repeat(10) { tracker.update(emptyList(), viewDirectionDegrees = 0) }
+
+        assertEquals(
+            1,
+            tracker.objects().size,
+            "a measured object is a fact about the room and must not be dropped",
+        )
+    }
+
+    @Test
     fun `the same object seen again is not counted twice`() {
         val tracker = SweepTracker()
 

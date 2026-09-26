@@ -25,6 +25,15 @@ import kotlin.math.sqrt
  * and nothing more. No appearance model, no re-identification, none of the machinery video
  * tracking normally needs.
  */
+/**
+ * Passes a candidate may go unseen before it is dropped.
+ *
+ * Segmentation runs about twice a second, so this is roughly a second and a half of not
+ * being found. Long enough to survive a hand wobble or a frame where the object was
+ * occluded, short enough that noise does not accumulate.
+ */
+private const val FORGET_AFTER_MISSES = 3
+
 class SweepTracker(
     /** How far a blob's centre may move between updates and still be the same object. */
     private val matchRadiusMm: Int = 150,
@@ -58,11 +67,26 @@ class SweepTracker(
                     observedAxes = axesObservedFrom(viewDirectionDegrees),
                     stableUpdates = 0,
                     lastChangeMm = Int.MAX_VALUE,
+                    missedUpdates = 0,
                 )
             } else {
                 unmatched -= match.id
                 tracked[match.id] = match.absorb(candidate, viewDirectionDegrees)
             }
+        }
+
+        // Anything the segmentation stopped finding.
+        //
+        // Without this the map only ever grows: a blob of depth noise became an object and
+        // stayed one for the rest of the session, which is how a table holding two things
+        // reported four, then nine, then eighteen, and never came back down when the camera
+        // moved away. Only unsettled candidates expire — an object that has been measured
+        // properly is a fact about the room, and walking out of the frame must not delete it.
+        unmatched.forEach { id ->
+            val stale = tracked[id] ?: return@forEach
+            if (stale.settledEnoughToKeep) return@forEach
+            if (stale.missedUpdates + 1 >= FORGET_AFTER_MISSES) tracked.remove(id)
+            else tracked[id] = stale.copy(missedUpdates = stale.missedUpdates + 1)
         }
     }
 
@@ -107,7 +131,18 @@ class SweepTracker(
         val observedAxes: MutableSet<Axis>,
         val stableUpdates: Int,
         val lastChangeMm: Int,
+        /** Consecutive passes in which segmentation did not find this again. */
+        val missedUpdates: Int = 0,
     ) {
+        /** Measured objects are kept whatever the camera is pointing at now. */
+        val settledEnoughToKeep: Boolean
+            get() = ObservationProgress(
+                viewpoints = viewDirections.size,
+                stableUpdates = stableUpdates,
+                observedAxes = observedAxes.toSet(),
+                lastChangeMm = lastChangeMm,
+            ).settled
+
         fun distanceTo(other: DetectedObject): Int {
             val dx = (latest.centroidXMm - other.centroidXMm).toDouble()
             val dy = (latest.centroidYMm - other.centroidYMm).toDouble()

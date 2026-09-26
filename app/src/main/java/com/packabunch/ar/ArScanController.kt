@@ -11,6 +11,7 @@ import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.packabunch.packing.ScannedSpace
 import com.packabunch.packing.VoxelGrid
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -60,6 +61,41 @@ class ArScanController(
     private val _objects = MutableStateFlow<List<com.packabunch.packing.SweptObject>>(emptyList())
     val objects = _objects.asStateFlow()
 
+    private val finder = if (trackItems) ObjectFinder() else null
+    private val namer = if (trackItems) {
+        ObjectNamer(com.packabunch.data.catalogue.ItemRecogniser())
+    } else {
+        null
+    }
+    private val namingScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default,
+    )
+
+    private val _names = MutableStateFlow<Map<String, String>>(emptyMap())
+
+    /** Recognised names by swept object id, filled in as labelling catches up. */
+    val names = _names.asStateFlow()
+
+    /**
+     * How far the sensor image is rotated from the way the phone is being held.
+     *
+     * ARCore hands over the raw sensor image, which on essentially every Android phone is
+     * landscape regardless of how the device is held. ML Kit needs telling, or every box
+     * comes back transposed.
+     */
+    private val cameraRotationDegrees: Int
+        get() = runCatching {
+            val characteristics = (context.getSystemService(Context.CAMERA_SERVICE)
+                as android.hardware.camera2.CameraManager)
+                .let { manager -> manager.cameraIdList.firstOrNull()?.let(manager::getCameraCharacteristics) }
+            characteristics?.get(android.hardware.camera2.CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
+        }.getOrDefault(90)
+
+    private val _found = MutableStateFlow<List<FoundObject>>(emptyList())
+
+    /** What the detector can currently see, in 0..1 image space. */
+    val found = _found.asStateFlow()
+
     private val _overlays = MutableStateFlow<List<ObjectOverlay>>(emptyList())
 
     /**
@@ -73,6 +109,7 @@ class ArScanController(
     private var lastDepthTimestamp = 0L
     private var lastProcessedTimestamp = 0L
     private var lastSegmentationTimestamp = 0L
+    private var lastNamingTimestamp = 0L
     @Volatile private var finishedGrid: VoxelGrid? = null
 
     private var session: Session? = null
@@ -132,6 +169,10 @@ class ArScanController(
         session = null
         accumulator = null
         tracker.clear()
+        finder?.close()
+        namer?.clear()
+        _found.value = emptyList()
+        _names.value = emptyMap()
         _objects.value = emptyList()
         finishedGrid = null
     }
@@ -279,13 +320,42 @@ class ArScanController(
                 return // No depth yet is not an empty scene or a completed measurement.
             }
             if (trackItems) {
+                // One camera frame per pass to the detector. It drops frames rather than
+                // queueing, so this never holds up rendering.
+                // No `use`: ownership passes to the finder, which closes it once ML Kit is
+                // done. Rotation is the sensor-to-display angle — a hardcoded 0 leaves every
+                // box on its side, since the analysis image is landscape while the phone is
+                // not.
+                try {
+                    val image = frame.acquireCameraImage()
+                    // Labelling is far slower than detection and the answer does not change,
+                    // so it runs about once a second on its own thread rather than per frame.
+                    if (frame.timestamp - lastNamingTimestamp >= 1_000_000_000L) {
+                        lastNamingTimestamp = frame.timestamp
+                        val boxes = _found.value
+                        val snapshot = image.toBitmap(cameraRotationDegrees)
+                        if (snapshot != null && boxes.isNotEmpty()) {
+                            namingScope.launch { namer?.name(snapshot, boxes) }
+                        }
+                    }
+                    finder?.offer(image, cameraRotationDegrees) {
+                        _found.value = finder?.found.orEmpty().map { it.toViewSpace(frame) }
+                    } ?: image.close()
+                } catch (_: com.google.ar.core.exceptions.NotYetAvailableException) {
+                    // Nothing this frame. Normal, and not worth a log line at 30 Hz.
+                } catch (e: Exception) {
+                    android.util.Log.w("ArScan", "camera image unavailable", e)
+                }
+            }
+
+            if (trackItems) {
                 val view = FloatArray(16)
                 val projection = FloatArray(16)
                 val viewProjection = FloatArray(16)
                 camera.getViewMatrix(view, 0)
                 camera.getProjectionMatrix(projection, 0, 0.05f, 20f)
                 android.opengl.Matrix.multiplyMM(viewProjection, 0, projection, 0, view, 0)
-                _overlays.value = _objects.value.mapNotNull { swept ->
+                val projected = _objects.value.mapNotNull { swept ->
                     projectObject(
                         detected = swept.detected,
                         originXM = builder.originXM,
@@ -294,6 +364,17 @@ class ArScanController(
                         viewProjection = viewProjection,
                     )?.let { ObjectOverlay(swept.id, swept.settled, it) }
                 }
+                _overlays.value = projected
+
+                // Tie the two halves together.
+                //
+                // The detector knows what things are; the depth grid knows how big they are;
+                // until now neither knew they were talking about the same object. Each
+                // measured object is projected to its screen rectangle and matched to the
+                // detector box it overlaps most, which is what lets a measurement inherit a
+                // name. Overlap is the right test rather than centre distance: a mug and the
+                // carton behind it can share a centre on screen and never share an outline.
+                _names.value = matchNames(projected, _found.value, namer)
             }
 
             if (frame.timestamp - lastSegmentationTimestamp >= 500_000_000L) {
@@ -447,4 +528,87 @@ private fun liesOnASurface(
         if (surface.isPoseInPolygon(pose)) return true
     }
     return false
+}
+
+/**
+ * Moves a detector box out of image space and into the space the preview is drawn in.
+ *
+ * These are not the same rectangle. ARCore renders the camera feed through a display
+ * transform that crops the sensor image to the screen's aspect ratio, so normalised image
+ * coordinates multiplied by the screen's width and height land somewhere else — the error
+ * grows towards the edges and looks exactly like the detector being inaccurate. ARCore
+ * exposes the conversion, so it is used rather than approximated.
+ */
+private fun FoundObject.toViewSpace(frame: com.google.ar.core.Frame): FoundObject {
+    val source = floatArrayOf(left, top, right, bottom)
+    val out = FloatArray(4)
+    return runCatching {
+        frame.transformCoordinates2d(
+            com.google.ar.core.Coordinates2d.IMAGE_NORMALIZED,
+            source,
+            com.google.ar.core.Coordinates2d.VIEW_NORMALIZED,
+            out,
+        )
+        // VIEW_NORMALIZED runs -1..1 with +Y up; the canvas wants 0..1 with +Y down.
+        fun x(v: Float) = (v * 0.5f + 0.5f)
+        fun y(v: Float) = (0.5f - v * 0.5f)
+        copy(
+            left = minOf(x(out[0]), x(out[2])),
+            right = maxOf(x(out[0]), x(out[2])),
+            top = minOf(y(out[1]), y(out[3])),
+            bottom = maxOf(y(out[1]), y(out[3])),
+        )
+    }.getOrDefault(this)
+}
+
+/** Below this intersection-over-union, two boxes are not the same thing. */
+private const val MIN_OVERLAP = 0.35f
+
+/**
+ * Which measured object each recognised name belongs to.
+ *
+ * Keyed by the swept object's own id, because that is what the item import understands. A
+ * measurement with no confident detector match keeps its numbered fallback rather than
+ * borrowing a neighbour's name, which would be worse than no name at all.
+ */
+internal fun matchNames(
+    projected: List<ObjectOverlay>,
+    found: List<FoundObject>,
+    namer: ObjectNamer?,
+): Map<String, String> {
+    if (namer == null || projected.isEmpty() || found.isEmpty()) return emptyMap()
+    val out = HashMap<String, String>()
+
+    for (overlay in projected) {
+        val xs = overlay.corners.map { it.first }
+        val ys = overlay.corners.map { it.second }
+        val left = xs.min()
+        val right = xs.max()
+        val top = ys.min()
+        val bottom = ys.max()
+
+        val best = found.maxByOrNull { overlapOf(left, top, right, bottom, it) } ?: continue
+        if (overlapOf(left, top, right, bottom, best) < MIN_OVERLAP) continue
+        namer.nameFor(best.trackingId)?.let { out[overlay.id] = it }
+    }
+    return out
+}
+
+/**
+ * Intersection over union.
+ *
+ * Measuring the intersection as a share of the *smaller* box seems reasonable and is wrong:
+ * a carton filling the frame completely contains a mug's rectangle, so that ratio is 1.0 for
+ * both the carton and the mug's own box, and the mug inherits whichever happened to be
+ * checked first. Dividing by the union instead charges the carton for all the area it covers
+ * that the mug does not, so only a box of about the right size and place can win.
+ */
+private fun overlapOf(left: Float, top: Float, right: Float, bottom: Float, other: FoundObject): Float {
+    val w = minOf(right, other.right) - maxOf(left, other.left)
+    val h = minOf(bottom, other.bottom) - maxOf(top, other.top)
+    if (w <= 0f || h <= 0f) return 0f
+    val intersection = w * h
+    val union = (right - left) * (bottom - top) +
+        (other.right - other.left) * (other.bottom - other.top) - intersection
+    return if (union <= 0f) 0f else intersection / union
 }
