@@ -2,6 +2,7 @@ package com.packabunch.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,6 +84,17 @@ fun SweepItemsScreen(
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
         cameraPreview()
+
+        // A vignette, not a flat scrim: the middle stays clear to aim with, and the edges
+        // darken enough that a glowing box never competes with a bright window behind it.
+        Box(
+            Modifier.fillMaxSize().background(
+                androidx.compose.ui.graphics.Brush.radialGradient(
+                    0.45f to Color.Transparent,
+                    1f to Color(0x99000000),
+                ),
+            ),
+        )
 
         ScanOverlay(overlays, Modifier.fillMaxSize())
 
@@ -256,16 +268,30 @@ private fun SweptRow(
  * Without these the screen is a live camera feed with a counter on it, and nothing tells you
  * the app can see anything — which reads as broken even when the measurement is going fine.
  *
- * Still measuring is amber and thin; measured is the app's green, thicker, with its corners
- * picked out. The corner ticks matter more than they look: a full wireframe over a busy
- * kitchen bench turns into visual soup, while corners read as a box at a glance.
+ * The glow is done by stroking each edge three times at falling alpha and rising width rather
+ * than by an emissive shader. On a camera feed at these line weights the result is the same
+ * bloom, and it costs a few draw calls instead of a renderer.
+ *
+ * Amber while measuring, the app's green once measured. Corners are picked out heavier than
+ * the edges between them: over a busy bench a full even wireframe turns into visual soup,
+ * while bracketed corners still read as a box at a glance.
  */
 @Composable
 private fun ScanOverlay(
     overlays: List<com.packabunch.ar.ObjectOverlay>,
     modifier: Modifier = Modifier,
 ) {
-    // Each box fades in rather than appearing, so a flickering detection does not strobe.
+    // One slow sweep, shared by every box, so the screen reads as alive while it works.
+    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "scan")
+    val phase by pulse.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(1_800, easing = androidx.compose.animation.core.LinearEasing),
+        ),
+        label = "phase",
+    )
+
     androidx.compose.foundation.Canvas(modifier) {
         overlays.forEach { overlay ->
             val p = overlay.corners.map {
@@ -273,31 +299,56 @@ private fun ScanOverlay(
             }
             if (p.size != 8) return@forEach
 
-            val colour = if (overlay.settled) Color(0xFF3F7A5A) else Color(0xFFE08A46)
-            val width = if (overlay.settled) 3.5f else 2f
+            val colour = if (overlay.settled) Color(0xFF6FE3A8) else Color(0xFFFFB259)
 
-            fun edge(a: Int, b: Int, alpha: Float = 1f) = drawLine(
-                color = colour.copy(alpha = alpha),
-                start = p[a],
-                end = p[b],
-                strokeWidth = width,
-                cap = androidx.compose.ui.graphics.StrokeCap.Round,
-            )
+            // Three passes: a wide dim halo, a mid pass, then the bright core on top.
+            fun glowLine(a: androidx.compose.ui.geometry.Offset, b: androidx.compose.ui.geometry.Offset, core: Float) {
+                drawLine(colour.copy(alpha = 0.10f), a, b, core * 5f, androidx.compose.ui.graphics.StrokeCap.Round)
+                drawLine(colour.copy(alpha = 0.28f), a, b, core * 2.4f, androidx.compose.ui.graphics.StrokeCap.Round)
+                drawLine(colour, a, b, core, androidx.compose.ui.graphics.StrokeCap.Round)
+            }
 
-            // A soft wash inside a measured box, so a finished one reads as solid.
+            // A measured box gets a faint lid, which is what makes it read as solid.
             if (overlay.settled) {
-                val path = androidx.compose.ui.graphics.Path().apply {
+                val lid = androidx.compose.ui.graphics.Path().apply {
                     moveTo(p[4].x, p[4].y)
                     for (i in 5..7) lineTo(p[i].x, p[i].y)
                     close()
                 }
-                drawPath(path, colour.copy(alpha = 0.16f))
+                drawPath(lid, colour.copy(alpha = 0.14f))
             }
 
+            // Corner brackets: a short stub along each of the three edges meeting a corner.
             for (i in 0 until 4) {
-                edge(i, (i + 1) % 4, 0.55f)          // base
-                edge(4 + i, 4 + (i + 1) % 4)          // top
-                edge(i, i + 4, 0.75f)                 // uprights
+                val base = p[i]
+                val top = p[i + 4]
+                val nextBase = p[(i + 1) % 4]
+                val prevBase = p[(i + 3) % 4]
+                fun stub(from: androidx.compose.ui.geometry.Offset, to: androidx.compose.ui.geometry.Offset) =
+                    glowLine(from, androidx.compose.ui.geometry.lerp(from, to, 0.28f), 3f)
+                stub(base, nextBase)
+                stub(base, prevBase)
+                stub(base, top)
+                stub(top, p[4 + (i + 1) % 4])
+                stub(top, p[4 + (i + 3) % 4])
+                stub(top, base)
+            }
+
+            // The faint full outline behind the brackets, so the shape is still readable.
+            for (i in 0 until 4) {
+                drawLine(colour.copy(alpha = 0.22f), p[i], p[(i + 1) % 4], 1.5f)
+                drawLine(colour.copy(alpha = 0.32f), p[4 + i], p[4 + (i + 1) % 4], 1.5f)
+                drawLine(colour.copy(alpha = 0.22f), p[i], p[i + 4], 1.5f)
+            }
+
+            // A light sweeping up an unfinished box: the app is still working on this one.
+            if (!overlay.settled) {
+                val t = phase
+                val left = androidx.compose.ui.geometry.lerp(p[0], p[4], t)
+                val right = androidx.compose.ui.geometry.lerp(p[1], p[5], t)
+                val fade = kotlin.math.sin(t * Math.PI).toFloat()
+                drawLine(colour.copy(alpha = 0.55f * fade), left, right, 2.5f)
+                drawLine(colour.copy(alpha = 0.18f * fade), left, right, 9f)
             }
         }
     }
