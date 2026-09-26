@@ -2,6 +2,10 @@ package com.packabunch.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.foundation.clickable
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -81,6 +85,9 @@ fun SweepItemsScreen(
     overlays: List<com.packabunch.ar.ObjectOverlay> = emptyList(),
 ) {
     val settled = objects.count { it.settled }
+    // Collapsed by default: while sweeping, seeing the thing you are pointing at matters more
+    // than reading the list. Tap the handle to check the measurements.
+    var expanded by remember { mutableStateOf(false) }
 
     Box(modifier.fillMaxSize().background(Color.Black)) {
         cameraPreview()
@@ -132,12 +139,27 @@ fun SweepItemsScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(horizontal = 20.dp, vertical = 16.dp),
         ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(bottom = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    Modifier
+                        .size(width = 44.dp, height = 4.dp)
+                        .background(Color(0xFFE2D5C6), RoundedCornerShape(999.dp)),
+                )
+            }
+
             Text(
                 text = when {
                     !isTracking -> "Move slowly over the floor or table to find the surface"
                     objects.isEmpty() -> "Point at your things and walk round them"
                     settled == objects.size -> "Visible items ready to review"
-                    else -> "Keep moving, the ones still waiting say what they need"
+                    expanded -> "Keep moving, the ones still waiting say what they need"
+                    else -> "$settled measured, ${objects.size - settled} still going"
                 },
                 color = TextPrimary,
                 fontFamily = UiFamily,
@@ -158,20 +180,22 @@ fun SweepItemsScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 260.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(objects, key = { it.id }) { swept ->
-                    val index = objects.indexOf(swept)
-                    val enter = rememberStaggeredEntrance(index)
-                    SweptRow(
-                        index = index,
-                        swept = swept,
-                        unit = unit,
-                        fallback = fallbackFor(swept),
-                        modifier = Modifier.entrance(enter),
-                    )
+            if (expanded) {
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 220.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(objects, key = { it.id }) { swept ->
+                        val index = objects.indexOf(swept)
+                        val enter = rememberStaggeredEntrance(index)
+                        SweptRow(
+                            index = index,
+                            swept = swept,
+                            unit = unit,
+                            fallback = fallbackFor(swept),
+                            modifier = Modifier.entrance(enter),
+                        )
+                    }
                 }
             }
 

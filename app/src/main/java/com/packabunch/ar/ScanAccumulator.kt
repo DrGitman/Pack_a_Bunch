@@ -84,7 +84,18 @@ class ScanAccumulator(
         carve(start, end)
 
         if (inBounds(end[0], end[1], end[2])) {
-            cells[index(end[0], end[1], end[2])] = OCCUPIED
+            // Hits are counted, not latched.
+            //
+            // A single depth sample used to mark a cell solid forever, and ARCore's depth on
+            // a phone without a dedicated sensor is noisy enough that stray readings then
+            // became permanent phantom objects — the scan found things that were not there.
+            // Requiring the same cell to come back MIN_HITS times costs a little sensitivity
+            // on genuinely thin surfaces and removes almost all of the invented geometry.
+            val at = index(end[0], end[1], end[2])
+            val seen = cells[at]
+            if (seen < OCCUPIED_MAX) {
+                cells[at] = if (seen < OCCUPIED_BASE) OCCUPIED_BASE else (seen + 1).toByte()
+            }
         }
     }
 
@@ -160,7 +171,9 @@ class ScanAccumulator(
         for (n in cells.indices) {
             out[n] = when (cells[n]) {
                 FREE -> 0 // Cell.FREE
-                OCCUPIED -> 1 // Cell.SOLID
+                // Enough repeat sightings to trust. Fewer stays UNKNOWN rather than FREE:
+                // we saw something there, we just will not swear it is solid.
+                in SOLID_THRESHOLD..OCCUPIED_MAX -> 1 // Cell.SOLID
                 else -> 2 // Cell.UNKNOWN
             }
         }
@@ -195,7 +208,17 @@ class ScanAccumulator(
     private companion object {
         const val UNKNOWN: Byte = 0
         const val FREE: Byte = 1
-        const val OCCUPIED: Byte = 2
+
+        /** First sighting of a cell. Later sightings count up from here. */
+        const val OCCUPIED_BASE: Byte = 2
+        const val OCCUPIED_MAX: Byte = 120
+
+        /** How many separate sightings a cell needs before the scan calls it solid. */
+        const val MIN_HITS = 3
+        const val SOLID_THRESHOLD: Byte = (OCCUPIED_BASE + MIN_HITS - 1).toByte()
+
+        /** Kept for the round trip in [fromVoxelGrid], which restores an already-trusted cell. */
+        const val OCCUPIED: Byte = SOLID_THRESHOLD
 
         /** ARCore's own confidence for the point. Below this it is noise, not geometry. */
         const val MIN_CONFIDENCE = 0.3f

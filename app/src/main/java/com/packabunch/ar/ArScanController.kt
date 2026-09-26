@@ -230,16 +230,16 @@ class ArScanController(
             // Item mode therefore trades reach for detail: a 1.2 m box at 10 mm. Cell counts
             // stay comparable (about 1.2M either way) so memory and segmentation cost do not
             // blow up.
-            val reachM = if (trackItems) 0.6f else 1.2f
+            val reachM = if (trackItems) 0.8f else 1.2f
             val builder = accumulator ?: ScanAccumulator(
                 // Origin is placed a little behind and below the camera's first tracked
                 // position, so the space in front of the phone falls inside the grid.
                 originXM = pose.tx() - reachM,
                 originYM = requireNotNull(floor).centerPose.ty(),
                 originZM = pose.tz() + reachM,
-                resolutionMm = if (trackItems) 10 else 40,
-                widthMm = if (trackItems) 1_200 else 2_400,
-                depthMm = if (trackItems) 1_200 else 2_400,
+                resolutionMm = if (trackItems) 20 else 40,
+                widthMm = if (trackItems) 1_600 else 2_400,
+                depthMm = if (trackItems) 1_600 else 2_400,
                 heightMm = if (trackItems) 800 else 1_600,
             ).also { accumulator = it }
 
@@ -294,7 +294,21 @@ class ArScanController(
                 if (trackItems) {
                     val direction = Math.toDegrees(kotlin.math.atan2(
                         -pose.zAxis[0].toDouble(), -pose.zAxis[2].toDouble())).toInt()
-                    tracker.update(com.packabunch.packing.ObjectSegmentation.detect(grid, supportPlaneCellK = 0), direction)
+                    // The noise floor has to be a real volume, not a cell count.
+                    //
+                    // ObjectSegmentation's own default is 12 cells, which at 40 mm is a
+                    // proper blob and at 20 mm is a thimble. Left alone it reported eighteen
+                    // "objects" on a table holding four. Anything under about 60 cm3 is not
+                    // something anybody packs, so that is the line, converted into whatever
+                    // cell count this grid needs to express it.
+                    val cellVolumeMm3 = grid.resolutionMm.toLong() * grid.resolutionMm * grid.resolutionMm
+                    val minCells = (MIN_OBJECT_VOLUME_MM3 / cellVolumeMm3).toInt().coerceAtLeast(12)
+                    tracker.update(
+                        com.packabunch.packing.ObjectSegmentation.detect(
+                            grid, supportPlaneCellK = 0, minCells = minCells,
+                        ),
+                        direction,
+                    )
                     // The cap belongs here rather than at review time: tracking objects the
                     // pack could never hold costs frames and clutters the screen with boxes
                     // the user will only be told about later.
@@ -380,3 +394,12 @@ internal fun projectObject(
     }
     return out
 }
+
+/**
+ * The smallest thing worth calling an object, in cubic millimetres.
+ *
+ * About 60 cm3 — a small mug. Below this, on a phone without a depth sensor, what the grid
+ * holds is far more likely to be a fragment of something larger or a patch of noise than a
+ * separate item somebody intends to pack.
+ */
+private const val MIN_OBJECT_VOLUME_MM3 = 60_000L
