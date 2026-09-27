@@ -102,6 +102,18 @@ class AppViewModel(
         plusChanged.update { it + 1 }
     }
 
+    /** When Pack Plus from a promo code runs out; null when it comes from Google Play or is off. */
+    fun promoPlusEnds(): java.time.Instant? =
+        if (storePlus) null else promoPlusUntil?.takeIf { it.isAfter(java.time.Instant.now()) }
+
+    /** Asks Google Play for the plans again — the first try can fail offline. */
+    fun reloadPlans() {
+        viewModelScope.launch {
+            val fresh = com.packabunch.billing.Billing.plans()
+            if (fresh.isNotEmpty()) _plans.value = fresh
+        }
+    }
+
     /** Redeems a promo code; tells [onResult] until when Plus now runs, or null if refused. */
     fun redeemPromo(code: String, onResult: (java.time.Instant?, String?) -> Unit) {
         viewModelScope.launch {

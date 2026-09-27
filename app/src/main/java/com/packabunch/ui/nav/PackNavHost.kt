@@ -1128,25 +1128,6 @@ fun PackNavHost(
             }
         }
 
-        composable(Routes.PACK_PLAN) {
-            val plans by viewModel.plans.collectAsStateWithLifecycle()
-            WithNavBar(
-                here = com.packabunch.ui.components.NavSlots.PackPlan,
-                onProjects = ::home,
-                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { newPack() },
-            ) { pageModifier ->
-                com.packabunch.ui.screens.PackPlanScreen(
-                    modifier = pageModifier,
-                    tier = settings.tier,
-                    // The cheapest way in, with its period: "from $2.29 a week".
-                    price = plans.firstOrNull()?.let { "from ${it.price} ${it.kind.per}" },
-                    onUpgrade = { navController.navigate(Routes.UPGRADE) },
-                    onManageInPlay = { openPlaySubscriptions(context) },
-                    onBack = { navController.popBackStack() },
-                )
-            }
-        }
 
         composable(Routes.TERMS) {
             WithNavBar(
@@ -1172,7 +1153,10 @@ fun PackNavHost(
                     }
 }
 
-        composable(Routes.UPGRADE) {
+        // Pack Plus: the one page for buying it and for managing it — the Pack Plan tab and
+        // Settings' "Manage" both land here.
+        @Composable
+        fun PackPlusPage() {
             WithNavBar(
                 here = com.packabunch.ui.components.NavSlots.PackPlan,
                 onProjects = ::home,
@@ -1180,6 +1164,8 @@ fun PackNavHost(
                 onNewPack = { newPack() },
             ) { pageModifier ->
             val plans by viewModel.plans.collectAsStateWithLifecycle()
+            // Ask Google Play again each time the page opens: a failed first load is not final.
+            androidx.compose.runtime.LaunchedEffect(Unit) { if (plans.isEmpty()) viewModel.reloadPlans() }
             val selectedPlan by viewModel.selectedPlan.collectAsStateWithLifecycle()
             val outcome by viewModel.purchaseOutcome.collectAsStateWithLifecycle()
             val activity = androidx.compose.ui.platform.LocalContext.current as android.app.Activity
@@ -1201,6 +1187,10 @@ fun PackNavHost(
                 onCompare = { navController.navigate(Routes.PLAN_COMPARISON) },
                 onBack = { navController.popBackStack() },
                 onHaveCode = { promoOpen = true },
+                plusOn = settings.tier == com.packabunch.packing.Tier.PLUS,
+                plusUntil = viewModel.promoPlusEnds(),
+                onManageInPlay = { openPlaySubscriptions(context) },
+                onRetry = viewModel::reloadPlans,
             )
             if (promoOpen) {
                 var code by remember { mutableStateOf("") }
@@ -1266,6 +1256,8 @@ fun PackNavHost(
             }
                     }
 }
+        composable(Routes.UPGRADE) { PackPlusPage() }
+        composable(Routes.PACK_PLAN) { PackPlusPage() }
     }
 }
 

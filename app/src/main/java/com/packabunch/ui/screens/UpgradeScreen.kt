@@ -8,6 +8,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,8 +26,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -36,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.packabunch.billing.PlanKind
 import com.packabunch.billing.PlanOffer
 import com.packabunch.packing.TierLimits
 import com.packabunch.ui.components.Note
@@ -92,13 +100,24 @@ fun UpgradeScreen(
     onCompare: () -> Unit = {},
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Pack Plus is already on: the page manages it instead of selling it. */
+    plusOn: Boolean = false,
+    /** When a promo code's Pack Plus runs out; null for a Google Play subscription. */
+    plusUntil: java.time.Instant? = null,
+    onManageInPlay: () -> Unit = {},
+    /** Ask Google Play for the plans again, after they failed to load. */
+    onRetry: () -> Unit = {},
 ) {
     ArtboardPage(modifier) {
+        com.packabunch.ui.components.PackAppBar(
+            title = "Pack Plus",
+            onBack = onBack,
+            modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars),
+        )
         Column(
             Modifier
-                .windowInsetsPadding(WindowInsets.statusBars)
                 .padding(horizontal = Spacing.gutter)
-                .padding(top = 8.dp),
+                .padding(top = 6.dp),
         ) {
             Hero()
             Spacer(Modifier.height(10.dp))
@@ -110,39 +129,41 @@ fun UpgradeScreen(
             }
 
             Spacer(Modifier.height(14.dp))
-            val chosen = plans.getOrNull(selected)
-            // Weekly, monthly and yearly, whichever Google Play offers here.
-            if (plans.size > 1) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    plans.forEachIndexed { index, plan ->
-                        SelectableChip(text = plan.kind.title, selected = index == selected, onClick = { onSelect(index) })
-                    }
+            if (plusOn) {
+                PlusOnCard(plusUntil)
+            } else {
+                // Weekly and monthly (and yearly, if one is set up), always shown as the choice
+                // they are — before Google Play has answered too, so the page never looks bare.
+                val kinds = plans.map { it.kind }.ifEmpty { listOf(PlanKind.WEEKLY, PlanKind.MONTHLY) }
+                var fallbackKind by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(PlanKind.MONTHLY) }
+                val selectedKind = plans.getOrNull(selected)?.kind ?: fallbackKind
+                PlanToggle(kinds, selectedKind) { kind ->
+                    val index = plans.indexOfFirst { it.kind == kind }
+                    if (index >= 0) onSelect(index) else fallbackKind = kind
                 }
                 Spacer(Modifier.height(10.dp))
-            }
-            if (chosen != null) {
-                PriceCard(chosen)
-            } else {
-                // Products unavailable means no purchase, not a fake success.
-                Note(
-                    text = "Subscriptions aren't available right now. Nothing has been charged.",
-                    tone = NoteTone.Caution,
-                    icon = PackIcons.Warning,
-                )
+                val chosen = plans.getOrNull(selected)
+                if (chosen != null) PriceCard(chosen) else PricesUnavailable(onRetry)
             }
         }
 
         PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            PrimaryButton(
-                text = if (chosen(plans, selected)?.trial != null) "Start free trial" else "Subscribe",
-                onClick = onSubscribe,
-                enabled = chosen(plans, selected) != null,
-            )
+            when {
+                plusOn && plusUntil == null -> PrimaryButton(text = "Manage in Google Play", onClick = onManageInPlay)
+                plusOn -> Unit
+                else -> PrimaryButton(
+                    text = if (chosen(plans, selected)?.trial != null) "Start free trial" else "Subscribe",
+                    onClick = onSubscribe,
+                    enabled = chosen(plans, selected) != null,
+                )
+            }
             Spacer(Modifier.height(10.dp))
             Text(
-                text = "Free keeps ${TierLimits.FREE.maxSavedPacks} pack, up to " +
+                text = if (plusOn) "Cancel any time; your packs stay either way. Free keeps " +
+                    "${TierLimits.FREE.maxSavedPacks} pack, up to ${TierLimits.FREE.maxPiecesPerPack} pieces."
+                else "Free keeps ${TierLimits.FREE.maxSavedPacks} pack, up to " +
                     "${TierLimits.FREE.maxPiecesPerPack} pieces, and the whole packing guide.",
                 color = TextTertiary,
                 fontFamily = UiFamily,
@@ -151,19 +172,27 @@ fun UpgradeScreen(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             )
+            // Two short rows rather than one long one: on a narrow phone "Privacy" used to
+            // break across two lines.
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 PackTextButton(text = "Restore purchases", onClick = onRestore, color = Primary)
-                Text("·", color = TextTertiary, fontFamily = UiFamily)
-                PackTextButton(text = "Terms", onClick = onTerms, color = Primary)
-                Text("·", color = TextTertiary, fontFamily = UiFamily)
-                PackTextButton(text = "Privacy", onClick = onPrivacy, color = Primary)
+                if (!plusOn) {
+                    Text("·", color = TextTertiary, fontFamily = UiFamily)
+                    PackTextButton(text = "Have a promo code?", onClick = onHaveCode, color = Primary)
+                }
             }
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PackTextButton(text = "Have a promo code?", onClick = onHaveCode, color = TextSecondary)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                PackTextButton(text = "Terms", onClick = onTerms, color = TextSecondary)
+                Text("·", color = TextTertiary, fontFamily = UiFamily)
+                PackTextButton(text = "Privacy", onClick = onPrivacy, color = TextSecondary)
             }
         }
     }
@@ -301,6 +330,91 @@ private fun PriceCard(plan: PlanOffer) {
                 Spacer(Modifier.height(6.dp))
                 Text(it, color = PrimaryDark, fontFamily = UiFamily, fontWeight = FontWeight.SemiBold, fontSize = 12.5f.sp)
             }
+        }
+    }
+}
+
+/** Weekly | Monthly (| Yearly): one pill, the chosen half filled. */
+@Composable
+private fun PlanToggle(kinds: List<PlanKind>, selected: PlanKind, onPick: (PlanKind) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF1E4D6), RoundedCornerShape(999.dp))
+            .padding(4.dp),
+    ) {
+        kinds.forEach { kind ->
+            val on = kind == selected
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(40.dp)
+                    .background(if (on) Primary else Color.Transparent, RoundedCornerShape(999.dp))
+                    .clip(RoundedCornerShape(999.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        role = Role.Tab,
+                    ) { onPick(kind) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    kind.title,
+                    color = if (on) Color.White else TextSecondary,
+                    fontFamily = UiFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+    }
+}
+
+/** Google Play hasn't answered: say where prices come from and offer to ask again. */
+@Composable
+private fun PricesUnavailable(onRetry: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(PackIcons.Warning, contentDescription = null, tint = com.packabunch.ui.theme.Caution, modifier = Modifier.size(16.dp))
+            Text("Prices couldn't load", color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 14.5f.sp)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Google Play sets the price for your country, in your currency. It couldn't be reached just now. Nothing has been charged.",
+            color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5f.sp, lineHeight = 18.sp,
+        )
+        PackTextButton(text = "Try again", onClick = onRetry, color = Primary)
+    }
+}
+
+/** Pack Plus is on: where it comes from, and until when if it runs out by itself. */
+@Composable
+private fun PlusOnCard(until: java.time.Instant?) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(20.dp))
+            .border(1.5.dp, Primary, RoundedCornerShape(20.dp))
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(34.dp).background(com.packabunch.ui.theme.SuccessTint, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+            Icon(PackIcons.Check, contentDescription = null, tint = com.packabunch.ui.theme.Success, modifier = Modifier.size(17.dp))
+        }
+        Column {
+            Text("Pack Plus is on", color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+            Text(
+                if (until != null) "From a promo code, until " +
+                    java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy").format(until.atZone(java.time.ZoneId.systemDefault())) + "."
+                else "Billed through Google Play. Change or cancel it there.",
+                color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5f.sp, lineHeight = 18.sp,
+            )
         }
     }
 }
