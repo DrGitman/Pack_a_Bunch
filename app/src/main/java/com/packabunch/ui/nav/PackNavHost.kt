@@ -474,6 +474,10 @@ fun PackNavHost(
                 hasActiveSubscription = settings.tier == com.packabunch.packing.Tier.PLUS,
                 onConfirmDelete = {
                     scope.launch {
+                        // The profile photo sits in a public bucket and is not a database row, so
+                        // deleting the account would leave it online. It goes first; a person
+                        // with no photo simply has nothing to remove.
+                        com.packabunch.data.cloud.CloudAvatar(account, account.userId.orEmpty()).remove()
                         val problem = runCatching { account.deleteAccount() }.exceptionOrNull()
                         if (problem != null) {
                             notice = "Couldn't delete the account. " +

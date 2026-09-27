@@ -30,3 +30,7 @@ supabase/.temp/
 .kotlin/
 animations/
 logos/
+# JVM crash and replay logs record the machine's user name, paths and environment.
+hs_err_pid*.log
+replay_pid*.log
+*.log

@@ -1,0 +1,9 @@
+# Weekly pull requests for outdated or vulnerable dependencies. A breach through a known hole
+# in an old library is more likely than through anything written here.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
