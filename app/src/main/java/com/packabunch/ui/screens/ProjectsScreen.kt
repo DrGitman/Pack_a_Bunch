@@ -143,13 +143,13 @@ fun ProjectsScreen(
                     fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.7).sp)
                 Box {
                     com.packabunch.ui.components.LottieTapIcon(
-                        animation = com.packabunch.R.raw.icon_bell,
+                        animation = com.packabunch.R.raw.icon_bell_header,
                         contentDescription = if (unreadNotifications > 0) "Notifications, $unreadNotifications new" else "Notifications",
                         onClick = onNotifications,
                         size = 52.dp,
                     )
                     if (unreadNotifications > 0) Box(
-                        Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp).size(9.dp)
+                        Modifier.align(Alignment.TopEnd).padding(top = 9.dp, end = 9.dp).size(10.dp)
                             .background(com.packabunch.ui.theme.Primary, androidx.compose.foundation.shape.CircleShape),
                     )
                 }

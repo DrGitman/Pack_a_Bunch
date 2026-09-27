@@ -409,12 +409,19 @@ fun PackNavHost(
                     notifications = notifications,
                     onMarkAllRead = viewModel::markNotificationsRead,
                     onOpen = { n ->
+                        viewModel.markNotificationRead(n.id)
                         when {
                             n.id.startsWith("progress-") -> {
                                 val packId = n.id.removePrefix("progress-").substringBeforeLast('-')
                                 viewModel.openPack(packId) { viewModel.resumeGuide(); navController.navigate(Routes.PACKING_GUIDE) }
                             }
-                            n.id.startsWith("plus-") -> navController.navigate(Routes.PLAN_COMPARISON)
+                            n.id.startsWith("done-") -> {
+                                val packId = n.id.removePrefix("done-").substringBeforeLast('-')
+                                viewModel.openPack(packId) { navController.navigate(Routes.PLAN_RESULT) }
+                            }
+                            n.id.startsWith("plus-ending-") || n.id.startsWith("plus-ended-") ->
+                                navController.navigate(Routes.UPGRADE)
+                            n.id.startsWith("plus-") -> navController.navigate(Routes.PACK_PLAN)
                             else -> Unit
                         }
                     },

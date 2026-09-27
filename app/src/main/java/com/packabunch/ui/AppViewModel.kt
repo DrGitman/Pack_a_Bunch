@@ -99,6 +99,7 @@ class AppViewModel(
         val plus = storePlus || promo
         if (plus && _settings.value.tier != Tier.PLUS) preferences.edit().putLong("plusSeenAt", System.currentTimeMillis()).apply()
         setTier(if (plus) Tier.PLUS else Tier.FREE)
+        plusChanged.update { it + 1 }
     }
 
     /** Redeems a promo code; tells [onResult] until when Plus now runs, or null if refused. */
@@ -113,52 +114,121 @@ class AppViewModel(
     // -- notifications ------------------------------------------------------------------------
 
     private val readNotifications = MutableStateFlow(preferences.getStringSet("readNotifications", emptySet())!!.toSet())
-    private val lastBackup = MutableStateFlow(preferences.getLong("lastBackupAt", 0L) to preferences.getInt("lastBackupPacks", 0))
+
+    /** The last backup that finished, and the last one that didn't — both real sync results. */
+    private data class BackupLog(val at: Long, val packs: Int, val failedAt: Long)
+    private val backupLog = MutableStateFlow(BackupLog(
+        at = preferences.getLong("lastBackupAt", 0L),
+        packs = preferences.getInt("lastBackupPacks", 0),
+        failedAt = preferences.getLong("lastBackupFailedAt", 0L),
+    ))
+
+    /** Bumped whenever the Pack Plus source changes, so the billing notices are worked out again. */
+    private val plusChanged = MutableStateFlow(0)
 
     /**
      * What the app has to tell you, worked out from what is actually true: a pack left part
-     * packed, the last completed backup, Pack Plus switching on. Nothing seeded or made up.
+     * packed, a pack finished, the last backup (or the one that failed), Pack Plus starting or
+     * about to end. Nothing is seeded, and each kind obeys its switch on the notification
+     * settings page — "Choose what shows up here" really does choose.
      */
     val notifications: StateFlow<List<com.packabunch.ui.screens.AppNotification>> by lazy {
-        kotlinx.coroutines.flow.combine(repository.projects, _settings, lastBackup, readNotifications) { projects, settings, backup, read ->
+        kotlinx.coroutines.flow.combine(repository.projects, _settings, backupLog, readNotifications, plusChanged) { projects, settings, backup, read, _ ->
+            val show = settings.notifications
+            val now = System.currentTimeMillis()
             buildList {
                 for (p in projects) {
+                    if (p.id == "sample") continue
                     val total = p.plan?.placements?.size ?: 0
                     val packed = p.packedInstanceIds.size
-                    if (total == 0 || packed == 0 || packed >= total) continue
-                    val name = p.name.ifBlank { "pack" }
-                    val how = if (packed * 2 in total - 1..total + 1) "half packed" else "$packed of $total packed"
-                    add(com.packabunch.ui.screens.AppNotification(
-                        id = "progress-${p.id}-$packed",
-                        icon = com.packabunch.ui.components.PackIcons.Clock,
-                        title = "The ${name.lowercase()} is $how",
-                        body = "You stopped at step ${packed + 1} of $total. ${total - packed} ${if (total - packed == 1) "piece" else "pieces"} still to go in.",
-                        whenText = whenText(p.updatedAtMillis), unread = false,
-                        tint = com.packabunch.ui.theme.Caution, tile = com.packabunch.ui.theme.CautionTint, atMillis = p.updatedAtMillis,
+                    if (total == 0 || packed == 0) continue
+                    val name = p.name.ifBlank { "pack" }.lowercase()
+                    if (packed < total && show.halfFinishedPack) {
+                        val how = if (packed * 2 in total - 1..total + 1) "half packed" else "$packed of $total packed"
+                        val left = total - packed
+                        add(com.packabunch.ui.screens.AppNotification(
+                            id = "progress-${p.id}-$packed",
+                            icon = com.packabunch.ui.components.PackIcons.Clock,
+                            title = "The $name is $how",
+                            body = "You stopped at step ${packed + 1} of $total. $left ${if (left == 1) "piece" else "pieces"} still to go in.",
+                            whenText = whenText(p.updatedAtMillis), unread = false,
+                            tint = com.packabunch.ui.theme.Caution, tile = com.packabunch.ui.theme.CautionTint, atMillis = p.updatedAtMillis,
+                        ))
+                    } else if (packed >= total && show.askHowItWent) {
+                        add(com.packabunch.ui.screens.AppNotification(
+                            id = "done-${p.id}-${p.updatedAtMillis}",
+                            icon = com.packabunch.ui.components.PackIcons.Check,
+                            title = "The $name is packed",
+                            body = "All $total ${if (total == 1) "piece" else "pieces"} went in. Did it go to plan? Tell us if something didn't fit.",
+                            whenText = whenText(p.updatedAtMillis), unread = false,
+                            tint = com.packabunch.ui.theme.Success, tile = com.packabunch.ui.theme.SuccessTint, atMillis = p.updatedAtMillis,
+                        ))
+                    }
+                }
+                if (show.backupState) {
+                    if (backup.failedAt > backup.at) add(com.packabunch.ui.screens.AppNotification(
+                        id = "backup-failed-${backup.failedAt / DAY_MS}",
+                        icon = com.packabunch.ui.components.PackIcons.Download,
+                        title = "Backup didn't finish",
+                        body = "Your packs are safe on this phone. It tries again by itself when you're connected.",
+                        whenText = whenText(backup.failedAt), unread = false,
+                        tint = com.packabunch.ui.theme.Caution, tile = com.packabunch.ui.theme.CautionTint, atMillis = backup.failedAt,
+                    )) else if (backup.at > 0) add(com.packabunch.ui.screens.AppNotification(
+                        // One a day at most: a sync after every edit is not news each time.
+                        id = "backup-${backup.at / DAY_MS}",
+                        icon = com.packabunch.ui.components.PackIcons.Download,
+                        title = "Backup finished",
+                        body = "${backup.packs} ${if (backup.packs == 1) "pack is" else "packs are"} safe in your account.",
+                        whenText = whenText(backup.at), unread = false,
+                        tint = com.packabunch.ui.theme.Success, tile = com.packabunch.ui.theme.SuccessTint, atMillis = backup.at,
                     ))
                 }
-                if (backup.first > 0) add(com.packabunch.ui.screens.AppNotification(
-                    id = "backup-${backup.first}",
-                    icon = com.packabunch.ui.components.PackIcons.Download,
-                    title = "Backup finished",
-                    body = "${backup.second} ${if (backup.second == 1) "pack is" else "packs are"} safe in your account.",
-                    whenText = whenText(backup.first), unread = false,
-                    tint = com.packabunch.ui.theme.Success, tile = com.packabunch.ui.theme.SuccessTint, atMillis = backup.first,
-                ))
-                if (settings.tier == Tier.PLUS) {
+                if (show.billing) {
                     val until = promoPlusUntil
-                    add(com.packabunch.ui.screens.AppNotification(
-                        id = "plus-${until?.toEpochMilli() ?: "store"}",
+                    val fmt = java.time.format.DateTimeFormatter.ofPattern("d MMMM")
+                    fun day(i: java.time.Instant) = fmt.format(i.atZone(java.time.ZoneId.systemDefault()))
+                    if (settings.tier == Tier.PLUS) {
+                        val since = preferences.getLong("plusSeenAt", 0L)
+                        add(com.packabunch.ui.screens.AppNotification(
+                            id = "plus-${until?.toEpochMilli() ?: "store"}",
+                            icon = com.packabunch.ui.components.PackIcons.Cube,
+                            title = "Pack Plus is on",
+                            body = if (until != null && !storePlus) "From a promo code, until ${day(until)}."
+                            else "Billed by Google Play. Manage it there any time.",
+                            whenText = if (since > 0) whenText(since) else "", unread = false,
+                            atMillis = since,
+                        ))
+                        if (until != null && !storePlus) {
+                            val daysLeft = java.time.Duration.between(java.time.Instant.ofEpochMilli(now), until).toDays()
+                            if (daysLeft in 0L..3L) add(com.packabunch.ui.screens.AppNotification(
+                                id = "plus-ending-${until.toEpochMilli()}",
+                                icon = com.packabunch.ui.components.PackIcons.Clock,
+                                title = if (daysLeft == 0L) "Pack Plus ends today" else "Pack Plus ends in $daysLeft ${if (daysLeft == 1L) "day" else "days"}",
+                                body = "Your promo code runs out on ${day(until)}. Your packs stay; only the Plus limits come back.",
+                                whenText = whenText(now), unread = false,
+                                tint = com.packabunch.ui.theme.Caution, tile = com.packabunch.ui.theme.CautionTint,
+                                atMillis = until.toEpochMilli() - 3 * DAY_MS,
+                            ))
+                        }
+                    } else if (until != null && until.toEpochMilli() <= now) add(com.packabunch.ui.screens.AppNotification(
+                        id = "plus-ended-${until.toEpochMilli()}",
                         icon = com.packabunch.ui.components.PackIcons.Cube,
-                        title = "Pack Plus is on",
-                        body = if (until != null) "From a promo code, until ${java.time.format.DateTimeFormatter.ofPattern("d MMMM").format(until.atZone(java.time.ZoneId.systemDefault()))}."
-                        else "Billed by Google Play. Manage it there any time.",
-                        whenText = whenText(preferences.getLong("plusSeenAt", System.currentTimeMillis())), unread = false,
-                        atMillis = preferences.getLong("plusSeenAt", 0L),
+                        title = "Pack Plus has ended",
+                        body = "The promo code ran out on ${day(until)}. Everything you saved is still here.",
+                        whenText = whenText(until.toEpochMilli()), unread = false,
+                        atMillis = until.toEpochMilli(),
                     ))
                 }
+                // "New kinds of space" has no source yet — it gets a notice only when one ships.
             }.map { it.copy(unread = it.id !in read) }.sortedByDescending { it.atMillis }
         }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
+    }
+
+    fun markNotificationRead(id: String) {
+        if (id in readNotifications.value) return
+        val all = readNotifications.value + id
+        preferences.edit().putStringSet("readNotifications", all).apply()
+        readNotifications.value = all
     }
 
     fun markNotificationsRead() {
@@ -238,11 +308,14 @@ class AppViewModel(
             kotlinx.coroutines.delay(afterMillis)
             sync.sync()
             // A completed backup is worth telling about, once each time it happens.
+            val now = System.currentTimeMillis()
             if (sync.state.value.backedUp) {
-                val now = System.currentTimeMillis()
                 val count = projects.value.count { it.id != "sample" }
                 preferences.edit().putLong("lastBackupAt", now).putInt("lastBackupPacks", count).apply()
-                lastBackup.value = now to count
+                backupLog.update { it.copy(at = now, packs = count) }
+            } else if (sync.state.value.message.startsWith("Couldn't")) {
+                preferences.edit().putLong("lastBackupFailedAt", now).apply()
+                backupLog.update { it.copy(failedAt = now) }
             }
             // Whether it worked or not, the packs have had their chance to turn up.
             _firstSyncDone.value = true
@@ -876,3 +949,6 @@ data class PackEditorState(
 
     val hasUsableSpace: Boolean get() = space?.dimensions?.isValid() == true
 }
+
+/** A day, for keeping a notice to one a day. */
+private const val DAY_MS = 86_400_000L
