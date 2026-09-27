@@ -339,6 +339,22 @@ class AppViewModel(
 
     // -- editing a pack -------------------------------------------------------------------
 
+    /**
+     * Starts a scan if the plan allows another today, and counts it. Free includes
+     * [TierLimits.maxScansPerDay] a day — mapping a space or scanning items; typing sizes is
+     * never limited. Counted on this phone, per calendar day.
+     */
+    fun tryStartScan(): Boolean {
+        val today = java.time.LocalDate.now().toString()
+        val sofar = if (preferences.getString("scanDay", null) == today) preferences.getInt("scanCount", 0) else 0
+        if (!limits.allowsAnotherScanToday(sofar)) return false
+        preferences.edit().putString("scanDay", today).putInt("scanCount", sofar + 1).apply()
+        return true
+    }
+
+    /** Saved packs that count against the plan. The sample pack is the app's, not theirs. */
+    fun savedPackCount(): Int = projects.value.count { it.id != "sample" }
+
     fun startNewPack() {
         openGeneration++
         solveGeneration++

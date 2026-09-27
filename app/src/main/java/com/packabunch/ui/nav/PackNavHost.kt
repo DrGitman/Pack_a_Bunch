@@ -315,6 +315,25 @@ fun PackNavHost(
     var deletedForUndo by remember { mutableStateOf<com.packabunch.data.Project?>(null) }
     // Onboarding runs before sign-in (RequiredAccount), so a signed-in person always lands on their packs.
     val startRoute = Routes.PROJECTS
+    // Free keeps one saved pack. Starting or copying another goes to Pack Plus instead, with
+    // the reason said; deleting the one there is always the free way out.
+    fun packRoomOrUpsell(): Boolean {
+        if (viewModel.limits.allowsAnotherPack(viewModel.savedPackCount())) return true
+        notice = "Free keeps ${viewModel.limits.maxSavedPacks} pack. Delete it to start another, or get Pack Plus for as many as you like."
+        navController.navigate(Routes.UPGRADE)
+        return false
+    }
+    fun newPack() {
+        if (!packRoomOrUpsell()) return
+        viewModel.startNewPack()
+        navController.navigate(Routes.SPACE_TYPE)
+    }
+    // Free includes a few scans a day; typing sizes in is never limited, so that is offered.
+    fun scanOrType(route: String, typed: () -> Unit) {
+        if (viewModel.tryStartScan()) { navController.navigate(route); return }
+        notice = "Free includes ${viewModel.limits.maxScansPerDay} scans a day. Type the sizes in, or get Pack Plus to scan as often as you like."
+        typed()
+    }
     fun home() = navController.navigate(Routes.PROJECTS) {
         popUpTo(navController.graph.id) { inclusive = true }
         launchSingleTop = true
@@ -341,8 +360,7 @@ fun PackNavHost(
         composable(Routes.WELCOME) {
             WelcomeScreen(
                 onPlanAPack = {
-                    viewModel.startNewPack()
-                    navController.navigate(Routes.SPACE_TYPE)
+                    newPack()
                 },
                 onTrySample = {
                     viewModel.openPack("sample") { navController.navigate(Routes.ITEMS) }
@@ -397,7 +415,7 @@ fun PackNavHost(
                 here = com.packabunch.ui.components.NavSlots.Account,
                 onProjects = ::home,
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+                onNewPack = { newPack() },
             ) { pageModifier ->
             // Android's own photo picker: no storage permission, and it only ever hands back
             // the one picture the person chose.
@@ -547,15 +565,14 @@ fun PackNavHost(
                     }
                 },
                 onNewPack = {
-                    viewModel.startNewPack()
-                    navController.navigate(Routes.SPACE_TYPE)
+                    newPack()
                 },
                 onBack = { navController.popBackStack() },
                 onDelete = { viewModel.deleteProject(it.id) },
                 onRestore = { viewModel.restoreProject(it); deletedForUndo = null },
                 onSettings = { navController.navigate(Routes.SETTINGS) },
                 onRename = viewModel::renameProject,
-                onDuplicate = viewModel::duplicateProject,
+                onDuplicate = { if (packRoomOrUpsell()) viewModel.duplicateProject(it) },
                 onRemeasure = { project ->
                     viewModel.openPack(project.id) { navController.navigate(Routes.MEASURE_REVIEW) }
                 },
@@ -610,7 +627,7 @@ fun PackNavHost(
                     if (!settings.cameraMeasuring) {
                         navController.navigate(Routes.CREATE_SPACE)
                     } else if (editor.spaceKind == SpaceKind.ANY_SHAPE) {
-                        navController.navigate(Routes.SPACE_SCAN)
+                        scanOrType(Routes.SPACE_SCAN) { navController.navigate(Routes.CREATE_SPACE) }
                     } else {
                         navController.navigate(Routes.MEASURE)
                     }
@@ -622,6 +639,15 @@ fun PackNavHost(
         composable(Routes.SPACE_SCAN) {
             SpaceScanScreen(
                 onScanned = { scan ->
+                    // Free maps spaces up to a size; a bigger one is Pack Plus. The same space
+                    // can always be typed in, at any size.
+                    val g = scan.baseGrid
+                    val litres = g.countX.toDouble() * g.countY * g.countZ * g.resolutionMm.toDouble().let { it * it * it } / 1e6
+                    if (!viewModel.limits.allowsSpaceLitres(litres)) {
+                        notice = "Free maps spaces up to ${viewModel.limits.maxScannedSpaceLitres} litres; this one is about ${litres.toInt()}. Type its size in, or get Pack Plus to map any size."
+                        navController.navigate(Routes.UPGRADE)
+                        return@SpaceScanScreen
+                    }
                     viewModel.setScannedSpace(scan)
                     val report = scan.report()
                     // Significant gaps get their own screen before anything is planned on it.
@@ -732,7 +758,7 @@ fun PackNavHost(
                 onEditConsumed = { editItemId = null },
                 onLibrary = { navController.navigate(Routes.ITEM_LIBRARY) },
                 onScan = {
-                    if (settings.cameraMeasuring) navController.navigate(Routes.SWEEP_ITEMS)
+                    if (settings.cameraMeasuring) scanOrType(Routes.SWEEP_ITEMS) { }
                     else notice = "Camera measuring is turned off in Settings. You can still add items by typing their dimensions."
                 },
             )
@@ -909,7 +935,7 @@ fun PackNavHost(
                     project = pack,
                     unit = settings.unit,
                     onRename = { packMenuOpen = false; renamePack = pack },
-                    onDuplicate = { packMenuOpen = false; viewModel.duplicateProject(pack) },
+                    onDuplicate = { packMenuOpen = false; if (packRoomOrUpsell()) viewModel.duplicateProject(pack) },
                     onRemeasure = {
                         packMenuOpen = false
                         viewModel.openPack(pack.id) { navController.navigate(Routes.CREATE_SPACE) }
@@ -955,7 +981,7 @@ fun PackNavHost(
                 here = com.packabunch.ui.components.NavSlots.Notifications,
                 onProjects = ::home,
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+                onNewPack = { newPack() },
             ) { pageModifier ->
             NotificationSettingsScreen(
                 modifier = pageModifier,
@@ -1016,8 +1042,7 @@ fun PackNavHost(
                     }
                 },
                 onNewPack = {
-                    viewModel.startNewPack()
-                    navController.navigate(Routes.SPACE_TYPE)
+                    newPack()
                 },
                 onUpgrade = { navController.navigate(Routes.UPGRADE) },
                 onAccount = { navController.navigate(Routes.PROFILE) },
@@ -1041,7 +1066,7 @@ fun PackNavHost(
                 here = com.packabunch.ui.components.NavSlots.Info,
                 onProjects = ::home,
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+                onNewPack = { newPack() },
             ) { pageModifier ->
                 com.packabunch.ui.screens.InfoScreen(
                     modifier = pageModifier,
@@ -1064,7 +1089,7 @@ fun PackNavHost(
                 here = com.packabunch.ui.components.NavSlots.Restore,
                 onProjects = ::home,
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+                onNewPack = { newPack() },
             ) { pageModifier ->
                 com.packabunch.ui.screens.RestorePurchasesScreen(
                     modifier = pageModifier,
@@ -1080,7 +1105,7 @@ fun PackNavHost(
                 here = com.packabunch.ui.components.NavSlots.PackPlan,
                 onProjects = ::home,
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+                onNewPack = { newPack() },
             ) { pageModifier ->
                 com.packabunch.ui.screens.PackPlanScreen(
                     modifier = pageModifier,
@@ -1099,7 +1124,7 @@ fun PackNavHost(
                 here = com.packabunch.ui.components.NavSlots.Info,
                 onProjects = ::home,
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+                onNewPack = { newPack() },
             ) { pageModifier ->
             com.packabunch.ui.screens.TermsScreen(
                 modifier = pageModifier,onBack = { navController.popBackStack() })
@@ -1111,7 +1136,7 @@ fun PackNavHost(
                 here = com.packabunch.ui.components.NavSlots.Info,
                 onProjects = ::home,
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+                onNewPack = { newPack() },
             ) { pageModifier ->
             com.packabunch.ui.screens.PrivacyPolicyScreen(
                 modifier = pageModifier,onBack = { navController.popBackStack() })
@@ -1123,7 +1148,7 @@ fun PackNavHost(
                 here = com.packabunch.ui.components.NavSlots.PackPlan,
                 onProjects = ::home,
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
-                onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
+                onNewPack = { newPack() },
             ) { pageModifier ->
             val plans by viewModel.plans.collectAsStateWithLifecycle()
             val selectedPlan by viewModel.selectedPlan.collectAsStateWithLifecycle()

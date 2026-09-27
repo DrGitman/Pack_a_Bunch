@@ -373,7 +373,6 @@ class ScannedSpaceTest {
         assertTrue(TierLimits.PLUS.allowsAnotherScanToday(99))
         assertTrue(TierLimits.PLUS.allowsAnotherPack(99))
         assertTrue(TierLimits.PLUS.itemLibrary)
-        assertTrue(TierLimits.PLUS.planComparison)
 
         assertFalse(TierLimits.FREE.allowsSpaceLitres(400.0), "a car boot is past the free cap")
         assertFalse(TierLimits.FREE.allowsAnotherScanToday(3))

@@ -87,14 +87,13 @@ artboard. Never hardcode a hex value in a composable — colour, type and spacin
 
 ## Plans
 
-| | Free | Pro |
+| | Free | Pack Plus |
 |---|---|---|
 | Pieces per pack | 20 | unlimited |
 | Saved packs | 1 | unlimited |
 | Scans per day | 3 | unlimited |
 | Size of space you can scan | 120 L | any |
 | Item library | — | ✓ |
-| Plan comparison | — | ✓ |
 
 "Unlimited" means no *product* limit. The engine can only search about 400 pieces, and
 that ceiling applies to everyone — it must never be left out when describing Pro.

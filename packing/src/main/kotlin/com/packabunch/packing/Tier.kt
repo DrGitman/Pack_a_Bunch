@@ -36,8 +36,6 @@ data class TierLimits(
     val maxScannedSpaceLitres: Int?,
     /** Measure an item once and reuse it across packs. */
     val itemLibrary: Boolean,
-    /** Keep two arrangements side by side and choose. */
-    val planComparison: Boolean,
     /** Scan irregular spaces at all — boots, cupboards, anything that is not a box. */
     val irregularSpaceScanning: Boolean,
 ) {
@@ -63,7 +61,6 @@ data class TierLimits(
             maxScansPerDay = 3,
             maxScannedSpaceLitres = 120,
             itemLibrary = false,
-            planComparison = false,
             irregularSpaceScanning = true,
         )
 
@@ -74,7 +71,6 @@ data class TierLimits(
          *  - scan as often as needed, with no daily count
          *  - as many saved packs as they like
          *  - the item library, so a thing measured once is measured forever
-         *  - plan comparison, to keep two arrangements and choose
          *
          * "Unlimited" here means *no product limit*. [PackingEngine.MAX_INSTANCE_COUNT]
          * still applies — past roughly four hundred pieces the search cannot return
@@ -87,7 +83,6 @@ data class TierLimits(
             maxScansPerDay = null,
             maxScannedSpaceLitres = null,
             itemLibrary = true,
-            planComparison = true,
             irregularSpaceScanning = true,
         )
 
@@ -123,5 +118,4 @@ sealed interface TierBlock {
     data class OutOfScansToday(val allowedPerDay: Int) : TierBlock
     data class NoRoomForAnotherPack(val allowed: Int) : TierBlock
     data object LibraryLocked : TierBlock
-    data object ComparisonLocked : TierBlock
 }
