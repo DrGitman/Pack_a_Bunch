@@ -34,3 +34,6 @@ logos/
 hs_err_pid*.log
 replay_pid*.log
 *.log
+
+# Python bytecode from running the geometry tools.
+__pycache__/

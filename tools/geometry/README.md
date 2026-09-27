@@ -74,6 +74,58 @@ Canonical box 1000 × 1000 × 1000 mm, origin at the minimum corner, X width, Y 
 | `watering_can` | 92 | 6 | Watering can: body, a long spout with its rose, and the handle at the back. |
 | `power_drill` | 328 | 4 | Cordless drill: rounded motor housing, a round chuck, the grip and the battery pack. |
 | `hand_tool` | 12 | 2 | Hammer, spanner, screwdriver or pliers: a handle and a heavier head, lying along the width. |
+| `mug` | 276 | 2 | Mug: a straight-sided body with a rolled foot, a coffee line below the rim, a D handle. |
+| `wine_glass` | 382 | 1 | Wine glass: a round foot, a thin stem, and a tulip bowl. |
+| `vase` | 446 | 1 | Vase: a foot ring, a full shoulder, a narrow neck and a flared lip. |
+| `teapot` | 477 | 4 | Teapot: a squat round body, a lid with a knob, a curved spout and a looped handle. |
+| `blender` | 439 | 5 | Blender: a motor base with a dial, a tapered jug with a lid, and the jug's handle. |
+| `stand_mixer` | 556 | 6 | Stand mixer: a base, a column at the back, the tilting head over a steel bowl, the beater. |
+| `air_fryer` | 320 | 4 | Air fryer: a rounded body, the basket drawer with its handle, a dial on the top panel. |
+| `knife_block` | 76 | 6 | Knife block: a slanted block with five handles standing out of its top. |
+| `dish_rack` | 436 | 11 | Dish drying rack: a drip tray, a wire rail round it, four plates standing in it. |
+| `laundry_basket` | 478 | 1 | Laundry basket: an oval woven tub, ribbed round its sides, with a rolled rim. |
+| `bucket` | 304 | 3 | Bucket: a tapered pail with a beaded rim and a wire bail with a grip. |
+| `pedal_bin` | 361 | 4 | Pedal bin: a round body, a domed lid on a hinge at the back, the pedal at the front. |
+| `clothes_iron` | 118 | 4 | Iron: a pointed soleplate, the body over it, a looped handle and the dial. |
+| `ironing_board` | 90 | 6 | Ironing board folded for carrying: the padded board with its pointed end, legs folded under. |
+| `pedestal_fan` | 534 | 8 | Standing fan: a round base, a pole, the motor housing and a caged three-blade head. |
+| `oil_heater` | 992 | 16 | Oil-filled radiator: nine rounded fins in a row, a control box and castor feet. |
+| `desk_lamp` | 338 | 4 | Desk lamp: a weighted round base, two jointed arms and a cone shade looking down. |
+| `speaker` | 348 | 3 | Bookshelf speaker: a rounded cabinet with a woofer cone and a dome tweeter on the front. |
+| `camera` | 534 | 5 | Camera: the body with its grip and viewfinder hump, and a lens with focus and zoom rings. |
+| `headphones` | 402 | 3 | Over-ear headphones: a padded band arching over two cushioned ear cups. |
+| `alarm_clock` | 378 | 6 | Twin-bell alarm clock: a round case facing forward, two bells, a hammer and two feet. |
+| `book_stack` | 96 | 16 | A stack of four books of different sizes, spines and page edges showing. |
+| `potted_plant` | 594 | 11 | Potted plant: a tapered pot with its rim, soil, and a full leafy crown. |
+| `umbrella` | 274 | 3 | Folded umbrella: the pleated canopy tapering to its tip, the shaft and a crook handle. |
+| `storage_bin` | 212 | 4 | Plastic storage box: a tub flaring to its rim, a clip-on lid and handles at each end. |
+| `boot` | 260 | 4 | Tall boot: sole and heel, the foot, and the shaft rising from the back. |
+| `hair_dryer` | 196 | 2 | Hair dryer: the barrel with its nozzle and back vent, and the handle angled below. |
+| `skateboard` | 662 | 9 | Skateboard: a deck with both tails kicked up, two trucks and four wheels. |
+| `kick_scooter` | 374 | 7 | Kick scooter: a deck on two wheels, the steering column and a T handlebar with grips. |
+| `tennis_racket` | 328 | 5 | Racket lying flat: the oval frame round its string bed, the throat, and the grip. |
+| `golf_bag` | 796 | 11 | Golf bag: a tall padded tube with a collar, a pocket, a strap and clubs standing in it. |
+| `snowboard` | 174 | 7 | Snowboard lying flat: the board with raised tips at both ends and two bindings. |
+| `lantern` | 462 | 8 | Camping lantern: a base, a glass chimney in a wire cage, a vented cap and a bail handle. |
+| `gas_cylinder` | 332 | 3 | Gas bottle: a domed steel body on a foot ring, the valve and its protective shroud. |
+| `stroller` | 728 | 10 | Folded stroller: two long frame tubes with hooked handles, the folded seat, four wheels. |
+| `child_car_seat` | 482 | 6 | Child car seat: a moulded base, the seat, a tall back with side wings and a headrest. |
+| `high_chair` | 282 | 7 | High chair: a seat with arms and a tray, on four splayed legs. |
+| `office_chair` | 1158 | 18 | Office chair: a five-star base on castors, the gas lift, a padded seat, back and arms. |
+| `bean_bag` | 207 | 1 | Bean bag: a heavy pear-shaped slump, wider and flatter at the bottom. |
+| `side_table` | 346 | 3 | Round side table: a top with a rounded edge, a pedestal and a weighted foot. |
+| `coffee_table` | 244 | 6 | Coffee table: a top with rounded edges, a lower shelf and four legs. |
+| `filing_cabinet` | 288 | 16 | Filing cabinet: a tall carcass, four drawers, each with a handle and a label holder. |
+| `robot_vacuum` | 282 | 3 | Robot vacuum: a low round body with a bevelled edge, the bumper and a sensor turret. |
+| `dumbbell` | 522 | 5 | Dumbbell: a knurled handle between stacks of round weight plates. |
+| `kettlebell` | 284 | 2 | Kettlebell: a round cast body on a flat base, and the thick handle over it. |
+| `sewing_machine` | 440 | 6 | Sewing machine: the bed, the pillar, the arm over it, the head, needle and handwheel. |
+| `paint_can` | 342 | 2 | Paint tin: a straight can with rolled rims, a lid and a wire handle. |
+| `wheelbarrow` | 232 | 6 | Wheelbarrow: a flared steel tray, the wheel at the front, two handles and legs. |
+| `bbq_grill` | 517 | 9 | Kettle barbecue: a round bowl, its domed lid with a handle, three legs and two wheels. |
+| `pet_carrier` | 208 | 9 | Pet carrier: a rounded shell, the barred door on the front and a handle on top. |
+| `dog_bed` | 478 | 2 | Round dog bed: a plump bolster ring around a sunken cushion. |
+| `aquarium` | 178 | 11 | Fish tank: a base trim, glass walls in a frame, gravel, and the hood on top. |
 
 ## Compromises
 

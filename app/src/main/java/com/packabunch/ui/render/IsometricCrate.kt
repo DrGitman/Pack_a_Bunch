@@ -431,6 +431,9 @@ private fun DrawScope.drawSurface(view: CrateView, faces: List<SurfaceFace>, bas
     val ordered = if (visible.any { it.part >= 0 }) byPart(faces, visible, towardViewer, ::depth) else visible.sortedBy { depth(it) }
     ordered.forEach { face ->
         val p = face.points.map { view.project(it.x,it.y,it.z) }
+        // A facet smaller than a pixel on screen is invisible but still costs a path. Detailed
+        // shapes have hundreds of them on a small or distant item, so they are skipped.
+        if (face.smooth && screenArea(p) < MIN_FACE_PX2) return@forEach
         val n = face.normal ?: sideNormal(face.side)
         val fill = base.lighten(0.12f + 0.5f * n.z.coerceAtLeast(0f) + 0.22f * n.x * n.x).copy(alpha=alpha)
         quad(p[0],p[1],p[2],p[3],fill)
@@ -501,6 +504,15 @@ private fun byPart(
     order += keys.filter { it !in order }.sortedBy { centre.getValue(it) }
     return order.flatMap { k -> groups.getValue(k).sortedBy(depth) }
 }
+
+private fun screenArea(p: List<Offset>): Float {
+    var twice = 0f
+    for (i in p.indices) { val a = p[i]; val b = p[(i + 1) % p.size]; twice += a.x * b.y - b.x * a.y }
+    return kotlin.math.abs(twice) / 2f
+}
+
+/** Below this many square pixels a smooth facet is not drawn. Its neighbours cover the spot. */
+private const val MIN_FACE_PX2 = 0.35f
 
 /** Parts closer than this along an axis count as touching, not as one clear of the other. */
 private const val PART_GAP_MM = 0.5f
