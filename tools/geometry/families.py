@@ -594,10 +594,14 @@ def bookcase():
 
 def chest_of_drawers():
     """Chest of drawers, cupboard or bedside table: carcass, four drawer fronts, handles."""
-    m = Mesh().add(box(0, 1, 0.03, 1, 0, 1))
+    # Built as separate blocks with no single front panel behind the drawers: the plan paints
+    # faces far to near by their centres, and one tall panel would be painted over the lower
+    # drawers and hide them.
+    m = Mesh().add(box(0, 0.04, 0.03, 1, 0, 1)).add(box(0.96, 1, 0.03, 1, 0, 1))
+    m.add(box(0.04, 0.96, 0.03, 1, 0.97, 1)).add(box(0.04, 0.96, 0.03, 1, 0, 0.04))
     for i in range(4):
-        z0 = 0.04 + i * 0.24
-        m.add(box(0.04, 0.96, 0.012, 0.03, z0, z0 + 0.21)).add(box(0.42, 0.58, 0, 0.012, z0 + 0.09, z0 + 0.12))
+        z0 = 0.04 + i * 0.235
+        m.add(box(0.04, 0.96, 0.012, 1, z0 + 0.01, z0 + 0.225)).add(box(0.42, 0.58, 0, 0.012, z0 + 0.1, z0 + 0.13))
     return m
 
 
@@ -733,7 +737,8 @@ def facing_viewer(fn):
 
 
 for _f in ("appliance_slab", "upright_fridge", "wardrobe", "piano", "backpack", "sofa", "armchair", "chair", "bed_frame",
-           "coffee_maker", "microwave", "cooker", "bookcase", "chest_of_drawers", "desk", "monitor", "printer"):
+           "coffee_maker", "microwave", "cooker", "bookcase", "chest_of_drawers", "desk", "monitor", "printer",
+           "helmet"):
     globals()[_f] = facing_viewer(globals()[_f])
 
 

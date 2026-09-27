@@ -56,7 +56,7 @@ Canonical box 1000 × 1000 × 1000 mm, origin at the minimum corner, X width, Y 
 | `pillow` | 42 | 3 | Pillow or cushion: a puffed middle that thins towards the ends. |
 | `folded_stack` | 24 | 4 | Folded clothes, towels or a blanket: four soft layers, none quite squared up. |
 | `bookcase` | 60 | 10 | Bookcase or open shelving: sides, back, three shelves and books on two of them. |
-| `chest_of_drawers` | 54 | 9 | Chest of drawers, cupboard or bedside table: carcass, four drawer fronts, handles. |
+| `chest_of_drawers` | 72 | 12 | Chest of drawers, cupboard or bedside table: carcass, four drawer fronts, handles. |
 | `desk` | 36 | 6 | Desk: top, a drawer pedestal on one side, two legs on the other. |
 | `stool` | 42 | 5 | Stool or bar stool: a round seat on four legs, no back. |
 | `ottoman` | 34 | 5 | Ottoman, pouf or bench: a padded block with softened top edges on short feet. |
