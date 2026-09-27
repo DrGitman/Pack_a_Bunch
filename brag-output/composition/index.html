@@ -102,9 +102,8 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
 /* scene 8 */
 #s8 .centre { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
 #s8-logo { display:flex; align-items:center; gap:34px; }
-#s8-logo .mark { width:150px; height:150px; border-radius:40px; background:#A65C34; position:relative; box-shadow:0 20px 50px rgba(166,92,52,0.35); }
-#s8-logo .mark svg { position:absolute; left:25px; top:22px; }
-#s8-logo .name { font-weight:800; font-size:128px; letter-spacing:-5px; color:var(--ink); }
+#s8-logo .mark { width:190px; height:192px; filter:drop-shadow(0 20px 40px rgba(90,36,30,0.35)); }
+#s8-logo .name { height:120px; width:929px; }
 #s8-line { font-weight:700; font-size:52px; color:var(--muted); margin-top:30px; letter-spacing:-1px; }
 #s8-cta { margin-top:56px; padding:26px 56px; border-radius:60px; background:#A65C34; color:#FFFFFF; font-weight:800; font-size:44px; }
 #s8-foot { margin-top:30px; font-family:"DM Mono"; font-weight:500; font-size:28px; color:#8E4A26; letter-spacing:1px; }
@@ -130,11 +129,9 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
   </section>
 
   <section id="s2" class="clip" data-start="8" data-duration="17" data-track-index="0">
-    <div id="s2-title" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:30px;">
-      <div style="width:120px;height:120px;border-radius:32px;background:#A65C34;position:relative;">
-        <svg width="80" height="80" viewBox="0 0 24 24" style="position:absolute;left:20px;top:18px" fill="none" stroke="#FFF8F0" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z M4 7.5 12 12l8-4.5 M12 12v9"/></svg>
-      </div>
-      <div style="font-weight:800;font-size:120px;letter-spacing:-5px;">Pack a Bunch</div>
+    <div id="s2-title" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:40px;">
+      <img src="assets/img/logo_tile.png" alt="" style="width:170px;height:172px;" />
+      <img src="assets/img/wordmark.svg" alt="Pack-a-Bunch" style="height:110px;width:852px;" />
     </div>
     <div id="s2-inner" class="inner">
       <div class="copy" id="s2-copy">
@@ -254,7 +251,7 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
 
   <section id="s8" class="clip" data-start="108" data-duration="7" data-track-index="0">
     <div class="centre">
-      <div id="s8-logo"><div class="mark"><svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#FFF8F0" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z M4 7.5 12 12l8-4.5 M12 12v9"/></svg></div><div class="name">Pack a Bunch</div></div>
+      <div id="s8-logo"><img class="mark" src="assets/img/logo_tile.png" alt="" /><img class="name" src="assets/img/wordmark.svg" alt="Pack-a-Bunch" /></div>
       <div id="s8-line">Pack it once. It fits.</div>
       <div id="s8-cta">Try Pack Plus — code on the Pack Plus page</div>
       <div id="s8-foot">ON ANDROID</div>
