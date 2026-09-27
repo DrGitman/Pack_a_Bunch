@@ -111,9 +111,12 @@ internal class GlowOutlineRenderer {
     ) {
         if (polylines.isEmpty()) return
         val core = style.widthDp * density
-        val glow = style.glowDp * density
-        val wide = style.wideGlowDp * density
-        val half = core / 2 + maxOf(glow, wide) * 1.6f + 1f
+        // Figma's glow is a blur radius; a Gaussian with half that as its spread matches it.
+        // Using the whole radius as the spread made each dash's glow four times the area it is
+        // in the frame, and the dashes read as a ladder of fuzzy bars instead of a thin line.
+        val glow = style.glowDp * density / 2
+        val wide = style.wideGlowDp * density / 2
+        val half = core / 2 + maxOf(glow, wide) * 3f + 1f
 
         var floats = 0
         for (p in polylines) floats += (p.size / 2 - 1).coerceAtLeast(0) * 6 * 4
@@ -251,8 +254,8 @@ internal class GlowOutlineRenderer {
                 if (v_Along > u_Reveal) discard;
                 float d = abs(v_Across) * u_Half;
                 float core = 1.0 - smoothstep(u_Core * 0.5 - 0.6, u_Core * 0.5 + 0.6, d);
-                float glow = u_Glow > 0.0 ? 0.55 * exp(-(d * d) / (2.0 * u_Glow * u_Glow)) : 0.0;
-                float wide = u_WideGlow > 0.0 ? 0.28 * exp(-(d * d) / (2.0 * u_WideGlow * u_WideGlow)) : 0.0;
+                float glow = u_Glow > 0.0 ? 0.32 * exp(-(d * d) / (2.0 * u_Glow * u_Glow)) : 0.0;
+                float wide = u_WideGlow > 0.0 ? 0.16 * exp(-(d * d) / (2.0 * u_WideGlow * u_WideGlow)) : 0.0;
                 float a = max(core, glow + wide);
                 if (u_Dash.x > 0.0) {
                     float period = u_Dash.x + u_Dash.y;

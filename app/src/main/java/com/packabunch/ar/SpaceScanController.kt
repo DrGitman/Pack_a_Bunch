@@ -15,6 +15,7 @@ import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.packabunch.packing.DetectionPoints
+import com.packabunch.packing.FloorOutline
 import com.packabunch.packing.ObjectCloud
 import com.packabunch.packing.PlaneFrame
 import com.packabunch.packing.PlanePoint
@@ -282,6 +283,7 @@ class SpaceScanController(
         val camera = frame.camera
         val pose = camera.pose
         val pf = PlaneFrame(0f, y0, 0f, ALONG, UP)
+        val margin = FloorOutline.wallMargin(poly)
         val samples = ArrayList<DetectionPoints.Sample>(6000)
         try {
             frame.acquireDepthImage16Bits().use { depth ->
@@ -293,6 +295,9 @@ class SpaceScanController(
                 val plane = depth.planes[0]
                 val buf = plane.buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
                 val local = FloatArray(3); val world = FloatArray(3)
+                fun depthAt(u: Int, v: Int): Int =
+                    if (u < 0 || v < 0 || u >= depth.width || v >= depth.height) 0
+                    else buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
                 val cu0 = depth.width * 0.3f; val cu1 = depth.width * 0.7f
                 val cv0 = depth.height * 0.3f; val cv1 = depth.height * 0.7f
                 var v = 0
@@ -300,12 +305,16 @@ class SpaceScanController(
                     var u = 0
                     while (u < depth.width) {
                         val mm = buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
-                        if (mm in MIN_DEPTH_MM..MAX_DEPTH_MM) {
+                        // A space's surfaces are big; a pixel on a jump in depth is only ever a
+                        // smear between a flap's edge and the floor behind it, so it is dropped.
+                        if (mm in MIN_DEPTH_MM..MAX_DEPTH_MM &&
+                            !DetectionPoints.isEdge(mm, depthAt(u - 1, v), depthAt(u + 1, v), depthAt(u, v - 1), depthAt(u, v + 1))
+                        ) {
                             val p = projection.point(u, v, mm)
                             local[0] = p[0]; local[1] = p[1]; local[2] = p[2]
                             pose.transformPoint(local, 0, world, 0)
                             val pp2 = pf.toPlane(world[0], world[1], world[2])
-                            if (pp2.hMm in -BELOW_FLOOR_MM..MAX_HEIGHT_MM && nearPolygon(poly, world[0], world[2], WALL_MARGIN_M)) {
+                            if (pp2.hMm in -BELOW_FLOOR_MM..MAX_HEIGHT_MM && FloorOutline.near(poly, world[0], world[2], margin)) {
                                 samples += DetectionPoints.Sample(pp2, u >= cu0 && u <= cu1 && v >= cv0 && v <= cv1)
                             }
                         }
@@ -328,7 +337,7 @@ class SpaceScanController(
     private fun accumulate(samples: List<DetectionPoints.Sample>, cam: PlanePoint) {
         // The walls are whatever stands connected around the middle of the view; the floor is
         // kept wherever it lies inside the outline.
-        val keep = HashSet(DetectionPoints.select(samples))
+        val keep = HashSet(DetectionPoints.select(samples, minCentralShare = 0f, minCentralSamples = 0, cellMm = DetectionPoints.SPACE_CELL_MM, maxHeightMm = MAX_HEIGHT_MM))
         val points = samples.indices.filter { it in keep || samples[it].point.hMm <= SpaceFitter.FLOOR_BAND_MM }.map { samples[it].point }
         cloud.add(points)
         val last = cameras.lastOrNull()
@@ -447,8 +456,6 @@ class SpaceScanController(
         const val MAX_DEPTH_MM = 4_000
         const val BELOW_FLOOR_MM = 60f
         const val MAX_HEIGHT_MM = 3_000f
-        /** How far past the floor's outline a wall may stand. */
-        const val WALL_MARGIN_M = 0.2f
         const val FLOOR_MATCH_M = 0.04f
         const val NEAR_W = 0.06f
         const val FLOOR_FILL_ARGB = 0x1FFFFFFFL   // 12 % white
@@ -459,26 +466,5 @@ class SpaceScanController(
         val OPENING_STYLE = OutlineStyle(0xCCFFFFFF, 1.3f, dashOnDp = 5f, dashOffDp = 4f, glowDp = 4f)
 
         fun newCloud() = ObjectCloud(voxelMm = 10f, maxVoxels = 40_000, minHeightMm = -BELOW_FLOOR_MM, relativeSightings = 0.03f)
-
-        /** Inside the floor outline, or within [margin] metres of it — where the walls stand. */
-        fun nearPolygon(poly: FloatArray, x: Float, z: Float, margin: Float): Boolean {
-            val n = poly.size / 2
-            if (n < 3) return false
-            var inside = false
-            var j = n - 1
-            var best = Float.MAX_VALUE
-            for (i in 0 until n) {
-                val xi = poly[2 * i]; val zi = poly[2 * i + 1]; val xj = poly[2 * j]; val zj = poly[2 * j + 1]
-                if ((zi > z) != (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside
-                // Distance to this edge.
-                val ex = xi - xj; val ez = zi - zj
-                val len2 = ex * ex + ez * ez
-                val t = if (len2 > 0f) (((x - xj) * ex + (z - zj) * ez) / len2).coerceIn(0f, 1f) else 0f
-                val dx = x - (xj + t * ex); val dz = z - (zj + t * ez)
-                best = minOf(best, dx * dx + dz * dz)
-                j = i
-            }
-            return inside || best <= margin * margin
-        }
     }
 }

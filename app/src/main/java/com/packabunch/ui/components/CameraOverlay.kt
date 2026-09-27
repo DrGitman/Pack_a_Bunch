@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -141,15 +142,17 @@ fun RollingText(
     letterSpacing: TextUnit = TextUnit.Unspecified,
     maxLines: Int = 1,
 ) {
+    // Clipped to its own line: the old value rolls out of sight instead of sitting half a line
+    // above the new one, which read as two lines of text on top of each other.
     AnimatedContent(
         targetState = text,
-        modifier = modifier,
+        modifier = modifier.clipToBounds(),
         transitionSpec = {
             val up = initialState.firstNumber() <= targetState.firstNumber()
             (slideInVertically(tween(Motion.SHORT_MS + 60, easing = Motion.Enter)) { h -> if (up) h / 2 else -h / 2 } +
                 fadeIn(tween(Motion.SHORT_MS))) togetherWith
                 (slideOutVertically(tween(Motion.SHORT_MS, easing = Motion.Exit)) { h -> if (up) -h / 2 else h / 2 } +
-                    fadeOut(tween(Motion.SHORT_MS - 60))) using SizeTransform(clip = false)
+                    fadeOut(tween(Motion.SHORT_MS - 60))) using SizeTransform(clip = true)
         },
         label = "rollingText",
     ) { value ->
@@ -539,35 +542,64 @@ class AnchoredLabel(
     val x: Float,
     val y: Float,
     val align: AnchorAlign,
+    /**
+     * False for a label that must stay exactly on its point — a W / D / H pill on its edge.
+     * Others are nudged up or down, out of each other's way and off the pills.
+     */
+    val movable: Boolean = true,
     val content: @Composable () -> Unit,
 )
 
 /**
  * Places labels on the points the AR renderer projected for them. One layout for all of them,
  * so a frame's worth of moving tags is a single placement pass rather than a recomposition per
- * tag. Labels are kept on screen: an object half out of view still shows its tag at the edge.
+ * tag.
+ *
+ * Labels stay between [topInsetPx] and [bottomInsetPx] — clear of the back button and advice
+ * at the top and the buttons at the bottom, which is where tags used to disappear. Where two
+ * tags would overlap, the later one moves above the other, or below it when there is no room
+ * above; tags never cover a pill.
  */
 @Composable
-fun AnchoredLabels(labels: List<AnchoredLabel>, modifier: Modifier = Modifier) {
+fun AnchoredLabels(
+    labels: List<AnchoredLabel>,
+    modifier: Modifier = Modifier,
+    topInsetPx: Int = 0,
+    bottomInsetPx: Int = 0,
+) {
     Layout(
         content = { labels.forEach { label -> key(label.key) { label.content() } } },
         modifier = modifier,
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val placeables = measurables.map { it.measure(loose) }
+        val gap = 3.dp.roundToPx()
         layout(constraints.maxWidth, constraints.maxHeight) {
-            placeables.forEachIndexed { i, p ->
+            val top = topInsetPx
+            val bottom = constraints.maxHeight - bottomInsetPx
+            val placed = ArrayList<IntArray>()   // left, top, right, bottom
+            fun overlapping(l: Int, t: Int, r: Int, b: Int) = placed.firstOrNull { it[0] < r && l < it[2] && it[1] < b && t < it[3] }
+            // Fixed pills first, so the tags can move out of their way.
+            val order = labels.indices.sortedBy { if (labels[it].movable) 1 else 0 }
+            for (i in order) {
+                val p = placeables[i]
                 val label = labels[i]
-                val x = label.x * constraints.maxWidth - p.width / 2f
-                val y = when (label.align) {
+                val x = (label.x * constraints.maxWidth - p.width / 2f).roundToInt()
+                    .coerceIn(0, (constraints.maxWidth - p.width).coerceAtLeast(0))
+                var y = when (label.align) {
                     AnchorAlign.Above -> label.y * constraints.maxHeight - p.height
                     AnchorAlign.Centre -> label.y * constraints.maxHeight - p.height / 2f
                     AnchorAlign.Below -> label.y * constraints.maxHeight
+                }.roundToInt().coerceIn(top, (bottom - p.height).coerceAtLeast(top))
+                if (label.movable) {
+                    repeat(6) {
+                        val hit = overlapping(x, y, x + p.width, y + p.height) ?: return@repeat
+                        val above = hit[1] - gap - p.height
+                        y = if (above >= top) above else (hit[3] + gap).coerceAtMost((bottom - p.height).coerceAtLeast(top))
+                    }
                 }
-                p.place(
-                    x.roundToInt().coerceIn(0, (constraints.maxWidth - p.width).coerceAtLeast(0)),
-                    y.roundToInt().coerceIn(0, (constraints.maxHeight - p.height).coerceAtLeast(0)),
-                )
+                placed += intArrayOf(x, y, x + p.width, y + p.height)
+                p.place(x, y)
             }
         }
     }

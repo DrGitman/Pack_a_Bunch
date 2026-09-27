@@ -15,10 +15,13 @@ import kotlin.math.sin
  * does a new object begin.
  *
  * ### No phantoms
- * The old scanner showed "1 of 3 measured" for two objects. Here an object that never gathers
- * enough confirmed surface to fit is dropped after [PHANTOM_FRAMES] frames out of view, and two
- * objects whose footprints overlap by more than half are merged into one — the same carton
- * seen as two detections from two sides.
+ * The old scanner showed "1 of 3 measured" for two objects. Here an object is only shown once
+ * it has been seen in [CONFIRM_HITS] frames, and a detection that is not seen again is dropped
+ * after [TENTATIVE_FRAMES]. An object that never gathers enough confirmed surface to fit is
+ * dropped after [PHANTOM_FRAMES] frames out of view, one whose fit grows bigger than any item
+ * ([MAX_FOOTPRINT_MM]) has fitted the room and is dropped at once, and two objects whose
+ * footprints overlap by more than half are merged into one — the same carton seen as two
+ * detections from two sides.
  *
  * ### The cap
  * [maxItems] is product policy (20 on the free plan), applied here only by refusing to *start*
@@ -34,6 +37,7 @@ class ItemTracker(
         /** ML Kit tracking ids this object has been known by. Used to find its detector box again. */
         val trackingIds: Set<Int> get() = ids
         internal var lastSeenFrame = 0
+        internal var hits = 0
         internal var centreX = 0f
         internal var centreY = 0f
 
@@ -43,6 +47,13 @@ class ItemTracker(
         val state: ItemScanState get() = measurement.state
         val fit: FittedObject? get() = (state as? ItemScanState.Measured)?.fit ?: measurement.lastFit
         val isMeasured: Boolean get() = measurement.isMeasured
+
+        /**
+         * Seen in at least [CONFIRM_HITS] frames. Until then it is kept quiet — no outline, no
+         * tag, not counted — because one frame's detection of a patch of wall, a shadow or a
+         * cable is the commonest phantom of all, and it never comes back a fourth time.
+         */
+        val isConfirmed: Boolean get() = hits >= CONFIRM_HITS || isMeasured
     }
 
     /**
@@ -50,7 +61,13 @@ class ItemTracker(
      * points. [camera] overrides the frame's camera when this object stands on a different
      * surface from the others (heights are measured from each object's own surface).
      */
-    data class Observation(val trackingId: Int?, val points: List<PlanePoint>, val camera: PlanePoint? = null)
+    data class Observation(
+        val trackingId: Int?,
+        val points: List<PlanePoint>,
+        val camera: PlanePoint? = null,
+        /** False when the detector box touches the edge of the picture: some of it may be outside. */
+        val wholeInView: Boolean = true,
+    )
 
     data class Update(
         /** Every live object, oldest first. Order is stable, so list positions never jump. */
@@ -61,6 +78,9 @@ class ItemTracker(
         val assigned: Map<Int, Int> = emptyMap(),
     ) {
         val measuredCount: Int get() = tracks.count { it.isMeasured }
+
+        /** The objects worth showing the person: confirmed ones only, oldest first. */
+        val visible: List<Track> get() = tracks.filter { it.isConfirmed }
     }
 
     private val tracks = ArrayList<Track>()
@@ -74,6 +94,7 @@ class ItemTracker(
         var capReached = false
         val fed = LinkedHashMap<Track, ArrayList<PlanePoint>>()
         val cams = HashMap<Track, PlanePoint>()
+        val whole = HashMap<Track, Boolean>()
 
         val assigned = HashMap<Int, Track>()
         for ((index, obs) in observations.withIndex()) {
@@ -90,19 +111,32 @@ class ItemTracker(
                 for (t in tracks) if (t !== track) t.ids.remove(id)
                 track.ids += id
             }
+            if (track.lastSeenFrame != frame) track.hits++
             track.lastSeenFrame = frame
             assigned[index] = track
             fed.getOrPut(track) { ArrayList() } += obs.points
             obs.camera?.let { cams[track] = it }
+            whole[track] = (whole[track] ?: true) && obs.wholeInView
         }
 
         for ((track, pts) in fed) {
-            track.measurement.addFrame(pts, cams[track] ?: camera)
+            track.measurement.addFrame(pts, cams[track] ?: camera, whole[track] ?: true)
             track.measurement.lastFit?.let { track.centreX = it.centreXMm; track.centreY = it.centreYMm }
         }
 
         mergeDuplicates()
-        tracks.removeAll { it.measurement.lastFit == null && !it.isMeasured && frame - it.lastSeenFrame > PHANTOM_FRAMES }
+        tracks.removeAll { t ->
+            val unseen = frame - t.lastSeenFrame
+            when {
+                // Bigger than anything carried out of a house in one piece: the room, not an item.
+                t.fit?.let { implausible(it) } == true -> true
+                t.fit?.let { wallLike(it, t.measurement.lowestMm) } == true -> true
+                t.isMeasured -> false
+                !t.isConfirmed -> unseen > TENTATIVE_FRAMES
+                t.measurement.lastFit == null -> unseen > PHANTOM_FRAMES
+                else -> unseen > STALE_FRAMES
+            }
+        }
         // A merge can retire a track an observation was just given to; point it at the survivor.
         val live = tracks.associateBy { it.id }
         val resolved = assigned.mapValues { (_, t) -> live[t.id]?.id ?: tracks.firstOrNull { it.fit != null && t.fit != null && overlap(t.fit!!, it.fit!!) > MERGE_OVERLAP }?.id ?: t.id }
@@ -174,11 +208,25 @@ class ItemTracker(
                 keep.ids += drop.ids
                 if (keep.label == null) keep.label = drop.label
                 keep.lastSeenFrame = maxOf(keep.lastSeenFrame, drop.lastSeenFrame)
+                keep.hits = maxOf(keep.hits, drop.hits)
                 tracks.remove(drop)
                 merged = true
                 break@loop
             }
         }
+    }
+
+    private fun implausible(f: FittedObject) =
+        maxOf(f.widthMm, f.depthMm) > MAX_FOOTPRINT_MM || f.heightMm > DetectionPoints.MAX_HEIGHT_MM
+
+    /**
+     * A patch of wall that got boxed: a sheet thinner than any packed thing standing on edge,
+     * and either hanging above the surface or wider than anything that thin.
+     */
+    private fun wallLike(f: FittedObject, lowestMm: Float): Boolean {
+        val thin = minOf(f.widthMm, f.depthMm) < SLAB_MM
+        val broad = maxOf(f.widthMm, f.depthMm) > 200f && f.heightMm > 100f
+        return thin && broad && (lowestMm > FLOATING_MM || maxOf(f.widthMm, f.depthMm) > 400f)
     }
 
     private fun median(v: List<Float>): Float = v.sorted()[v.size / 2]
@@ -189,5 +237,26 @@ class ItemTracker(
         const val MERGE_OVERLAP = 0.5f
         const val PHANTOM_FRAMES = 45
         const val MIN_POINTS_TO_START = 30
+
+        /** Frames an object must be seen in before it is shown. About half a second. */
+        const val CONFIRM_HITS = 4
+
+        /** An unconfirmed detection not seen again for this many frames was never there. */
+        const val TENTATIVE_FRAMES = 8
+
+        /**
+         * A half-measured object out of view this long (about half a minute) is let go, so the
+         * count does not carry something the person has walked away from.
+         */
+        const val STALE_FRAMES = 300
+
+        /** A standing sheet thinner than this is a wall seen square on. */
+        const val SLAB_MM = 20f
+
+        /** An object whose lowest part is this far above the surface is not standing on it. */
+        const val FLOATING_MM = 40f
+
+        /** Longest footprint an item scan will believe. Past this it has fitted the room. */
+        const val MAX_FOOTPRINT_MM = 1500f
     }
 }

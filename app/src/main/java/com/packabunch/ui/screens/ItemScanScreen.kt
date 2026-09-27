@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -219,6 +220,10 @@ fun ItemScanOverlay(
         lastMeasured = measured
     }
 
+    // How much of the screen the controls take at the top and bottom; tags stay in between.
+    var topControlsPx by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+    var bottomControlsPx by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+
     Box(modifier.fillMaxSize().background(Color.Black)) {
         cameraPreview()
 
@@ -235,15 +240,15 @@ fun ItemScanOverlay(
                     val d = m.dimensions.asDimensions()
                     val round = item.shape == ShapeFamily.CYLINDER || item.shape == ShapeFamily.TAPERED || item.shape == ShapeFamily.SPHERE
                     a.depth?.let { (x, y) ->
-                        add(AnchoredLabel("d${a.id}", x, y, AnchorAlign.Centre) { DimensionPill("D", formatLengthWithUnit(d.depthMm, unit), appearDelayMillis = 90) })
+                        add(AnchoredLabel("d${a.id}", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("D", formatLengthWithUnit(d.depthMm, unit), appearDelayMillis = 90) })
                     }
                     a.height?.let { (x, y) ->
-                        add(AnchoredLabel("h${a.id}", x, y, AnchorAlign.Centre) { DimensionPill("H", formatLengthWithUnit(d.heightMm, unit), highlight = true, appearDelayMillis = 180) })
+                        add(AnchoredLabel("h${a.id}", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("H", formatLengthWithUnit(d.heightMm, unit), highlight = true, appearDelayMillis = 180) })
                     }
                     val w = a.width
                     if (w != null) {
                         // The tag goes under the width pill, as in the frame: the name reads as a caption.
-                        add(AnchoredLabel("w${a.id}", w.first, w.second, AnchorAlign.Below) {
+                        add(AnchoredLabel("w${a.id}", w.first, w.second, AnchorAlign.Below, movable = false) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Spacer(Modifier.height(4.fd))
                                 DimensionPill(if (round) "Ø" else "W", formatLengthWithUnit(d.widthMm, unit))
@@ -273,12 +278,13 @@ fun ItemScanOverlay(
                 })
             }
         }
-        AnchoredLabels(labels, Modifier.fillMaxSize())
+        AnchoredLabels(labels, Modifier.fillMaxSize(), topInsetPx = topControlsPx, bottomInsetPx = bottomControlsPx)
 
         // Top: back, counter, one instruction.
         Column(
             Modifier
                 .fillMaxWidth()
+                .onSizeChanged { topControlsPx = it.height }
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(horizontal = 14.fd, vertical = 6.fd),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -298,6 +304,7 @@ fun ItemScanOverlay(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
+                .onSizeChanged { bottomControlsPx = it.height }
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(start = 12.fd, end = 12.fd, bottom = 14.fd),
         ) {
@@ -358,6 +365,7 @@ private fun tagFor(state: ItemScanState, name: String): TagText = when (state) {
         when (state.hint) {
             AngleHint.TILT_DOWN -> "$name · tilt down"
             AngleHint.STEP_AROUND -> "$name · step around"
+            AngleHint.STEP_BACK -> "$name · step back"
         },
         ScanBadge.Working, state.progress,
     )
@@ -401,6 +409,7 @@ private fun guidance(ui: ItemScanUi): Pair<String, Boolean> {
         return when (hint) {
             AngleHint.TILT_DOWN -> "Tilt down so the top of the ${nameOf(item)} is in view"
             AngleHint.STEP_AROUND -> "Step to the side — I can't see behind the ${nameOf(item)}"
+            AngleHint.STEP_BACK -> "Step back — the ${nameOf(item)} runs out of the picture"
         } to true
     }
     val next = items.filter { it.state is ItemScanState.Scanning }.maxByOrNull { (it.state as ItemScanState.Scanning).progress }

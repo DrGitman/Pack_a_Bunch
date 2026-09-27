@@ -18,23 +18,52 @@ import kotlin.math.floor
  */
 object DetectionPoints {
 
-    /** One depth sample in the support surface's frame; [central] if it came from the middle of the box. */
-    class Sample(val point: PlanePoint, val central: Boolean)
+    /**
+     * One depth sample in the support surface's frame; [central] if it came from the middle of
+     * the box, [edge] if it sits on a jump in depth (see [isEdge]).
+     */
+    class Sample(val point: PlanePoint, val central: Boolean, val edge: Boolean = false)
 
     const val CELL_MM = 15f
+
+    /** See [select]: the grid for a space scanned from a metre or more away. */
+    const val SPACE_CELL_MM = 50f
 
     /** Samples higher than this above the surface are not something anyone packs on a tabletop. */
     const val MAX_HEIGHT_MM = 1500f
 
-    /** Returns the indices of [samples] that belong to the object. Empty if no object is found. */
-    fun select(samples: List<Sample>): List<Int> {
+    /**
+     * Returns the indices of [samples] that belong to the object. Empty if no object is found.
+     *
+     * [minCentralShare] and [minCentralSamples] are how much of the middle of the view the kept
+     * piece must own. An object must fill the middle of its box. A space need not: looking into
+     * a boot or across a room the middle is mostly floor, and the walls round it are the space,
+     * so the space scan passes zero for both.
+     *
+     * [cellMm] is the grid pieces are joined on. It must be wider than the gap between
+     * neighbouring samples or a surface falls apart into specks: [CELL_MM] suits an object at
+     * arm's length, where samples land a few millimetres apart; across a room they land five
+     * centimetres apart, and the space scan passes [SPACE_CELL_MM].
+     */
+    fun select(
+        samples: List<Sample>,
+        minCentralShare: Float = MIN_CENTRAL_SHARE,
+        minCentralSamples: Int = MIN_CENTRAL_SAMPLES,
+        cellMm: Float = CELL_MM,
+        /** Samples higher than this are ignored: [MAX_HEIGHT_MM] for things, a room's height for spaces. */
+        maxHeightMm: Float = MAX_HEIGHT_MM,
+    ): List<Int> {
+        fun key(p: PlanePoint) = pack(floor(p.xMm / cellMm).toInt(), floor(p.yMm / cellMm).toInt(), floor(p.hMm / cellMm).toInt())
         val cells = HashMap<Long, MutableList<Int>>()
+        val edges = ArrayList<Int>()
         var centralTotal = 0
         for ((i, s) in samples.withIndex()) {
             val p = s.point
             if (s.central) centralTotal++
-            if (p.hMm <= ObjectCloud.MIN_HEIGHT_MM || p.hMm > MAX_HEIGHT_MM) continue
-            cells.getOrPut(key(p)) { ArrayList() } += i
+            if (p.hMm <= ObjectCloud.MIN_HEIGHT_MM || p.hMm > maxHeightMm) continue
+            // Edge pixels may be the object's own rim or may float in the gap behind it; they
+            // are kept, but never allowed to join one piece to another.
+            if (s.edge) edges += i else cells.getOrPut(key(p)) { ArrayList() } += i
         }
         if (cells.isEmpty()) return emptyList()
 
@@ -51,6 +80,11 @@ object DetectionPoints {
                 val k = stack.removeLast()
                 val (i, j, h) = unpack(k)
                 for (di in -1..1) for (dj in -1..1) for (dh in -1..1) {
+                    // Cells in the lowest layer only join upwards, never sideways to each
+                    // other. Depth noise lifts patches of the table itself just clear of the
+                    // surface cut; joined sideways, those patches bridged every object on the
+                    // desk to the next one and to the wall behind.
+                    if (h == 0 && dh == 0) continue
                     val n = pack(i + di, j + dj, h + dh)
                     if (n in cells && n !in component) { component[n] = id; stack.addLast(n) }
                 }
@@ -71,9 +105,32 @@ object DetectionPoints {
         // too flat for depth — a phone, a sheet of paper — the middle is mostly table, and the
         // biggest raised piece left in the box is the wall or sofa behind it. Taking that is how
         // a phone came out 60 cm tall. Nothing this frame is the honest answer.
-        if (centralVotes[winner] < MIN_CENTRAL_SAMPLES || centralVotes[winner] < centralTotal * MIN_CENTRAL_SHARE) return emptyList()
-        return cells.filterKeys { component[it] == winner }.values.flatten().sorted()
+        if (centralVotes[winner] < minCentralSamples || centralVotes[winner] < centralTotal * minCentralShare) return emptyList()
+        val kept = cells.filterKeys { component[it] == winner }
+        val out = kept.values.flatten().toMutableList()
+        // An edge pixel belongs to the object if it lands in or right beside the object's cells.
+        for (i in edges) {
+            val (a, b, c) = unpack(key(samples[i].point))
+            var near = false
+            for (di in -1..1) for (dj in -1..1) for (dh in -1..1) if (pack(a + di, b + dj, c + dh) in kept) near = true
+            if (near) out += i
+        }
+        return out.sorted()
     }
+
+    /**
+     * Whether a depth pixel sits on a jump in depth: an edge pixel reads somewhere between the
+     * object and whatever is behind it, a point floating in the gap that joins the two. [d] is
+     * the pixel's depth and [neighbours] its four neighbours' (0 for none), all in mm.
+     */
+    fun isEdge(d: Int, vararg neighbours: Int): Boolean {
+        val jump = maxOf(EDGE_JUMP_MM, (d * EDGE_JUMP_SHARE).toInt())
+        for (n in neighbours) if (n > 0 && kotlin.math.abs(n - d) > jump) return true
+        return false
+    }
+
+    const val EDGE_JUMP_MM = 25
+    const val EDGE_JUMP_SHARE = 0.04f
 
     /** Fewer samples than this is not an object this frame — maybe next frame. */
     const val MIN_SAMPLES = 12
@@ -83,10 +140,6 @@ object DetectionPoints {
 
     /** Share of the box's middle, surface included, the kept piece must own. */
     const val MIN_CENTRAL_SHARE = 0.5f
-
-    private fun key(p: PlanePoint) = pack(
-        floor(p.xMm / CELL_MM).toInt(), floor(p.yMm / CELL_MM).toInt(), floor(p.hMm / CELL_MM).toInt(),
-    )
 
     private const val BIAS = 1 shl 20
     private const val MASK = (1L shl 21) - 1

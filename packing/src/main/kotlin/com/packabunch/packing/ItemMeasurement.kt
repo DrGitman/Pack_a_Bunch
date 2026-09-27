@@ -12,6 +12,12 @@ enum class AngleHint {
 
     /** The camera is already above the object — one side is just out of view. */
     STEP_AROUND,
+
+    /**
+     * The object has run off the edge of the picture every time it was seen, so how far it goes
+     * is unknown. Stepping back gets all of it in.
+     */
+    STEP_BACK,
 }
 
 enum class CannotMeasureReason {
@@ -82,6 +88,13 @@ class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
     var lastFit: FittedObject? = null
         private set
 
+    /**
+     * How high the lowest part seen of it sits above the surface, in mm. Near zero for anything
+     * standing on it; a patch of wall seen above the desk floats.
+     */
+    var lowestMm: Float = 0f
+        private set
+
     /** Share of the object's visible surface confirmed so far (0–1+). For the coverage ring. */
     var lastCoverage: Float = 0f
         private set
@@ -98,9 +111,10 @@ class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
      * One frame. [points] may be empty — that is itself information (no depth here).
      * Returns the new [state].
      */
-    fun addFrame(points: List<PlanePoint>, camera: PlanePoint): ItemScanState {
+    fun addFrame(points: List<PlanePoint>, camera: PlanePoint, wholeInView: Boolean = true): ItemScanState {
         if (isMeasured && framesSinceMeasured++ >= REFINE_FRAMES) return state
         recordCamera(camera)
+        if (wholeInView && points.isNotEmpty()) wholeFrames++
         if (points.isEmpty()) emptyFrames++ else emptyFrames = 0
         cloud.add(points)
         val before = state
@@ -113,10 +127,14 @@ class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
 
     private var framesSinceMeasured = 0
 
+    /** Frames in which the whole object was inside the picture. */
+    private var wholeFrames = 0
+
     /** Takes over another measurement of the same object — two tracks that turned out to be one. */
     fun absorb(other: ItemMeasurement) {
         if (isMeasured) return
         cloud.absorb(other.cloud)
+        wholeFrames += other.wholeFrames
         for (c in other.cameras) recordCamera(c)
         window.clear()
         cameras.lastOrNull()?.let { refit(it) }
@@ -143,6 +161,7 @@ class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
         cameras.clear()
         emptyFrames = 0
         framesSinceMeasured = 0
+        wholeFrames = 0
         lastFit = null
         state = ItemScanState.Scanning(null, 0f)
     }
@@ -171,6 +190,7 @@ class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
             }
             return state
         }
+        lowestMm = points.map { it.hMm }.sorted()[points.size / 10]
         val fit = ShapeFitter.fit(points, cameras, cloud.voxelMm, snap.weights) ?: return state
         lastFit = fit
         window.addLast(fit)
@@ -208,6 +228,14 @@ class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
         // Every side seen but the surface still thin: keep scanning, the edges are still filling in.
         if (unseen.isEmpty() && coverage < MIN_COVERAGE) {
             state = ItemScanState.Scanning(fit, progress)
+            return state
+        }
+        // Every face in view but the object always ran off the edge of the picture: its far end
+        // was never seen, so the lengths along the ground are only as long as the picture was.
+        // A book half out of shot measured at half its length is exactly the wrong size that
+        // silently breaks a plan.
+        if (unseen.isEmpty() && wholeFrames < MIN_WHOLE_FRAMES) {
+            state = ItemScanState.NeedsAngle(median, AngleHint.STEP_BACK, setOf(Axis.WIDTH, Axis.DEPTH), progress)
             return state
         }
         state = if (unseen.isEmpty()) {
@@ -303,6 +331,9 @@ class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
     companion object {
         const val STABLE_WINDOW = 5
         const val MIN_FRAMES = 8
+
+        /** Frames with the whole object in the picture before its lengths are believed. */
+        const val MIN_WHOLE_FRAMES = 3
 
         /** Frames after first reaching Measured during which the numbers may still sharpen. */
         const val REFINE_FRAMES = 30

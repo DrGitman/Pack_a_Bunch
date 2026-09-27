@@ -139,6 +139,9 @@ class ItemRecogniser {
             "crowd", "baby", "sky", "cloud", "sunset", "room",
             "building", "floor", "wall", "tile", "pattern", "textile", "leather", "wood",
             "metal", "event", "fun", "flesh", "night", "darkness", "interaction",
+            // Body parts: a heater's grille came back as "Mouth".
+            "mouth", "nose", "ear", "eye", "lip", "tooth", "teeth", "tongue", "face", "finger",
+            "nail", "arm", "leg", "foot", "ceiling",
         )
     }
 }

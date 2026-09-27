@@ -156,34 +156,102 @@ object SpaceFitter {
         val (uLo, uHi) = range(wallIdx, us, w)
         val (vLo, vHi) = range(wallIdx, vs, w)
         val band = max(40f, 0.06f * max(uHi - uLo, vHi - vLo))
+        val wallTop = range(wallIdx, hs, w).second
+        // A wall stands on the floor: its lower half alone runs the length of the side. What
+        // only exists up high — a carton's flap folded out over the rim, the car's roof beside
+        // the boot — is outside the space, and what is low only at one end — the tail-light
+        // pillars beside a boot's opening — is the end of another wall.
+        val lowerHalf = wallTop * 0.5f
 
-        // A side is a wall when the points near it run most of its length; then it is placed at
-        // their median. Otherwise — the open front of a boot, the missing side of a shelf —
+        /**
+         * One side: where it stands, how many points it has (0 when it is open), and how thick
+         * its points lie about that — the depth noise at its distance.
+         */
+        class Side(val at: Float, val count: Int, val spread: Float = 0f)
+
+        // A side is a wall when the points near it run most of its length and reach down to the
+        // floor; then it is placed at their median. The outermost points are not always it: a
+        // car's tail-light pillars stand outside the boot's trim, the flaps of an open carton
+        // hang outside its walls, the kitchen wall runs on past a shelf's sides. So the search
+        // walks inwards from the outermost points, up to a third of the way across, and takes
+        // the first band that is a wall. When none is — the open front of a boot or a shelf —
         // those points are just the ends of the neighbouring walls, and the extreme is right.
-        fun side(sel: (Int) -> Boolean, vals: FloatArray, along: FloatArray, alongLen: Float, fallback: Float): Pair<Float, Int> {
-            val idx = wallIdx.filter(sel)
-            if (idx.size < MIN_FACE_POINTS) return fallback to 0
-            // Run along its length in ten bins: a wall fills most of them; the two ends of the
-            // neighbouring walls fill only the first and last.
-            val lo = along.let { a -> idx.minOf { a[it] } }
-            val bins = BooleanArray(10)
-            for (i in idx) bins[((along[i] - lo) / alongLen * 10).toInt().coerceIn(0, 9)] = true
-            if (bins.count { it } < 6) return fallback to 0
-            return weightedMedian(idx, vals, w) to idx.size
+        fun side(vals: FloatArray, along: FloatArray, alongLen: Float, outer: Float, inward: Float, span: Float): Side {
+            val found = ArrayList<Side>()
+            var offset = 0f
+            while (offset <= span * 0.35f) {
+                val a = outer + inward * offset
+                val lower = wallIdx.filter { val d = (vals[it] - a) * inward; d >= 0f && d <= band && hs[it] <= lowerHalf }
+                if (lower.size >= MIN_FACE_POINTS) {
+                    // Judged on the densest few centimetres of the band, not all of it: the band
+                    // can also hold the pillar or trim standing right beside a wall.
+                    val peak = densest(lower, vals)
+                    val on = wallIdx.filter { abs(vals[it] - peak) <= max(20f, band / 4) && hs[it] <= lowerHalf }
+                    // Run along its length in ten bins: a wall fills most of them; the two ends
+                    // of the neighbouring walls fill only the first and last.
+                    if (on.size >= MIN_FACE_POINTS) {
+                        val lo = on.minOf { along[it] }
+                        val bins = BooleanArray(10)
+                        for (i in on) bins[((along[i] - lo) / alongLen * 10).toInt().coerceIn(0, 9)] = true
+                        if (bins.count { it } >= 6) {
+                            val at = weightedMedian(on, vals, w)
+                            val spread = on.map { abs(vals[it] - at) }.sorted()[on.size / 2] * 1.4826f
+                            if (found.none { abs(it.at - at) < 5f }) found += Side(at, on.size, spread)
+                        }
+                    }
+                }
+                offset += band / 2
+            }
+            // The outermost band that is plainly a wall: a pillar's corner caught with a little
+            // of the wall beside it passes too, but on a fraction of the wall's own points.
+            if (found.isNotEmpty()) {
+                val most = found.maxOf { it.count }
+                return found.filter { it.count >= most / 2 }.minBy { (it.at - outer) * inward }
+            }
+            // Open: bounded by the furthest thing standing, not by a flap reaching out over it.
+            val standing = wallIdx.filter { hs[it] <= lowerHalf }
+            if (standing.size < MIN_FACE_POINTS) return Side(outer, 0)
+            // Barely trimmed: an open side's last few centimetres are seen edge-on and are sparse.
+            val (lo, hi) = range(standing, vals, w, trim = 0.002)
+            return Side(if (inward > 0) lo else hi, 0)
         }
-        val (left, _) = side({ us[it] <= uLo + band }, us, vs, vHi - vLo, uLo)
-        val (right, _) = side({ us[it] >= uHi - band }, us, vs, vHi - vLo, uHi)
-        val (back, _) = side({ vs[it] >= vHi - band }, vs, us, uHi - uLo, vHi)
-        val (front, frontN) = side({ vs[it] <= vLo + band }, vs, us, uHi - uLo, vLo)
+        val leftSide = side(us, vs, vHi - vLo, uLo, 1f, uHi - uLo)
+        val rightSide = side(us, vs, vHi - vLo, uHi, -1f, uHi - uLo)
+        val backSide = side(vs, us, uHi - uLo, vHi, -1f, vHi - vLo)
+        val frontSide = side(vs, us, uHi - uLo, vLo, 1f, vHi - vLo)
+        val left = leftSide.at; val right = rightSide.at; val back = backSide.at; val front = frontSide.at
         val width = (right - left).coerceAtLeast(1f)
         val depth = (back - front).coerceAtLeast(1f)
 
-        // Height: a ceiling / lid / parcel shelf if one was seen spread over the footprint,
-        // otherwise the tops of the walls.
-        val wallTop = range(wallIdx, hs, w).second
-        val topBand = max(30f, 0.05f * wallTop)
-        val high = wallIdx.filter { hs[it] >= wallTop - topBand && us[it] > left + band && us[it] < right - band && vs[it] > front + band && vs[it] < back - band }
-        val height = if (high.size >= MIN_FACE_POINTS) weightedMedian(high, hs, w) else wallTop
+        // Height: where the walls stop. Each wall is followed up from the floor, on the points
+        // right against it and away from its corners, until the points run out; a flap folded
+        // out over the rim, or a roof seen from above, sits beyond a gap or off the wall's plane.
+        // The median over the walls, so one wall that runs on (the kitchen wall behind a shelf)
+        // does not carry the rest. A ceiling, lid or parcel shelf seen spread over the
+        // footprint at that height wins when there is one.
+        fun topOf(s: Side, vals: FloatArray, along: FloatArray, lo: Float, hi: Float): Float? {
+            if (s.count == 0) return null
+            val len = hi - lo
+            // As tight to the wall as its own points allow: a flap leaning out from the rim
+            // leaves a band this thin within a centimetre or two.
+            val tight = max(8f, 2f * s.spread)
+            val hsOn = wallIdx.filter { abs(vals[it] - s.at) <= tight && along[it] > lo + 0.1f * len && along[it] < hi - 0.1f * len }
+                .map { hs[it] }.sorted()
+            if (hsOn.size < MIN_FACE_POINTS) return null
+            val gap = max(50f, 0.08f * wallTop)
+            var top = hsOn.first()
+            for (hh in hsOn) { if (hh - top > gap) break; top = hh }
+            return top
+        }
+        // Not the front: that is where the person stands, and in a boot or a cupboard it is only
+        // the lip they lift things over.
+        val tops = listOfNotNull(
+            topOf(leftSide, us, vs, front, back), topOf(rightSide, us, vs, front, back), topOf(backSide, vs, us, left, right),
+        ).sorted()
+        val wallsTop = if (tops.isEmpty()) wallTop else tops[tops.size / 2]
+        val topBand = max(60f, 0.1f * wallsTop)
+        val high = wallIdx.filter { abs(hs[it] - wallsTop) <= topBand && us[it] > left + band && us[it] < right - band && vs[it] > front + band && vs[it] < back - band }
+        val height = if (high.size >= MIN_FACE_POINTS * 3) weightedMedian(high, hs, w) else wallsTop
 
         val um = (left + right) / 2; val vm = (front + back) / 2
         val box0 = SpaceBox(
@@ -192,9 +260,11 @@ object SpaceFitter {
             widthMm = width, depthMm = depth, heightMm = height,
             coverage = emptyMap(), opening = null, cameraInside = false, pointCount = n,
         )
+        // Inside means standing in it — a room — not leaning over an open box: the camera must
+        // also be below the space's top.
         val camInside = cameras.any { cam ->
             val (cu, cv) = box0.toBox(cam.xMm, cam.yMm)
-            abs(cu) < width / 2 && abs(cv) < depth / 2
+            abs(cu) < width / 2 && abs(cv) < depth / 2 && cam.hMm < height
         }
 
         // Coverage: cut each face into cells and count the cells a point landed near.
@@ -229,13 +299,17 @@ object SpaceFitter {
         // left above the sill — the highest thing standing along the front edge.
         val opening = if (camInside) null else {
             // Away from the side walls, whose front ends stand at full height.
+            // Only the lower part: the frame above a tailgate stands at the front too, and is the
+            // top of the opening, not a lip.
             val sillPts = (0 until n).filter {
-                abs(vs[it] - front) <= band && hs[it] > FLOOR_BAND_MM && us[it] > left + 2 * band && us[it] < right - 2 * band
+                abs(vs[it] - front) <= band && hs[it] > FLOOR_BAND_MM && hs[it] < height * 0.6f &&
+                    us[it] > left + 2 * band && us[it] < right - 2 * band
             }
-            val sill = if (sillPts.size >= MIN_FACE_POINTS && frontN >= MIN_FACE_POINTS) {
-                // A lip only: a full front wall would make this a closed box, seen over the top.
+            val sill = if (sillPts.size >= MIN_FACE_POINTS) {
+                // A lip only: a front wall reaching most of the way up makes this a box seen over
+                // the top, and its opening is the whole top.
                 val sillTop = range(sillPts, hs, w).second
-                if (sillTop < height * 0.6f) sillTop else 0f
+                if (sillTop < height * 0.5f) sillTop else 0f
             } else 0f
             Opening(widthMm = width.roundToInt(), heightMm = (height - sill).coerceAtLeast(0f).roundToInt())
         }
@@ -292,16 +366,25 @@ object SpaceFitter {
         )
     }
 
-    private fun range(idx: List<Int>, v: FloatArray, w: FloatArray): Pair<Float, Float> {
+    private fun range(idx: List<Int>, v: FloatArray, w: FloatArray, trim: Double = 0.01): Pair<Float, Float> {
         if (idx.size < 100) return idx.minOf { v[it] } to idx.maxOf { v[it] }
         val sorted = idx.sortedBy { v[it] }
         val total = sorted.sumOf { w[it].toDouble() }
-        val trim = total * 0.01
+        val trim = total * trim
         var acc = 0.0; var lo = v[sorted.first()]
         for (i in sorted) { acc += w[i]; if (acc > trim) { lo = v[i]; break } }
         acc = 0.0; var hi = v[sorted.last()]
         for (i in sorted.asReversed()) { acc += w[i]; if (acc > trim) { hi = v[i]; break } }
         return lo to hi
+    }
+
+    /** Centre of the most crowded 10 mm of [v] over [idx]. */
+    private fun densest(idx: List<Int>, v: FloatArray): Float {
+        val counts = HashMap<Int, Int>()
+        for (i in idx) { val b = floor(v[i] / 10f).toInt(); counts[b] = (counts[b] ?: 0) + 1 }
+        // Three bins at a time, so a wall straddling a bin edge still counts as one.
+        val best = counts.keys.maxBy { (counts[it - 1] ?: 0) + (counts[it] ?: 0) + (counts[it + 1] ?: 0) }
+        return best * 10f + 5f
     }
 
     private fun weightedMedian(idx: List<Int>, v: FloatArray, w: FloatArray): Float {

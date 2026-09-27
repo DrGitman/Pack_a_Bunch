@@ -17,6 +17,7 @@ import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.packabunch.packing.Axis
+import com.packabunch.packing.BoxDepth
 import com.packabunch.packing.DetectionPoints
 import com.packabunch.packing.FittedObject
 import com.packabunch.packing.ItemScanState
@@ -26,7 +27,9 @@ import com.packabunch.packing.OutlineGeometry
 import com.packabunch.packing.OutlineSegment
 import com.packabunch.packing.PlaneFrame
 import com.packabunch.packing.PlanePoint
+import com.packabunch.packing.ScanStateSmoother
 import com.packabunch.packing.ShapeFamily
+import com.packabunch.packing.WallPlane
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -112,9 +115,15 @@ data class ScannedItemResult(
  * of the surface it stands on and whose axes are world X and −Z, so all objects share one plan
  * (the tracker can compare their positions) while each height is from its own surface.
  *
- * ### What it will not do
- * Vertical planes are not searched for, because the old scan deleted every depth point that
- * lay on one — which is exactly where a carton's sides are. Nothing is uploaded.
+ * ### Keeping the room out
+ * A detector box around a heater against a wall is mostly wall, and the old scan tracked the
+ * wall as an object and drew an outline the size of the room. Three things stop that now:
+ * boxes covering most of the picture are the scene, not a thing, and are skipped; inside a box
+ * only depths near its middle's are kept ([BoxDepth]); and points on a *large* vertical plane —
+ * a wall, a fridge door — are dropped. Only large ones: the old scan deleted every point on any
+ * vertical plane, which is exactly where a carton's sides are.
+ *
+ * Nothing is uploaded.
  */
 class ItemScanController(
     private val context: Context,
@@ -137,6 +146,7 @@ class ItemScanController(
     private val detector = ItemScanDetector()
 
     private val tracker = ItemTracker(maxItems)
+    private val smoother = ScanStateSmoother()
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "item-scan").apply { priority = Thread.NORM_PRIORITY - 1 } }
     private val workerBusy = AtomicBoolean(false)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -190,7 +200,7 @@ class ItemScanController(
                 }
                 val c = Config(s).apply {
                     updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
-                    planeFindingMode = Config.PlaneFindingMode.HORIZONTAL
+                    planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
                     focusMode = Config.FocusMode.AUTO
                     depthMode = Config.DepthMode.AUTOMATIC
                     lightEstimationMode = Config.LightEstimationMode.DISABLED
@@ -230,12 +240,13 @@ class ItemScanController(
     /** Forgets one object (the ✕ on its tag). */
     fun remove(id: Int) = worker.execute {
         tracker.remove(id)
-        publish(tracker.all, capReached = false)
+        publish(tracker.all.filter { it.isConfirmed }, capReached = false)
     }
 
     /** Throws everything away and starts again, keeping the camera running. */
     fun restart() = worker.execute {
         tracker.clear()
+        smoother.clear()
         names.clear(); crops.clear(); cropArea.clear(); measuredAt.clear(); planeHeights.clear()
         publish(emptyList(), capReached = false)
     }
@@ -292,17 +303,16 @@ class ItemScanController(
             camera.getProjectionMatrix(proj, 0, 0.05f, 20f)
             Matrix.multiplyMM(viewProj, 0, proj, 0, view, 0)
 
-            val planes = s.getAllTrackables(Plane::class.java).filter {
-                it.trackingState == TrackingState.TRACKING && it.subsumedBy == null &&
-                    it.type == Plane.Type.HORIZONTAL_UPWARD_FACING
-            }
+            val tracked = s.getAllTrackables(Plane::class.java).filter { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
+            val planes = tracked.filter { it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
+            val walls = tracked.filter { it.type == Plane.Type.VERTICAL && WallPlane.isWallSized(it.extentX, it.extentZ) }
             if (_ui.value.status != TrackingStatus.TRACKING || _ui.value.surfaceFound != planes.isNotEmpty()) {
                 _ui.value = _ui.value.copy(status = TrackingStatus.TRACKING, failureReason = null, surfaceFound = planes.isNotEmpty())
             }
 
             if (frame.timestamp - lastProcessedNs >= PROCESS_INTERVAL_NS && planes.isNotEmpty()) {
                 lastProcessedNs = frame.timestamp
-                sampleAndSubmit(frame, planes)
+                sampleAndSubmit(frame, planes, walls)
             }
             drawOutlines(frame)
         } catch (e: CameraNotAvailableException) {
@@ -325,9 +335,9 @@ class ItemScanController(
 
     private class PlaneSnap(val y: Float, val polygonXZ: FloatArray)
 
-    private class BoxSamples(val box: ScanBox, val pixels: IntArray, val world: FloatArray, val central: BooleanArray)
+    private class BoxSamples(val box: ScanBox, val pixels: IntArray, val world: FloatArray, val central: BooleanArray, val edge: BooleanArray)
 
-    private fun sampleAndSubmit(frame: Frame, planes: List<Plane>) {
+    private fun sampleAndSubmit(frame: Frame, planes: List<Plane>, wallPlanes: List<Plane>) {
         val camera = frame.camera
         val pose = camera.pose
 
@@ -348,7 +358,13 @@ class ItemScanController(
         }
 
         if (workerBusy.get()) return
-        val boxes = detector.latest.filter { frame.timestamp - it.frameTimestampNs < MAX_BOX_AGE_NS }
+        // A box over most of the picture is ML Kit boxing the scene — the wall, the floor — not a thing.
+        val boxes = detector.latest.filter { frame.timestamp - it.frameTimestampNs < MAX_BOX_AGE_NS && it.area <= MAX_BOX_AREA }
+        val walls = wallPlanes.map {
+            // A plane's own Y axis is its normal; X and Z run along it.
+            val c = it.centerPose
+            WallPlane(c.translation, c.yAxis, c.xAxis, c.zAxis, it.extentX / 2, it.extentZ / 2)
+        }
         val snaps = planes.map { p ->
             val c = p.centerPose
             val poly = p.polygon.let { buf -> FloatArray(buf.limit()).also { buf.rewind(); buf.get(it) } }
@@ -375,6 +391,10 @@ class ItemScanController(
                 val plane = depth.planes[0]
                 val buf = plane.buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
                 val local = FloatArray(3); val world = FloatArray(3)
+                val focal = maxOf(projection.fx, projection.fy)
+                fun depthAt(u: Int, v: Int): Int =
+                    if (u < 0 || v < 0 || u >= depth.width || v >= depth.height) 0
+                    else buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
                 for (box in boxes) {
                     val w = box.sensor[2] - box.sensor[0]; val h = box.sensor[3] - box.sensor[1]
                     val u0 = ((box.sensor[0] + w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
@@ -385,25 +405,41 @@ class ItemScanController(
                     val step = if ((u1 - u0) * (v1 - v0) > 2400) 2 else 1
                     val cu0 = u0 + (u1 - u0) * 0.3f; val cu1 = u1 - (u1 - u0) * 0.3f
                     val cv0 = v0 + (v1 - v0) * 0.3f; val cv1 = v1 - (v1 - v0) * 0.3f
-                    val px = ArrayList<Int>(); val pts = ArrayList<Float>(); val central = ArrayList<Boolean>()
+                    // First pass: the raw depths, to find how far back the middle of the box is.
+                    val raw = ArrayList<Int>(); val rawMm = ArrayList<Int>(); val rawCentral = ArrayList<Boolean>()
                     var v = v0
                     while (v <= v1) {
                         var u = u0
                         while (u <= u1) {
                             val mm = buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
                             if (mm in MIN_DEPTH_MM..MAX_DEPTH_MM) {
-                                val p = projection.point(u, v, mm)
-                                local[0] = p[0]; local[1] = p[1]; local[2] = p[2]
-                                pose.transformPoint(local, 0, world, 0)
-                                px += v * depth.width + u
-                                pts += world[0]; pts += world[1]; pts += world[2]
-                                central += u >= cu0 && u <= cu1 && v >= cv0 && v <= cv1
+                                raw += v * depth.width + u
+                                rawMm += mm
+                                rawCentral += u >= cu0 && u <= cu1 && v >= cv0 && v <= cv1
                             }
                             u += step
                         }
                         v += step
                     }
-                    if (px.isNotEmpty()) samples += BoxSamples(box, px.toIntArray(), pts.toFloatArray(), central.toBooleanArray())
+                    val depths = rawMm.toIntArray(); val centralArr = rawCentral.toBooleanArray()
+                    val keep = BoxDepth.keepRange(depths, centralArr, maxOf(u1 - u0, v1 - v0).toFloat(), focal) ?: continue
+                    // Second pass: only depths that can be this object, and nothing on a wall.
+                    val px = ArrayList<Int>(); val pts = ArrayList<Float>(); val central = ArrayList<Boolean>(); val edge = ArrayList<Boolean>()
+                    for (k in depths.indices) {
+                        val mm = depths[k]
+                        if (mm !in keep) continue
+                        val pix = raw[k]
+                        val pu = pix % depth.width; val pv = pix / depth.width
+                        val p = projection.point(pu, pv, mm)
+                        local[0] = p[0]; local[1] = p[1]; local[2] = p[2]
+                        pose.transformPoint(local, 0, world, 0)
+                        if (walls.any { w -> w.contains(world[0], world[1], world[2]) }) continue
+                        px += pix
+                        pts += world[0]; pts += world[1]; pts += world[2]
+                        central += centralArr[k]
+                        edge += DetectionPoints.isEdge(mm, depthAt(pu - 1, pv), depthAt(pu + 1, pv), depthAt(pu, pv - 1), depthAt(pu, pv + 1))
+                    }
+                    if (px.isNotEmpty()) samples += BoxSamples(box, px.toIntArray(), pts.toFloatArray(), central.toBooleanArray(), edge.toBooleanArray())
                 }
             }
         } catch (_: NotYetAvailableException) {
@@ -429,12 +465,14 @@ class ItemScanController(
             val planeY = supportUnder(bs, keep, planes) ?: continue
             val frame = PlaneFrame(0f, planeY, 0f, ALONG, UP)
             val list = keep.map { i ->
-                DetectionPoints.Sample(frame.toPlane(bs.world[3 * i], bs.world[3 * i + 1], bs.world[3 * i + 2]), bs.central[i])
+                DetectionPoints.Sample(frame.toPlane(bs.world[3 * i], bs.world[3 * i + 1], bs.world[3 * i + 2]), bs.central[i], bs.edge[i])
             }
             val picked = DetectionPoints.select(list)
             if (picked.isEmpty()) continue
             for (j in picked) claimed += bs.pixels[keep[j]]
-            observations += ItemTracker.Observation(bs.box.trackingId, picked.map { list[it].point }, frame.toPlane(cam[0], cam[1], cam[2]))
+            val b = bs.box.sensor
+            val whole = b[0] > EDGE_OF_PICTURE && b[1] > EDGE_OF_PICTURE && b[2] < 1 - EDGE_OF_PICTURE && b[3] < 1 - EDGE_OF_PICTURE
+            observations += ItemTracker.Observation(bs.box.trackingId, picked.map { list[it].point }, frame.toPlane(cam[0], cam[1], cam[2]), whole)
             obsPlaneY += planeY
         }
         val defaultY = obsPlaneY.firstOrNull() ?: planes.maxOfOrNull { if (it.y < cam[1]) it.y else Float.NEGATIVE_INFINITY } ?: return
@@ -443,7 +481,7 @@ class ItemScanController(
             val y = obsPlaneY[obsIndex]
             planeHeights[trackId] = planeHeights[trackId]?.let { it * 0.8f + y * 0.2f } ?: y
         }
-        publish(update.tracks, update.capReached)
+        publish(update.visible, update.capReached)
     }
 
     /** The surface an object stands on: the highest tracked plane below it that it is over. */
@@ -456,14 +494,17 @@ class ItemScanController(
         return (below.filter { inside(it.polygonXZ, mx, mz) }.maxByOrNull { it.y } ?: below.maxByOrNull { it.y })?.y
     }
 
+    /** Hands the confirmed [tracks] to the screen and the renderer, each in its steadied state. */
     private fun publish(tracks: List<ItemTracker.Track>, capReached: Boolean) {
         val now = System.currentTimeMillis()
+        smoother.retain(tracks.map { it.id }.toSet())
+        val shown = tracks.associate { t -> t.id to smoother.smooth(t.id, t.state, now) }
         for (t in tracks) if (t.isMeasured) measuredAt.putIfAbsent(t.id, now)
         drawn = tracks.mapNotNull { t ->
             val y = planeHeights[t.id] ?: return@mapNotNull null
-            TrackSnapshot(t.id, t.state, t.fit, y, measuredAt[t.id])
+            TrackSnapshot(t.id, shown.getValue(t.id), t.fit, y, measuredAt[t.id])
         }
-        val items = tracks.map { t -> ScanItem(t.id, names[t.id], t.state, t.fit?.shape, crops[t.id], t.fit) }
+        val items = tracks.map { t -> ScanItem(t.id, names[t.id], shown.getValue(t.id), t.fit?.shape, crops[t.id], t.fit) }
         val u = _ui.value
         _ui.value = u.copy(items = items, capReached = capReached || (u.capReached && tracks.size >= u.maxItems))
     }
@@ -495,7 +536,7 @@ class ItemScanController(
                 naming.remove(id)
             }
         }
-        worker.execute { publish(tracker.all, _ui.value.capReached) }
+        worker.execute { publish(tracker.all.filter { it.isConfirmed }, _ui.value.capReached) }
     }
 
     // -- drawing (GL thread) -----------------------------------------------------------------------
@@ -508,12 +549,13 @@ class ItemScanController(
         val now = System.currentTimeMillis()
         for (t in drawn) {
             val fit = t.fit ?: continue
-            if (t.state is ItemScanState.CannotMeasure) continue
             val pf = PlaneFrame(0f, t.planeY, 0f, ALONG, UP)
             val cam = pf.toPlane(pose.tx(), pose.ty(), pose.tz())
             val segments = OutlineGeometry.of(fit, cam)
 
             when (val st = t.state) {
+                // No outline: a wrong outline would say "measured this". Only the tag, saying why.
+                is ItemScanState.CannotMeasure -> Unit
                 is ItemScanState.Measured -> {
                     val elapsed = now - (t.measuredAtMs ?: now)
                     val progress = (elapsed / OutlineStyle.DRAW_ON_MS.toFloat()).coerceIn(0f, 1f)
@@ -541,10 +583,12 @@ class ItemScanController(
                 )
             }
 
-            // Tag sits just above the object's top centre; pills sit on the edges they measure.
-            projectPoint(pf, PlanePoint(fit.centreXMm, fit.centreYMm, fit.heightMm + TAG_LIFT_MM))?.let { (x, y) ->
-                anchors += labelAnchors(t.id, x, y, fit, cam, segments, pf)
-            }
+            // The tag sits on top of the object's outline as seen — its highest visible point —
+            // centred over it; pills sit on the edges they measure. Anchoring to a point above
+            // the fit's centre put a short object's tag on whatever stood behind it. An object
+            // wholly out of view has no tag at all: pinning its tag to the edge of the screen
+            // is what put labels under the status bar.
+            tagPoint(segments, fit, pf)?.let { (x, y) -> anchors += labelAnchors(t.id, x, y, fit, cam, segments, pf) }
         }
         _anchors.value = anchors
     }
@@ -588,6 +632,22 @@ class ItemScanController(
             span = span,
         )
     }
+
+    /** Top middle of the object's on-screen outline, or null when none of it is on screen. */
+    private fun tagPoint(segments: List<OutlineSegment>, fit: FittedObject, pf: PlaneFrame): Pair<Float, Float>? {
+        var minX = Float.MAX_VALUE; var maxX = -Float.MAX_VALUE; var top = Float.MAX_VALUE
+        for (s in segments) for (p in listOf(s.a, s.b)) {
+            val q = projectPoint(pf, p) ?: continue
+            if (!onScreen(q)) continue
+            minX = minOf(minX, q.first); maxX = maxOf(maxX, q.first); top = minOf(top, q.second)
+        }
+        if (top == Float.MAX_VALUE) return null
+        val centre = projectPoint(pf, PlanePoint(fit.centreXMm, fit.centreYMm, fit.heightMm))?.first ?: ((minX + maxX) / 2)
+        return centre.coerceIn(minX, maxX) to (top - TAG_GAP_DP * density)
+    }
+
+    private fun onScreen(p: Pair<Float, Float>) =
+        p.first in 0f..viewportW.toFloat() && p.second in 0f..viewportH.toFloat()
 
     private fun polylines(segments: List<OutlineSegment>, pf: PlaneFrame): List<FloatArray> {
         // Chain segments that meet end to start so dashes run on around corners and curves.
@@ -644,9 +704,14 @@ class ItemScanController(
         const val MAX_DEPTH_MM = 1_500
         /** Nearest a point may be to the camera, in metres, and still be drawn. */
         const val MIN_DRAW_DISTANCE_M = 0.1f
+        /** A detector box this close to the picture's edge may have more of its object outside it. */
+        const val EDGE_OF_PICTURE = 0.01f
+        /** A detector box bigger than this share of the picture is the scene, not an object. */
+        const val MAX_BOX_AREA = 0.5f
         /** Share of a detector box trimmed off each side before sampling depth. */
         const val SHRINK = 0.06f
-        const val TAG_LIFT_MM = 25f
+        /** Space between an object's outline and the bottom of its tag. */
+        const val TAG_GAP_DP = 6f
         /** One full march of the scanning dashes (three dash periods) takes this long. */
         const val MARCH_PERIOD_MS = 1_200L
 
