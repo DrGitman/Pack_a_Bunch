@@ -121,6 +121,46 @@ Configuration lives in `local.properties`, which is never committed. See
 web client id, and the RevenueCat key. A `test_` RevenueCat key works only in debug builds;
 RevenueCat shuts the app down if one reaches a release build.
 
+### Running it on your phone from VS Code (Windows PowerShell)
+
+No Android Studio needed: VS Code's terminal (**Terminal → New Terminal**) and the Gradle
+wrapper in this repo build and install the app.
+
+**Once, on the phone:** Settings → About phone → Software information → tap **Build number**
+seven times; then Settings → **Developer options** → turn on **USB debugging**. Plug the phone
+in and tap **Allow** when it asks.
+
+**Once per terminal window:** tell PowerShell where Java and `adb` are. The paths below are
+the defaults; if yours differ, `Get-Content local.properties` shows the SDK folder on its
+`sdk.dir=` line.
+
+```powershell
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
+$env:Path += ";$env:LOCALAPPDATA\Android\Sdk\platform-tools"
+adb devices                      # should list the phone, followed by "device"
+```
+
+**Every time, to update the app on the phone:**
+
+```powershell
+git pull                         # fetch the latest changes
+.\gradlew.bat installStaging     # build and install the staging app
+adb shell monkey -p com.packabunch.staging -c android.intent.category.LAUNCHER 1   # open it
+```
+
+The staging app (`com.packabunch.staging`) installs beside any debug copy and keeps your packs
+between updates. `.\gradlew.bat installDebug` installs the debug build instead, for testing
+purchases.
+
+If something goes wrong:
+
+- **`adb` is not recognised** — the `platform-tools` line above was not run in this window, or
+  the SDK is elsewhere: use the folder from `sdk.dir` in `local.properties`.
+- **SDK location not found** — `local.properties` needs a line like
+  `sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk`.
+- **JAVA_HOME is not set** — run the `$env:JAVA_HOME` line; it must point at a JDK 17 or newer.
+- **The phone is listed as `unauthorized`** — unlock it and accept the USB debugging prompt.
+
 ## Before a Play release
 
 - **A privacy policy and terms at a public URL.** Both exist in the app
