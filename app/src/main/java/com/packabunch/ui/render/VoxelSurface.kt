@@ -20,6 +20,11 @@ data class SurfaceFace(
      * one surface instead of reading as the staves of a barrel.
      */
     val smooth: Boolean = false,
+    /**
+     * Which part of a family shape this face belongs to — a cushion, a leg, the frame. -1 for
+     * scanned and plain-box faces. Parts are painted as wholes; see IsometricCrate's drawSurface.
+     */
+    val part: Int = -1,
 )
 
 /** Greedy meshing joins coplanar voxel faces into clean panels, preserving every boundary. */

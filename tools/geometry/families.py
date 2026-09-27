@@ -31,7 +31,12 @@ import sys
 S = 1000.0  # canonical size
 
 
-class SmoothFace(list):
+class Face(list):
+    """Four points, plus the part of the shape they belong to (see Mesh.add)."""
+    part = 0
+
+
+class SmoothFace(Face):
     """
     One facet of a curved surface, or one piece of a flat cap cut into a fan. Written out with
     `"smooth": true`, so the app draws it without an edge line: a round thing should shade as
@@ -107,6 +112,12 @@ class Mesh:
         self.parts = 0
 
     def add(self, faces):
+        # Every face remembers which part it belongs to. The app paints whole parts far to near
+        # before sorting faces inside each one; sorting all faces of a sofa together lets a
+        # cushion's side be painted over the cushion in front of it.
+        faces = [f if isinstance(f, Face) else Face(f) for f in faces]
+        for f in faces:
+            f.part = self.parts
         self.faces.extend(faces)
         self.parts += 1
         return self
@@ -257,6 +268,70 @@ def torus(centre, big, small_ab, small_z, ring_sides, tube_sides):
     return faces
 
 
+def rounded_ring(x0, x1, y0, y1, r, inset, segs):
+    """
+    A rounded rectangle shrunk by `inset`, as a ring of points. Corner centres stay put and the
+    radius shrinks with the inset, so every edge of one ring is parallel to the same edge of the
+    next — which keeps the quads between rings flat.
+    """
+    rr = max(r - inset, 0.0)
+    corners = ((x1 - r, y0 + r, -90), (x1 - r, y1 - r, 0), (x0 + r, y1 - r, 90), (x0 + r, y0 + r, 180))
+    pts = []
+    for cx, cy, start in corners:
+        for k in range(segs + 1):
+            a = math.radians(start + 90.0 * k / segs)
+            pts.append((cx + rr * math.cos(a), cy + rr * math.sin(a)))
+    return pts
+
+
+def soft_box(x0, x1, y0, y1, z0, z1, r, inset=None, edge=None, segs=3, arc=2):
+    """
+    A box with rounded upright corners and rounded top and bottom edges: a cushion, a case, a
+    moulded appliance body. `r` rounds the corners seen from above; the top and bottom edges
+    curve in by `inset` across and `edge` up. The whole surface is smooth, so it shades as one
+    soft object rather than six flat panels.
+    """
+    inset = r * 0.6 if inset is None else min(inset, r)
+    edge = (z1 - z0) * 0.12 if edge is None else edge
+    profile = []
+    for k in range(arc + 1):
+        t = math.pi / 2 * k / arc
+        profile.append((inset * (1 - math.sin(t)), z0 + edge * (1 - math.cos(t))))
+    for k in range(arc, -1, -1):
+        t = math.pi / 2 * k / arc
+        profile.append((inset * (1 - math.sin(t)), z1 - edge * (1 - math.cos(t))))
+    rings = [[(x, y, z) for x, y in rounded_ring(x0, x1, y0, y1, r, d, segs)] for d, z in profile]
+    c = ((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
+    faces = []
+    n = len(rings[0])
+    for a, b in zip(rings, rings[1:]):
+        if a[0][2] == b[0][2]:
+            continue
+        for i in range(n):
+            j = (i + 1) % n
+            q = [a[i], a[j], b[j], b[i]]
+            if newell_len(q) < 1e-12:
+                continue
+            mid = centroid(q)
+            out = (mid[0] - c[0], mid[1] - c[1], 0.0)
+            # The outward direction of a band leans up or down with the edge it rounds.
+            out = (out[0], out[1], (mid[2] - c[2]) * 0.5)
+            faces.append(SmoothFace(orient(q, out)))
+    faces += [SmoothFace(orient(f, (0, 0, -1))) for f in fan(rings[0])]
+    faces += [SmoothFace(orient(f, (0, 0, 1))) for f in fan(rings[-1])]
+    return faces
+
+
+def newell_len(q):
+    n = newell(q)
+    return math.sqrt(dot(n, n))
+
+
+def leg(cx, cy, radius, z0, z1, taper=1.0):
+    """A turned round leg or post, optionally narrowing towards the floor."""
+    return lathe([(taper, z0), (1, z1)], 6, "z", (cx, cy), (radius, radius))
+
+
 # ---------------------------------------------------------------------------------------------
 # the families — each fills the unit box exactly
 
@@ -329,10 +404,14 @@ def shallow_tray():
 
 
 def suitcase():
-    """Standing case with rounded corners and a carry handle."""
-    m = Mesh().add(prism(chamfered_rect(0, 1, 0, 0.9, 0.08, 0.08), "y", 0, 1))
-    m.add(box(0.34, 0.39, 0.4, 0.6, 0.9, 0.955)).add(box(0.61, 0.66, 0.4, 0.6, 0.9, 0.955))
-    return m.add(box(0.34, 0.66, 0.4, 0.6, 0.955, 1))
+    """Hard-shell case standing on four spinner wheels, with a pull handle and a carry handle."""
+    m = Mesh().add(soft_box(0, 1, 0, 0.88, 0.07, 0.92, 0.1, 0.05, 0.06))
+    for x in (0.06, 0.86):
+        for y in (0.06, 0.74):
+            m.add(lathe([(1, x), (1, x + 0.08)], 6, "x", (y + 0.04, 0.035), (0.04, 0.035)))
+    m.add(box(0.3, 0.34, 0.92, 0.96, 0.4, 0.95)).add(box(0.66, 0.7, 0.92, 0.96, 0.4, 0.95))
+    m.add(soft_box(0.27, 0.73, 0.9, 1, 0.94, 1, 0.03, 0.02, 0.02, segs=2, arc=1))
+    return m.add(soft_box(0.38, 0.62, 0.36, 0.52, 0.92, 0.97, 0.04, 0.02, 0.02, segs=2, arc=1))
 
 
 def duffel_bag():
@@ -342,16 +421,20 @@ def duffel_bag():
 
 
 def backpack():
-    """Main body with a rounded top, a front pocket and a grab handle."""
-    body = prism([(0.22, 0), (1, 0), (1, 0.84), (0.86, 0.94), (0.36, 0.94), (0.22, 0.84)], "x", 0, 1)
-    m = Mesh().add(body)
-    m.add(box(0.16, 0.84, 0, 0.22, 0.08, 0.56))
-    return m.add(box(0.4, 0.6, 0.52, 0.7, 0.94, 1))
+    """Rounded main body, a front pocket, two side pockets and a grab loop."""
+    m = Mesh().add(soft_box(0.06, 0.94, 0.26, 1, 0, 0.92, 0.16, 0.12, 0.2))
+    m.add(soft_box(0.16, 0.84, 0, 0.3, 0.06, 0.56, 0.1, 0.08, 0.1))
+    m.add(soft_box(0, 0.08, 0.42, 0.82, 0.05, 0.45, 0.03, 0.02, 0.06, segs=2))
+    m.add(soft_box(0.92, 1, 0.42, 0.82, 0.05, 0.45, 0.03, 0.02, 0.06, segs=2))
+    return m.add(soft_box(0.42, 0.58, 0.55, 0.7, 0.9, 1, 0.04, 0.02, 0.03, segs=2, arc=1))
 
 
 def cooler_box():
-    """Cool box: body, overhanging lid, handle."""
-    return Mesh().add(box(0.03, 0.97, 0.03, 0.97, 0, 0.8)).add(box(0, 1, 0, 1, 0.8, 0.92)).add(box(0.28, 0.72, 0.44, 0.56, 0.92, 1))
+    """Cool box: moulded body, an overhanging lid and a carry handle across the top."""
+    m = Mesh().add(soft_box(0.02, 0.98, 0.02, 0.98, 0, 0.8, 0.08, 0.04, 0.05))
+    m.add(soft_box(0, 1, 0, 1, 0.78, 0.92, 0.09, 0.03, 0.03, arc=1))
+    m.add(box(0.28, 0.32, 0.46, 0.54, 0.92, 0.98)).add(box(0.68, 0.72, 0.46, 0.54, 0.92, 0.98))
+    return m.add(soft_box(0.26, 0.74, 0.44, 0.56, 0.96, 1, 0.03, 0.02, 0.015, segs=2, arc=1))
 
 
 def folded_chair():
@@ -406,8 +489,9 @@ def upright_fridge():
 
 
 def mattress():
-    """A mattress with softened long edges."""
-    return Mesh().add(prism(chamfered_rect(0, 1, 0, 1, 0.04, 0.2), "x", 0, 1))
+    """A mattress: plump rounded edges and a quilted top panel."""
+    m = Mesh().add(soft_box(0, 1, 0, 1, 0, 0.9, 0.04, 0.03, 0.25))
+    return m.add(soft_box(0.05, 0.95, 0.05, 0.95, 0.9, 1, 0.03, 0.02, 0.06, arc=1))
 
 
 def plank_stack():
@@ -457,34 +541,54 @@ def lawnmower():
 
 
 def sofa():
-    """Seat base, back, two arms."""
-    m = Mesh().add(box(0.12, 0.88, 0, 0.74, 0, 0.45)).add(box(0, 1, 0.74, 1, 0, 1))
-    return m.add(box(0, 0.12, 0, 0.74, 0, 0.64)).add(box(0.88, 1, 0, 0.74, 0, 0.64))
+    """Sofa: base, three seat cushions, three back cushions against the frame, padded arms."""
+    m = Mesh().add(soft_box(0.1, 0.9, 0, 0.8, 0.05, 0.3, 0.03, 0.02, 0.03, segs=2, arc=1))
+    for i in range(3):
+        a = 0.1 + i * 0.8 / 3
+        m.add(soft_box(a + 0.005, a + 0.8 / 3 - 0.005, 0, 0.74, 0.3, 0.46, 0.05, 0.04, 0.05, segs=2, arc=1))
+        m.add(soft_box(a + 0.01, a + 0.8 / 3 - 0.01, 0.62, 0.84, 0.46, 0.9, 0.05, 0.04, 0.08, segs=2, arc=1))
+    m.add(soft_box(0, 1, 0.8, 1, 0.05, 1, 0.05, 0.03, 0.06, segs=2))
+    m.add(soft_box(0, 0.12, 0, 0.84, 0.05, 0.64, 0.05, 0.04, 0.08, segs=2))
+    m.add(soft_box(0.88, 1, 0, 0.84, 0.05, 0.64, 0.05, 0.04, 0.08, segs=2))
+    # Short feet, as blocks: turned ones this small are a few pixels and cost a hundred faces.
+    for x in (0.04, 0.92):
+        for y in (0.04, 0.92):
+            m.add(box(x, x + 0.04, y, y + 0.04, 0, 0.05))
+    return m
 
 
 def armchair():
-    """A deep seat between thick arms, high back."""
-    m = Mesh().add(box(0.2, 0.8, 0, 0.72, 0, 0.46)).add(box(0, 1, 0.72, 1, 0, 1))
-    return m.add(box(0, 0.2, 0, 0.72, 0, 0.66)).add(box(0.8, 1, 0, 0.72, 0, 0.66))
+    """Armchair: a deep seat cushion between padded arms, a back cushion and short legs."""
+    m = Mesh().add(soft_box(0.18, 0.82, 0, 0.8, 0.07, 0.3, 0.04, 0.03, 0.04, segs=2, arc=1))
+    m.add(soft_box(0.19, 0.81, 0, 0.74, 0.3, 0.48, 0.07, 0.05, 0.06, segs=2))
+    m.add(soft_box(0.2, 0.8, 0.6, 0.84, 0.48, 0.92, 0.07, 0.05, 0.09, segs=2))
+    m.add(soft_box(0.04, 0.96, 0.8, 1, 0.07, 1, 0.08, 0.04, 0.08, segs=2))
+    m.add(soft_box(0, 0.2, 0, 0.86, 0.07, 0.68, 0.07, 0.05, 0.1, segs=2))
+    m.add(soft_box(0.8, 1, 0, 0.86, 0.07, 0.68, 0.07, 0.05, 0.1, segs=2))
+    for x in (0.07, 0.93):
+        for y in (0.06, 0.93):
+            m.add(leg(x, y, 0.03, 0, 0.07, 0.7))
+    return m
 
 
 def dining_table():
-    """Top and four legs."""
-    m = Mesh().add(box(0, 1, 0, 1, 0.92, 1))
-    for x0 in (0.04, 0.9):
-        for y0 in (0.04, 0.9):
-            m.add(box(x0, x0 + 0.06, y0, y0 + 0.06, 0, 0.92))
+    """Table: a top with rounded edges, an apron under it and four turned legs."""
+    m = Mesh().add(soft_box(0, 1, 0, 1, 0.93, 1, 0.03, 0.01, 0.02, segs=3, arc=1))
+    m.add(box(0.06, 0.94, 0.06, 0.1, 0.84, 0.93)).add(box(0.06, 0.94, 0.9, 0.94, 0.84, 0.93))
+    for x in (0.07, 0.93):
+        for y in (0.07, 0.93):
+            m.add(leg(x, y, 0.03, 0, 0.93, 0.65))
     return m
 
 
 def chair():
-    """Seat, four legs, back posts and a back rail."""
-    m = Mesh().add(box(0, 1, 0, 1, 0.44, 0.52))
-    for x0 in (0.02, 0.88):
-        for y0 in (0.02, 0.88):
-            m.add(box(x0, x0 + 0.1, y0, y0 + 0.1, 0, 0.44))
-    m.add(box(0.02, 0.12, 0.88, 0.98, 0.52, 1)).add(box(0.88, 0.98, 0.88, 0.98, 0.52, 1))
-    return m.add(box(0.12, 0.88, 0.9, 0.96, 0.72, 0.96))
+    """Chair: a padded seat on four turned legs, back posts and a curved back rest."""
+    m = Mesh().add(soft_box(0, 1, 0, 1, 0.44, 0.53, 0.08, 0.05, 0.03, segs=3))
+    for x in (0.08, 0.92):
+        for y in (0.08, 0.92):
+            m.add(leg(x, y, 0.06, 0, 0.44, 0.7))
+        m.add(leg(x, 0.93, 0.05, 0.53, 1))
+    return m.add(soft_box(0.1, 0.9, 0.88, 0.98, 0.68, 0.96, 0.04, 0.03, 0.04, segs=2))
 
 
 def wardrobe():
@@ -495,11 +599,15 @@ def wardrobe():
 
 
 def bed_frame():
-    """Frame on legs, mattress, headboard and a low footboard; length runs along depth."""
-    m = Mesh().add(box(0, 1, 0.04, 0.94, 0.1, 0.3)).add(box(0.03, 0.97, 0.05, 0.93, 0.3, 0.46))
-    m.add(box(0, 1, 0.94, 1, 0, 1)).add(box(0, 1, 0, 0.04, 0, 0.4))
-    for x0 in (0, 0.94):
-        m.add(box(x0, x0 + 0.06, 0.4, 0.46, 0, 0.1))
+    """Bed: frame on turned legs, a plump mattress, a padded headboard and a low footboard."""
+    m = Mesh().add(soft_box(0, 1, 0.04, 0.94, 0.1, 0.3, 0.02, 0.01, 0.02, arc=1))
+    m.add(soft_box(0.02, 0.98, 0.05, 0.93, 0.3, 0.5, 0.04, 0.03, 0.06))
+    m.add(soft_box(0.04, 0.34, 0.72, 0.92, 0.5, 0.58, 0.05, 0.04, 0.03, segs=2))
+    m.add(soft_box(0.66, 0.96, 0.72, 0.92, 0.5, 0.58, 0.05, 0.04, 0.03, segs=2))
+    m.add(soft_box(0, 1, 0.94, 1, 0, 1, 0.02, 0.01, 0.1, segs=2))
+    m.add(soft_box(0, 1, 0, 0.04, 0, 0.4, 0.02, 0.01, 0.03, segs=2, arc=1))
+    for x in (0.04, 0.96):
+        m.add(leg(x, 0.5, 0.03, 0, 0.1, 0.8))
     return m
 
 
@@ -545,16 +653,17 @@ def coffee_maker():
 
 
 def microwave():
-    """Microwave or countertop oven: body, a door window and the control strip beside it."""
-    m = Mesh().add(box(0, 1, 0.04, 1, 0, 1))
+    """Microwave or countertop oven: a rounded body, a door window and the control strip beside it."""
+    m = Mesh().add(soft_box(0, 1, 0.04, 1, 0, 1, 0.05, 0.03, 0.05))
     return m.add(box(0.05, 0.7, 0, 0.04, 0.12, 0.88)).add(box(0.76, 0.95, 0.015, 0.04, 0.12, 0.88))
 
 
 def toaster():
-    """Pop-up toaster: body with two slot rims on top and the lever on its side."""
-    m = Mesh().add(box(0, 0.9, 0, 1, 0, 0.9))
-    m.add(box(0.12, 0.78, 0.18, 0.4, 0.9, 0.96)).add(box(0.12, 0.78, 0.6, 0.82, 0.9, 0.96))
-    return m.add(box(0.9, 1, 0.42, 0.58, 0.45, 1))
+    """Pop-up toaster: a rounded body, two slot rims on top and the lever on its side."""
+    m = Mesh().add(soft_box(0, 0.9, 0, 1, 0, 0.9, 0.14, 0.06, 0.1))
+    m.add(soft_box(0.14, 0.76, 0.2, 0.4, 0.9, 0.95, 0.04, 0.02, 0.02, segs=2, arc=1))
+    m.add(soft_box(0.14, 0.76, 0.6, 0.8, 0.9, 0.95, 0.04, 0.02, 0.02, segs=2, arc=1))
+    return m.add(soft_box(0.9, 1, 0.42, 0.58, 0.5, 1, 0.03, 0.02, 0.03, segs=2, arc=1))
 
 
 def cooker():
@@ -592,10 +701,8 @@ def bowl():
 
 
 def pillow():
-    """Pillow or cushion: a puffed middle that thins towards the ends."""
-    m = Mesh().add(prism(chamfered_rect(0, 1, 0, 1, 0.16, 0.42), "x", 0.07, 0.93))
-    m.add(prism(chamfered_rect(0.1, 0.9, 0.22, 0.78, 0.14, 0.2), "x", 0, 0.07))
-    return m.add(prism(chamfered_rect(0.1, 0.9, 0.22, 0.78, 0.14, 0.2), "x", 0.93, 1))
+    """Pillow or cushion: plump in the middle, thinning to rounded edges all round."""
+    return Mesh().add(soft_box(0, 1, 0, 1, 0, 1, 0.22, 0.2, 0.48, segs=4, arc=3))
 
 
 def folded_stack():
@@ -634,9 +741,11 @@ def desk():
 
 
 def monitor():
-    """Monitor or flat-screen TV: foot, neck and a thin screen."""
-    m = Mesh().add(box(0.3, 0.7, 0, 1, 0, 0.05)).add(box(0.45, 0.55, 0.56, 0.7, 0.05, 0.3))
-    return m.add(box(0, 1, 0.4, 0.56, 0.3, 1))
+    """Monitor or flat-screen TV: a rounded foot, a neck and a thin screen with softened corners."""
+    m = Mesh().add(soft_box(0.3, 0.7, 0, 1, 0, 0.05, 0.08, 0.03, 0.02, segs=2, arc=1))
+    m.add(box(0.45, 0.55, 0.56, 0.7, 0.05, 0.3))
+    m.add(prism(rounded_ring(0, 1, 0.3, 1, 0.02, 0, 2), "y", 0.4, 0.56))
+    return m
 
 
 def printer():
@@ -693,9 +802,11 @@ def watering_can():
 
 
 def power_drill():
-    """Cordless drill: barrel, chuck, grip and the battery it stands on."""
-    m = Mesh().add(box(0, 0.8, 0.2, 0.8, 0.55, 1)).add(box(0.8, 1, 0.38, 0.62, 0.66, 0.88))
-    return m.add(box(0.38, 0.62, 0.3, 0.7, 0.18, 0.55)).add(box(0.25, 0.75, 0, 1, 0, 0.18))
+    """Cordless drill: rounded motor housing, a round chuck, the grip and the battery pack."""
+    m = Mesh().add(soft_box(0, 0.78, 0.2, 0.8, 0.55, 1, 0.12, 0.08, 0.1))
+    m.add(lathe([(0.9, 0.78), (1, 0.84), (1, 0.94), (0.6, 1)], 8, "x", (0.5, 0.77), (0.13, 0.11)))
+    m.add(soft_box(0.36, 0.64, 0.3, 0.7, 0.16, 0.58, 0.08, 0.05, 0.04, segs=2))
+    return m.add(soft_box(0.22, 0.78, 0, 1, 0, 0.18, 0.08, 0.04, 0.04, segs=2))
 
 
 def hand_tool():
@@ -718,18 +829,20 @@ def tote_bag():
 
 
 def stool():
-    """Stool or bar stool: a round seat on four legs, no back."""
-    m = Mesh().add(lathe([(1, 0.88), (1, 1)], 10, "z", (0.5, 0.5), (0.5, 0.5)))
-    for x0, y0 in ((0.14, 0.14), (0.78, 0.14), (0.14, 0.78), (0.78, 0.78)):
-        m.add(box(x0, x0 + 0.08, y0, y0 + 0.08, 0, 0.88))
+    """Stool or bar stool: a round padded seat on four splayed turned legs and a foot ring."""
+    m = Mesh().add(lathe([(0.9, 0.86), (1, 0.9), (1, 0.97), (0.9, 1)], 10, "z", (0.5, 0.5), (0.5, 0.5)))
+    for x, y in ((0.2, 0.2), (0.8, 0.2), (0.2, 0.8), (0.8, 0.8)):
+        m.add(leg(x, y, 0.05, 0, 0.86, 0.8))
+    m.add(box(0.2, 0.8, 0.18, 0.22, 0.32, 0.35)).add(box(0.2, 0.8, 0.78, 0.82, 0.32, 0.35))
     return m
 
 
 def ottoman():
-    """Ottoman, pouf or bench: a padded block with softened top edges on short feet."""
-    m = Mesh().add(prism([(0, 0.12), (1, 0.12), (1, 0.88), (0.94, 1), (0.06, 1), (0, 0.88)], "x", 0, 1))
-    for x0, y0 in ((0.04, 0.04), (0.9, 0.04), (0.04, 0.9), (0.9, 0.9)):
-        m.add(box(x0, x0 + 0.06, y0, y0 + 0.06, 0, 0.12))
+    """Ottoman, pouf or bench: a plump padded block on four short turned feet."""
+    m = Mesh().add(soft_box(0, 1, 0, 1, 0.12, 1, 0.12, 0.06, 0.14))
+    for x in (0.08, 0.92):
+        for y in (0.08, 0.92):
+            m.add(leg(x, y, 0.04, 0, 0.12, 0.7))
     return m
 
 
@@ -750,7 +863,12 @@ def facing_viewer(fn):
     """
     def wrapped():
         m = fn()
-        m.faces = [type(f)(reversed([(p[0], 1 - p[1], p[2]) for p in f])) for f in m.faces]
+        mirrored = []
+        for f in m.faces:
+            g = type(f)(reversed([(p[0], 1 - p[1], p[2]) for p in f]))
+            g.part = f.part
+            mirrored.append(g)
+        m.faces = mirrored
         return m
     wrapped.__doc__ = fn.__doc__
     wrapped.__name__ = fn.__name__
@@ -856,7 +974,8 @@ def emit(out_dir, readme_dir=None):
             "version": 1,
             "params": {},
             "bounds_mm": [1000, 1000, 1000],
-            "faces": [dict({"points": [[round(c * S, 1) for c in p] for p in f]}, **({"smooth": True} if isinstance(f, SmoothFace) else {}))
+            "faces": [dict({"points": [[round(c * S, 1) for c in p] for p in f], "part": f.part},
+                           **({"smooth": True} if isinstance(f, SmoothFace) else {}))
                       for f in faces],
         }
         with open(os.path.join(out_dir, "family_%s.json" % name), "w") as fh:

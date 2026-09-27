@@ -424,10 +424,12 @@ private fun DrawScope.drawSurface(view: CrateView, faces: List<SurfaceFace>, bas
     fun depth(face: SurfaceFace): Float = face.points.sumOf { view.depth(it.x,it.y,it.z).toDouble() }.toFloat()
     val o = view.depth(0f, 0f, 0f)
     val towardViewer = floatArrayOf(view.depth(1f, 0f, 0f) - o, view.depth(0f, 1f, 0f) - o, view.depth(0f, 0f, 1f) - o)
-    faces.filter { face ->
+    val visible = faces.filter { face ->
         val n = face.normal ?: return@filter true
         n.x * towardViewer[0] + n.y * towardViewer[1] + n.z * towardViewer[2] > -1e-3f
-    }.sortedBy { depth(it) }.forEach { face ->
+    }
+    val ordered = if (visible.any { it.part >= 0 }) byPart(faces, visible, towardViewer, ::depth) else visible.sortedBy { depth(it) }
+    ordered.forEach { face ->
         val p = face.points.map { view.project(it.x,it.y,it.z) }
         val n = face.normal ?: sideNormal(face.side)
         val fill = base.lighten(0.12f + 0.5f * n.z.coerceAtLeast(0f) + 0.22f * n.x * n.x).copy(alpha=alpha)
@@ -438,6 +440,70 @@ private fun DrawScope.drawSurface(view: CrateView, faces: List<SurfaceFace>, bas
         else quadOutline(p[0],p[1],p[2],p[3],base.darken(0.28f).copy(alpha=alpha*0.4f),0.7f)
     }
 }
+
+/**
+ * A family shape's faces in painting order: whole parts far to near, then faces within each.
+ *
+ * Sorting every face of a sofa together by its own centre let a back cushion's side be painted
+ * over the cushion in front of it, and a big mattress over the pillows lying on it. Parts are
+ * ordered instead: when one part's box lies wholly on the far side of another's along any axis,
+ * it is painted first. Only where neither is clear of the other (they touch or overlap on every
+ * axis) does the centre decide. [all] gives each part's full extent, including faces turned
+ * away, which are not drawn.
+ */
+private fun byPart(
+    all: List<SurfaceFace>,
+    visible: List<SurfaceFace>,
+    towardViewer: FloatArray,
+    depth: (SurfaceFace) -> Float,
+): List<SurfaceFace> {
+    val lo = HashMap<Int, FloatArray>()
+    val hi = HashMap<Int, FloatArray>()
+    val centreSum = HashMap<Int, Double>()
+    val count = HashMap<Int, Int>()
+    for (f in all) {
+        val l = lo.getOrPut(f.part) { floatArrayOf(Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE) }
+        val h = hi.getOrPut(f.part) { floatArrayOf(-Float.MAX_VALUE, -Float.MAX_VALUE, -Float.MAX_VALUE) }
+        for (p in f.points) {
+            l[0] = minOf(l[0], p.x); l[1] = minOf(l[1], p.y); l[2] = minOf(l[2], p.z)
+            h[0] = maxOf(h[0], p.x); h[1] = maxOf(h[1], p.y); h[2] = maxOf(h[2], p.z)
+        }
+        centreSum[f.part] = (centreSum[f.part] ?: 0.0) + depth(f)
+        count[f.part] = (count[f.part] ?: 0) + 1
+    }
+    val groups = visible.groupBy { it.part }
+    val keys = groups.keys.toList()
+    val centre = keys.associateWith { (centreSum[it] ?: 0.0) / (count[it] ?: 1) }
+    fun behind(a: Int, b: Int): Boolean {
+        val al = lo.getValue(a); val ah = hi.getValue(a); val bl = lo.getValue(b); val bh = hi.getValue(b)
+        for (i in 0..2) {
+            if (towardViewer[i] > 1e-6f && ah[i] <= bl[i] + PART_GAP_MM) return true
+            if (towardViewer[i] < -1e-6f && al[i] >= bh[i] - PART_GAP_MM) return true
+        }
+        return false
+    }
+    val after = keys.associateWith { ArrayList<Int>() }
+    val waiting = HashMap<Int, Int>().apply { keys.forEach { put(it, 0) } }
+    for (a in keys) for (b in keys) {
+        if (a != b && behind(a, b) && !behind(b, a)) { after.getValue(a) += b; waiting[b] = waiting.getValue(b) + 1 }
+    }
+    val order = ArrayList<Int>(keys.size)
+    val ready = keys.filter { waiting.getValue(it) == 0 }.sortedBy { centre.getValue(it) }.toMutableList()
+    while (ready.isNotEmpty()) {
+        val k = ready.removeAt(0)
+        order += k
+        for (b in after.getValue(k)) {
+            waiting[b] = waiting.getValue(b) - 1
+            if (waiting.getValue(b) == 0) { ready += b; ready.sortBy { centre.getValue(it) } }
+        }
+    }
+    // A cycle — three parts each partly in front of the next — has no right order; the centre decides.
+    order += keys.filter { it !in order }.sortedBy { centre.getValue(it) }
+    return order.flatMap { k -> groups.getValue(k).sortedBy(depth) }
+}
+
+/** Parts closer than this along an axis count as touching, not as one clear of the other. */
+private const val PART_GAP_MM = 0.5f
 
 /** The outward normal of a [voxelSurface] face: axis `side / 2`, positive when `side` is odd. */
 private fun sideNormal(side: Int): SurfacePoint {

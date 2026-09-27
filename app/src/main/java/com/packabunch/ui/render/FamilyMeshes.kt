@@ -111,7 +111,7 @@ data class FamilyChoice(val family: GeometryFamily, val axes: List<Int> = listOf
 object FamilyMeshes {
 
     /** The mesh as authored: quads in the 1000 mm box, with an outward normal per quad. */
-    private class Canonical(val points: FloatArray, val normals: FloatArray, val smooth: BooleanArray) {
+    private class Canonical(val points: FloatArray, val normals: FloatArray, val smooth: BooleanArray, val parts: IntArray) {
         val faceCount get() = normals.size / 3
     }
 
@@ -157,8 +157,10 @@ object FamilyMeshes {
         val points = FloatArray(faces.length() * 12)
         val normals = FloatArray(faces.length() * 3)
         val smooth = BooleanArray(faces.length())
+        val parts = IntArray(faces.length())
         for (f in 0 until faces.length()) {
             smooth[f] = faces.getJSONObject(f).optBoolean("smooth", false)
+            parts[f] = faces.getJSONObject(f).optInt("part", -1)
             val quad = faces.getJSONObject(f).getJSONArray("points")
             require(quad.length() == 4) { "family ${family.name}: face $f has ${quad.length()} points" }
             for (v in 0 until 4) {
@@ -181,7 +183,7 @@ object FamilyMeshes {
             val len = sqrt(nx * nx + ny * ny + nz * nz).coerceAtLeast(1e-9f)
             normals[f * 3] = nx / len; normals[f * 3 + 1] = ny / len; normals[f * 3 + 2] = nz / len
         }
-        Canonical(points, normals, smooth)
+        Canonical(points, normals, smooth, parts)
     }.getOrNull()
 
     /**
@@ -217,7 +219,7 @@ object FamilyMeshes {
             val len = sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).coerceAtLeast(1e-12f)
             // `side` is unused for a face with a normal; 5 keeps any code that still reads it
             // treating the face as a lid rather than a wall.
-            SurfaceFace(pts, side = 5, normal = SurfacePoint(n[0] / len, n[1] / len, n[2] / len), smooth = mesh.smooth[f])
+            SurfaceFace(pts, side = 5, normal = SurfacePoint(n[0] / len, n[1] / len, n[2] / len), smooth = mesh.smooth[f], part = mesh.parts[f])
         }
     }
 }

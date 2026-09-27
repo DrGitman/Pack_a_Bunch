@@ -13,6 +13,32 @@ def proj(x, y, z, W, D):  # same as CrateView.rawProject with yaw 0, then flip f
     return ((rx - ry)*ct, -((rx + ry)*st - z))
 def depth(x, y, z): return x + y + z   # CrateView.depth with yaw 0 (x*1 - 0 + 0 + y + z)
 
+def part_order(boxes, view, centre_depth):
+    """boxes: {part: (lo[3], hi[3])}. Parts clearly apart along an axis are painted far side first."""
+    eps = 1e-6
+    keys = list(boxes)
+    def behind(a, b):
+        (alo, ahi), (blo, bhi) = boxes[a], boxes[b]
+        for i in range(3):
+            if view[i] > 0 and ahi[i] <= blo[i] + eps: return True
+            if view[i] < 0 and alo[i] >= bhi[i] - eps: return True
+        return False
+    after = {k: set() for k in keys}; indeg = {k: 0 for k in keys}
+    for a in keys:
+        for b in keys:
+            if a != b and behind(a, b) and not behind(b, a):
+                after[a].add(b); indeg[b] += 1
+    out = []; ready = sorted([k for k in keys if indeg[k] == 0], key=centre_depth)
+    while ready:
+        k = ready.pop(0); out.append(k)
+        for b in after[k]:
+            indeg[b] -= 1
+            if indeg[b] == 0: ready.append(b)
+        ready.sort(key=centre_depth)
+    rest = sorted([k for k in keys if k not in out], key=centre_depth)   # a cycle: fall back
+    return out + rest
+
+
 def newell(p):
     n=[0,0,0]
     for i in range(len(p)):
@@ -51,15 +77,24 @@ for ax, f in zip(axes.flat, files):
     d = json.load(open(f)); name = d["family"]; W, D, H = dims.get(name, (1000,1000,1000))
     faces = [[(p[0]/1000*W, p[1]/1000*D, p[2]/1000*H) for p in fc["points"]] for fc in d["faces"]]
     smooth = [fc.get("smooth", False) for fc in d["faces"]]
+    parts = [fc.get("part", 0) for fc in d["faces"]]
+    # Parts are painted as wholes in occlusion order, then faces within each — as IsometricCrate does.
+    boxes, depths = {}, {}
+    for fc, pt in zip(faces, parts):
+        lo, hi = boxes.setdefault(pt, ([9e9]*3, [-9e9]*3))
+        for q in fc:
+            depths.setdefault(pt, []).append(depth(*q))
+            for i in range(3): lo[i] = min(lo[i], q[i]); hi[i] = max(hi[i], q[i])
+    rank = {k: i for i, k in enumerate(part_order(boxes, (1, 1, 1), lambda k: sum(depths[k]) / len(depths[k])))}
     view = (1, 1, 1)  # towards the viewer, gradient of depth()
     shown = []
-    for fc, sm in zip(faces, smooth):
+    for fc, sm, pt in zip(faces, smooth, parts):
         # normal in canonical space, then scaled by inverse dims (normals transform with inverse-transpose)
         n0 = newell([(p[0]/W, p[1]/D, p[2]/H) for p in fc])
         n = [n0[0]/W, n0[1]/D, n0[2]/H]; l = math.sqrt(sum(v*v for v in n)) or 1; n = [v/l for v in n]
         if sum(n[i]*view[i] for i in range(3)) <= 0: continue
         lit = 0.12 + 0.5*max(n[2],0) + 0.22*n[0]*n[0]
-        shown.append((sum(depth(*p) for p in fc)/4, fc, lit, sm))
+        shown.append(((rank[pt], sum(depth(*p) for p in fc)/4), fc, lit, sm))
     shown.sort(key=lambda t: t[0])
     pts=[proj(*p, W, D) for fc in faces for p in fc]
     for _, fc, lit, sm in shown:
