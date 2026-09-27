@@ -43,6 +43,22 @@ class ScanGeometryTest {
         assertTrue(picked.size > 250)
     }
 
+    @Test fun `a phone lying flat gives nothing rather than the wall behind it`() {
+        val rnd = Random(7)
+        val samples = ArrayList<DetectionPoints.Sample>()
+        // Phone: 8 mm thick, so its whole face sits within depth noise of the table.
+        repeat(300) {
+            samples += DetectionPoints.Sample(PlanePoint(rnd.nextFloat() * 70f - 35f, rnd.nextFloat() * 150f - 75f, rnd.nextFloat() * 6f), central = rnd.nextFloat() < 0.6f)
+        }
+        // A few noisy samples off the phone's face.
+        repeat(8) { samples += DetectionPoints.Sample(PlanePoint(rnd.nextFloat() * 70f - 35f, 0f, 8f + rnd.nextFloat() * 4f), central = true) }
+        // A wall 300 mm behind, filling the box's edges.
+        repeat(3000) {
+            samples += DetectionPoints.Sample(PlanePoint(-150f + rnd.nextFloat() * 300f, 300f, 10f + rnd.nextFloat() * 400f), central = rnd.nextFloat() < 0.05f)
+        }
+        assertTrue(DetectionPoints.select(samples).isEmpty(), "the wall was taken as the phone")
+    }
+
     @Test fun `a box outline has twelve edges, four per axis`() {
         val fit = FittedObject(0f, 0f, 30f, 300f, 200f, 150f, ShapeFamily.BOX, observedAxes = Axis.entries.toSet(), pointCount = 100)
         val edges = OutlineGeometry.of(fit, PlanePoint(600f, 0f, 400f))

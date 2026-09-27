@@ -29,8 +29,10 @@ object DetectionPoints {
     /** Returns the indices of [samples] that belong to the object. Empty if no object is found. */
     fun select(samples: List<Sample>): List<Int> {
         val cells = HashMap<Long, MutableList<Int>>()
+        var centralTotal = 0
         for ((i, s) in samples.withIndex()) {
             val p = s.point
+            if (s.central) centralTotal++
             if (p.hMm <= ObjectCloud.MIN_HEIGHT_MM || p.hMm > MAX_HEIGHT_MM) continue
             cells.getOrPut(key(p)) { ArrayList() } += i
         }
@@ -64,11 +66,23 @@ object DetectionPoints {
         }
         val winner = (0 until next).maxWithOrNull(compareBy({ centralVotes[it] }, { size[it] })) ?: return emptyList()
         if (size[winner] < MIN_SAMPLES) return emptyList()
+        // The kept piece has to be most of what the middle of the box is looking at, counting the
+        // middle's samples that landed on the surface too. When the detector boxes something
+        // too flat for depth — a phone, a sheet of paper — the middle is mostly table, and the
+        // biggest raised piece left in the box is the wall or sofa behind it. Taking that is how
+        // a phone came out 60 cm tall. Nothing this frame is the honest answer.
+        if (centralVotes[winner] < MIN_CENTRAL_SAMPLES || centralVotes[winner] < centralTotal * MIN_CENTRAL_SHARE) return emptyList()
         return cells.filterKeys { component[it] == winner }.values.flatten().sorted()
     }
 
     /** Fewer samples than this is not an object this frame — maybe next frame. */
     const val MIN_SAMPLES = 12
+
+    /** The kept piece needs at least this many samples from the middle of the box. */
+    const val MIN_CENTRAL_SAMPLES = 6
+
+    /** Share of the box's middle, surface included, the kept piece must own. */
+    const val MIN_CENTRAL_SHARE = 0.5f
 
     private fun key(p: PlanePoint) = pack(
         floor(p.xMm / CELL_MM).toInt(), floor(p.yMm / CELL_MM).toInt(), floor(p.hMm / CELL_MM).toInt(),

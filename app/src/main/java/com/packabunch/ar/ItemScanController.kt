@@ -623,7 +623,10 @@ class ItemScanController(
         pf.toWorld(p, world3)
         world4[0] = world3[0]; world4[1] = world3[1]; world4[2] = world3[2]; world4[3] = 1f
         Matrix.multiplyMV(clip4, 0, viewProj, 0, world4, 0)
-        if (clip4[3] <= 0.02f) return null
+        // Anything nearer than this is inside the depth sensor's dead zone anyway, and a corner
+        // 2 cm in front of the lens projects thousands of pixels off screen — the lines that
+        // slashed across the whole view came from exactly that.
+        if (clip4[3] <= MIN_DRAW_DISTANCE_M) return null
         return ((clip4[0] / clip4[3]) * 0.5f + 0.5f) * viewportW to (0.5f - (clip4[1] / clip4[3]) * 0.5f) * viewportH
     }
 
@@ -634,7 +637,13 @@ class ItemScanController(
         const val NAMING_INTERVAL_NS = 1_000_000_000L
         const val MAX_BOX_AGE_NS = 400_000_000L
         const val MIN_DEPTH_MM = 150
-        const val MAX_DEPTH_MM = 2_000
+        /**
+         * Items are scanned at arm's length. Past this the depth is mostly the room behind the
+         * table, which only ever adds background to a box and never adds the object.
+         */
+        const val MAX_DEPTH_MM = 1_500
+        /** Nearest a point may be to the camera, in metres, and still be drawn. */
+        const val MIN_DRAW_DISTANCE_M = 0.1f
         /** Share of a detector box trimmed off each side before sampling depth. */
         const val SHRINK = 0.06f
         const val TAG_LIFT_MM = 25f
