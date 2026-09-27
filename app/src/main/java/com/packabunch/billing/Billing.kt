@@ -6,6 +6,7 @@ import com.packabunch.BuildConfig
 import com.packabunch.ui.screens.PurchaseOutcome
 import com.revenuecat.purchases.CustomerInfo
 import com.revenuecat.purchases.Package
+import com.revenuecat.purchases.models.Period
 import com.revenuecat.purchases.PurchaseParams
 import com.revenuecat.purchases.Purchases
 import com.revenuecat.purchases.PurchasesConfiguration
@@ -59,9 +60,65 @@ object Billing {
             .onFailure { runCatching { onEntitlement(Purchases.sharedInstance.awaitCustomerInfo().hasPlus()) } }
     }
 
-    /** The monthly package from the current offering, or null — never an invented price. */
-    suspend fun monthly(): Package? = if (!configured) null else runCatching {
-        Purchases.sharedInstance.awaitOfferings().current?.let { it.monthly ?: it.availablePackages.firstOrNull() }
+    /**
+     * Every plan in the current offering — weekly, monthly, yearly, whichever are set up in
+     * RevenueCat — cheapest commitment first. Empty when billing has not loaded: never an
+     * invented price. Prices, periods and trials all come from Google Play; nothing here sets
+     * what anybody pays.
+     */
+    suspend fun plans(): List<PlanOffer> = if (!configured) emptyList() else runCatching {
+        val offering = Purchases.sharedInstance.awaitOfferings().current ?: return@runCatching emptyList<PlanOffer>()
+        listOfNotNull(offering.weekly, offering.monthly, offering.annual)
+            .ifEmpty { offering.availablePackages }
+            .mapNotNull(::offerFor)
+    }.getOrDefault(emptyList())
+
+    /**
+     * One package in the words the paywall shows. A plan whose period is not a plain week,
+     * month or year is left out rather than described vaguely: the renewal has to be stated
+     * exactly, or the plan is not shown.
+     */
+    private fun offerFor(pkg: Package): PlanOffer? {
+        val product = pkg.product
+        val period = product.period ?: return null
+        val kind = when {
+            period.unit == Period.Unit.WEEK && period.value == 1 -> PlanKind.WEEKLY
+            period.unit == Period.Unit.MONTH && period.value == 1 -> PlanKind.MONTHLY
+            period.unit == Period.Unit.YEAR && period.value == 1 -> PlanKind.YEARLY
+            period.unit == Period.Unit.MONTH && period.value == 12 -> PlanKind.YEARLY
+            else -> return null
+        }
+        val price = product.price.formatted
+        val free = product.defaultOption?.freePhase?.billingPeriod
+        val perMonth = when (kind) {
+            PlanKind.WEEKLY -> product.price.amountMicros * 52 / 12
+            PlanKind.YEARLY -> product.price.amountMicros / 12
+            PlanKind.MONTHLY -> null
+        }?.let { formatMicros(it, product.price.currencyCode) }
+        return PlanOffer(
+            pkg = pkg,
+            kind = kind,
+            price = price,
+            trial = free?.let { "${lengthOf(it)} free, then $price ${kind.per}" },
+            perMonth = perMonth?.let { "About $it a month" },
+        )
+    }
+
+    private fun lengthOf(period: Period): String {
+        val unit = when (period.unit) {
+            Period.Unit.DAY -> "day"
+            Period.Unit.WEEK -> "week"
+            Period.Unit.MONTH -> "month"
+            Period.Unit.YEAR -> "year"
+            else -> "day"
+        }
+        return "${period.value} $unit" + if (period.value == 1) "" else "s"
+    }
+
+    private fun formatMicros(micros: Long, currency: String): String? = runCatching {
+        java.text.NumberFormat.getCurrencyInstance().apply {
+            this.currency = java.util.Currency.getInstance(currency)
+        }.format(micros / 1_000_000.0)
     }.getOrNull()
 
     suspend fun purchase(activity: Activity, pkg: Package): PurchaseOutcome = try {
@@ -84,4 +141,28 @@ object Billing {
     }
 
     private fun CustomerInfo.hasPlus() = entitlements[ENTITLEMENT]?.isActive == true
+}
+
+enum class PlanKind(val title: String, val per: String, val every: String) {
+    WEEKLY("Weekly", "a week", "week"),
+    MONTHLY("Monthly", "a month", "month"),
+    YEARLY("Yearly", "a year", "year"),
+}
+
+/**
+ * One plan as the paywall shows it. Everything in it is Google Play's figure put into words;
+ * the renewal is always stated, because weekly plans are the ones people feel tricked by when
+ * the renewal is small print.
+ */
+data class PlanOffer(
+    val pkg: Package,
+    val kind: PlanKind,
+    /** Google Play's localised price, as given. */
+    val price: String,
+    /** "7 days free, then $2.29 a week", or null when the plan has no free trial. */
+    val trial: String?,
+    /** What it comes to per month, so plans can be compared honestly. Null for monthly. */
+    val perMonth: String?,
+) {
+    val renewal: String get() = "Renews every ${kind.every} until you cancel."
 }

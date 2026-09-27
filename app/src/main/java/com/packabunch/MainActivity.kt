@@ -31,6 +31,11 @@ class MainActivity : ComponentActivity() {
                         key = "packs-" + account.userId,
                         factory = AppViewModel.Factory(applicationContext, account.userId!!, account),
                     )
+                    // Sync and its live connection only while the app is on screen.
+                    androidx.lifecycle.compose.LifecycleStartEffect(appViewModel) {
+                        appViewModel.onForeground()
+                        onStopOrDispose { appViewModel.onBackground() }
+                    }
                     PackNavHost(
                         viewModel = appViewModel,
                         account = account,

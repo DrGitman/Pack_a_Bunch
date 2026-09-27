@@ -3,20 +3,15 @@ package com.packabunch.ui.screens
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
-import android.opengl.GLSurfaceView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.*
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.packabunch.ar.*
-import com.packabunch.packing.SweptObject
 import com.packabunch.ui.components.*
-import com.packabunch.ui.format.LengthUnit
 
 @Composable
 fun DepthCaptureGate(onManual: () -> Unit, onBack: () -> Unit, content: @Composable () -> Unit) {
@@ -116,54 +111,4 @@ fun DepthCaptureGate(onManual: () -> Unit, onBack: () -> Unit, content: @Composa
     }
 
     ArUnavailableScreen(onTypeInstead = onManual, onBack = onBack)
-}
-
-@Composable
-fun LiveSweepScreen(
-    unit: LengthUnit,
-    onDone: (List<SweptObject>) -> Unit,
-    onManual: () -> Unit,
-    onBack: () -> Unit,
-    /** Room left in this pack. Scanning stops noticing objects past it. */
-    maxObjects: Int = Int.MAX_VALUE,
-    /** Recognised names by swept object id, reported up so the import can use them. */
-    onNames: (Map<String, String>) -> Unit = {},
-) {
-    DepthCaptureGate(onManual, onBack) {
-        val context = LocalContext.current
-        val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-        val controller = remember(maxObjects) { ArScanController(context, trackItems = true, maxObjects = maxObjects) }
-        val state by controller.state.collectAsStateWithLifecycle()
-        val objects by controller.objects.collectAsStateWithLifecycle()
-        val found by controller.found.collectAsStateWithLifecycle()
-        val names by controller.names.collectAsStateWithLifecycle()
-        androidx.compose.runtime.LaunchedEffect(names) { onNames(names) }
-        var error by remember { mutableStateOf<String?>(null) }
-        val view = remember { GLSurfaceView(context).apply {
-            preserveEGLContextOnPause = true
-            setEGLContextClientVersion(2)
-            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-            setRenderer(controller)
-        } }
-        DisposableEffect(owner) {
-            val observer = LifecycleEventObserver { _, event -> when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    error = controller.resume(view.display?.rotation ?: 0, view.width.coerceAtLeast(1), view.height.coerceAtLeast(1))
-                    if (error == null) view.onResume()
-                }
-                Lifecycle.Event.ON_PAUSE -> { view.onPause(); controller.pause() }
-                else -> Unit
-            } }
-            owner.lifecycle.addObserver(observer)
-            onDispose { owner.lifecycle.removeObserver(observer); view.onPause(); controller.release() }
-        }
-        if (error != null || state.fatalError != null) ScreenScaffold {
-            PackAppBar(title = "Item scan", onBack = onBack)
-            Note(text = error ?: state.fatalError.orEmpty())
-            SecondaryButton(text = "Type measurements instead", onClick = onManual)
-        } else SweepItemsScreen(objects, unit, state.status == TrackingStatus.TRACKING,
-            fallbackFor = { null }, onDone = onDone, onAddManually = onManual, onBack = onBack,
-            cameraPreview = { AndroidView(factory = { view }, modifier = Modifier.fillMaxSize()) },
-            found = found)
-    }
 }

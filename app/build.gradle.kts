@@ -116,6 +116,8 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.arcore)
     implementation(libs.revenuecat)
+    implementation(libs.okhttp)
+    implementation(libs.play.review)
     implementation(libs.lottie.compose)
     implementation(libs.coil.compose)
     implementation(libs.coil.network)

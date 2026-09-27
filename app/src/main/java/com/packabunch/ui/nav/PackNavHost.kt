@@ -957,6 +957,8 @@ fun PackNavHost(
                 limits = viewModel.limits,
                 savedPackCount = projects.size,
                 onDone = {
+                    // Whatever they answered about the fit: the prompt never depends on it.
+                    (context as? android.app.Activity)?.let(com.packabunch.review.ReviewPrompt::packFinished)
                     home()
                 },
                 onSeePlan = {
@@ -1011,7 +1013,11 @@ fun PackNavHost(
                         " (" + com.packabunch.BuildConfig.VERSION_CODE + ")",
                     onPrivacy = { navController.navigate(Routes.PRIVACY) },
                     onTerms = { navController.navigate(Routes.TERMS) },
-                    onSupport = { notice = "Support: " + com.packabunch.ui.screens.SUPPORT_EMAIL },
+                    onSupport = {
+                        val opened = com.packabunch.review.ReviewPrompt.feedback(context, com.packabunch.ui.screens.SUPPORT_EMAIL,
+                            com.packabunch.BuildConfig.VERSION_NAME + " (" + com.packabunch.BuildConfig.VERSION_CODE + ")")
+                        if (!opened) notice = "Support: " + com.packabunch.ui.screens.SUPPORT_EMAIL
+                    },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -1033,7 +1039,7 @@ fun PackNavHost(
         }
 
         composable(Routes.PACK_PLAN) {
-            val plusPackage by viewModel.plusPackage.collectAsStateWithLifecycle()
+            val plans by viewModel.plans.collectAsStateWithLifecycle()
             WithNavBar(
                 here = com.packabunch.ui.components.NavSlots.PackPlan,
                 onProjects = ::home,
@@ -1043,7 +1049,8 @@ fun PackNavHost(
                 com.packabunch.ui.screens.PackPlanScreen(
                     modifier = pageModifier,
                     tier = settings.tier,
-                    price = plusPackage?.product?.price?.formatted,
+                    // The cheapest way in, with its period: "from $2.29 a week".
+                    price = plans.firstOrNull()?.let { "from ${it.price} ${it.kind.per}" },
                     onUpgrade = { navController.navigate(Routes.UPGRADE) },
                     onManageInPlay = { openPlaySubscriptions(context) },
                     onBack = { navController.popBackStack() },
@@ -1082,7 +1089,8 @@ fun PackNavHost(
                 onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
                 onNewPack = { viewModel.startNewPack(); navController.navigate(Routes.SPACE_TYPE) },
             ) { pageModifier ->
-            val plusPackage by viewModel.plusPackage.collectAsStateWithLifecycle()
+            val plans by viewModel.plans.collectAsStateWithLifecycle()
+            val selectedPlan by viewModel.selectedPlan.collectAsStateWithLifecycle()
             val outcome by viewModel.purchaseOutcome.collectAsStateWithLifecycle()
             val activity = androidx.compose.ui.platform.LocalContext.current as android.app.Activity
             outcome?.let { result ->
@@ -1099,10 +1107,10 @@ fun PackNavHost(
             }
             UpgradeScreen(
                 modifier = pageModifier,
-                // Google Play's localised price, or null — never a price we invented.
-                price = plusPackage?.product?.price?.formatted,
-                period = "a month",
-                purchaseEnabled = plusPackage != null,
+                // Google Play's localised plans, or none — never a price we invented.
+                plans = plans,
+                selected = selectedPlan,
+                onSelect = viewModel::selectPlan,
                 onSubscribe = { viewModel.subscribe(activity) },
                 onRestore = {
                     viewModel.restorePurchases { restored ->

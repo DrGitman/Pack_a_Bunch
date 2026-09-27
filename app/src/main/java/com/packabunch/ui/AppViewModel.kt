@@ -51,21 +51,29 @@ class AppViewModel(
     private val cloudSync: com.packabunch.data.cloud.CloudPackSync? = null,
     private val userId: String? = null,
     private val cloudSettings: com.packabunch.data.cloud.CloudSettings? = null,
+    /** Only for the Realtime connection that tells sync when another device changed a pack. */
+    private val account: com.packabunch.auth.SupabaseAccount? = null,
 ) : ViewModel() {
     val syncState = cloudSync?.state ?: MutableStateFlow(com.packabunch.data.cloud.CloudSyncState()).asStateFlow()
     fun syncNow() { viewModelScope.launch { cloudSync?.sync() } }
 
     // -- Pack a Bunch Pro ------------------------------------------------------------------------
 
-    private val _plusPackage = MutableStateFlow<com.revenuecat.purchases.Package?>(null)
-    /** Null until Google Play returns a real, localised product. The paywall stays disabled. */
-    val plusPackage = _plusPackage.asStateFlow()
+    private val _plans = MutableStateFlow<List<com.packabunch.billing.PlanOffer>>(emptyList())
+    /** Empty until Google Play returns real, localised products. The paywall stays disabled. */
+    val plans = _plans.asStateFlow()
+
+    private val _selectedPlan = MutableStateFlow(0)
+    /** Index into [plans]. Starts on the first — the weekly plan, when one is offered. */
+    val selectedPlan = _selectedPlan.asStateFlow()
+
+    fun selectPlan(index: Int) { _selectedPlan.value = index }
 
     private val _purchaseOutcome = MutableStateFlow<com.packabunch.ui.screens.PurchaseOutcome?>(null)
     val purchaseOutcome = _purchaseOutcome.asStateFlow()
 
     fun subscribe(activity: android.app.Activity) {
-        val pkg = _plusPackage.value ?: return
+        val pkg = _plans.value.getOrNull(_selectedPlan.value)?.pkg ?: return
         viewModelScope.launch { _purchaseOutcome.value = com.packabunch.billing.Billing.purchase(activity, pkg) }
     }
 
@@ -78,19 +86,54 @@ class AppViewModel(
     /** False until the first sync has been attempted. Nothing to wait for with no account. */
     private val _firstSyncDone = MutableStateFlow(cloudSync == null)
 
+    // Sync runs when something happened, never on a timer: when the app comes to the front, a
+    // couple of seconds after a local edit settles, and when the server says another device
+    // changed a pack. In the background nothing runs at all.
+    private var foreground = false
+    private var pendingSync: kotlinx.coroutines.Job? = null
+    private val realtime = cloudSync?.let { _ -> account?.let { com.packabunch.data.cloud.CloudRealtime(it) { requestSync(REMOTE_SETTLE_MS) } } }
+
     init {
         if (cloudSync != null) {
             viewModelScope.launch {
-                repository.projects.collect { cloudSync.localChanged() }
-            }
-            viewModelScope.launch {
-                while (true) {
-                    cloudSync.sync()
-                    // Whether it worked or not, the packs have had their chance to turn up.
-                    _firstSyncDone.value = true
-                    kotlinx.coroutines.delay(30_000)
+                repository.projects.collect {
+                    cloudSync.localChanged()
+                    if (foreground) requestSync(LOCAL_SETTLE_MS)
                 }
             }
+        }
+    }
+
+    /** Called when the app's screen starts. Catches up on anything missed while away. */
+    fun onForeground() {
+        if (foreground) return
+        foreground = true
+        requestSync(0)
+        realtime?.start()
+    }
+
+    fun onBackground() {
+        foreground = false
+        realtime?.stop()
+    }
+
+    override fun onCleared() {
+        realtime?.stop()
+        super.onCleared()
+    }
+
+    /**
+     * Runs one sync after [afterMillis], replacing any sync already waiting. A burst of edits
+     * or of remote changes therefore costs one sync, not one each.
+     */
+    private fun requestSync(afterMillis: Long) {
+        val sync = cloudSync ?: return
+        pendingSync?.cancel()
+        pendingSync = viewModelScope.launch {
+            kotlinx.coroutines.delay(afterMillis)
+            sync.sync()
+            // Whether it worked or not, the packs have had their chance to turn up.
+            _firstSyncDone.value = true
         }
     }
 
@@ -150,7 +193,7 @@ class AppViewModel(
     init {
         if (userId != null) viewModelScope.launch {
             com.packabunch.billing.Billing.identify(userId) { active -> setTier(if (active) Tier.PLUS else Tier.FREE) }
-            _plusPackage.value = com.packabunch.billing.Billing.monthly()
+            _plans.value = com.packabunch.billing.Billing.plans()
         }
     }
 
@@ -463,37 +506,6 @@ class AppViewModel(
     }
 
     /**
-     * @param namesById what the recogniser made of each object, keyed by its swept id. A
-     *   missing entry just means nothing was confident enough, and the numbered fallback
-     *   stands.
-     */
-    fun importSweptItems(
-        objects: List<com.packabunch.packing.SweptObject>,
-        namesById: Map<String, String> = emptyMap(),
-    ): Boolean {
-        val measured = objects.filter { it.settled && it.detected.observedShape != null }
-        if (!limits.allowsPieces(_editor.value.pieceCount + measured.size)) return false
-        val initialCount = _editor.value.items.size
-        val additions = measured.mapIndexed { index, obj ->
-            val surface = requireNotNull(obj.detected.observedShape)
-            ItemSpec(
-                id = java.util.UUID.randomUUID().toString(),
-                // A recognised name beats a serial number by a mile: "Coffee cup" tells you
-                // which row is which in the packing guide, "Scanned item 3" never does. It
-                // stays editable, and it is a label rather than a claim about the product.
-                name = namesById[obj.id] ?: "Scanned item ${initialCount + index + 1}",
-                dimensions = surface.boundsMm,
-                measurementSource = MeasurementSource.CAMERA_ESTIMATE,
-                maySupportItems = false,
-                visualShape = surface,
-            )
-        }
-        _editor.update { it.copy(items = it.items + additions, plan = null) }
-        autosave()
-        return true
-    }
-
-    /**
      * Items measured by the item scan ([com.packabunch.ui.screens.ItemScanScreen]).
      *
      * Each arrives with its id already chosen, because its photo was written under that id
@@ -612,10 +624,16 @@ class AppViewModel(
                 context.getSharedPreferences("app_preferences_$userId", Context.MODE_PRIVATE),
                 account?.let { com.packabunch.data.cloud.CloudPackSync(repository,it,userId,
                     context.getSharedPreferences("cloud_sync_$userId",Context.MODE_PRIVATE)) }, userId,
-                account?.let { com.packabunch.data.cloud.CloudSettings(it,userId) }) as T
+                account?.let { com.packabunch.data.cloud.CloudSettings(it,userId) }, account) as T
         }
     }
 }
+
+/** How long local edits must settle before they sync: one upload for a burst of typing. */
+private const val LOCAL_SETTLE_MS = 2_000L
+
+/** A remote change usually arrives as several row events; they are gathered into one sync. */
+private const val REMOTE_SETTLE_MS = 500L
 
 data class AppSettings(
     val cameraMeasuring: Boolean = true,

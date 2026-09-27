@@ -81,9 +81,6 @@ val ItemTints = listOf(
 fun itemColor(index: Int) = ItemColors[index % ItemColors.size]
 fun itemTint(index: Int) = ItemTints[index % ItemTints.size]
 
-/** Where a stored dimension came from. Shown wherever the number is shown. */
-enum class MeasurementSource { CameraEstimate, TypedIn }
-
 val CameraEstimateText = Color(0xFF7C4223)
 val CameraEstimateTint = Color(0xFFF5E4D6)
 val TypedInText        = Color(0xFF3F5F7A)

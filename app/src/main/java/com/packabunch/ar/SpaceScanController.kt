@@ -69,8 +69,6 @@ data class SpaceAnchors(
  * The fit ([SpaceFitter]) places each wall at the median of the points on it and finds the
  * opening and sill. Its result becomes the solver's grid ([SpaceFitter.toScannedSpace]):
  * free inside, solid where something stands in it, unknown behind a wall nobody saw.
- *
- * This is new and separate from [ArScanController], which is left as it was.
  */
 class SpaceScanController(
     private val context: Context,

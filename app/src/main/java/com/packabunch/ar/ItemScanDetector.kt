@@ -27,8 +27,7 @@ class ScanBox(
 /**
  * ML Kit object detection for the item scan.
  *
- * A separate class from [ObjectFinder] on purpose — that one belongs to the space scan and is
- * being changed independently. Two things differ here:
+ * Two things it takes care over:
  *
  * 1. **Orientation.** ML Kit answers in upright pixels of the *rotated* image. Those are
  *    normalised by the rotated width and height and turned back into sensor coordinates

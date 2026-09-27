@@ -1,6 +1,8 @@
 package com.packabunch.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,15 +50,18 @@ import com.packabunch.ui.theme.UiFamily
  *    period is easy to miss.
  *  - **Nothing is sold that does not exist yet.** No cloud sync, no "AI optimisation", no
  *    unlimited precision. Each line here maps to a real field on [TierLimits].
- *  - **[price] comes from Google Play**, localised, and this screen renders whatever it is
- *    given. A hardcoded price is wrong for almost everybody who sees it, so when billing
+ *  - **Every price comes from Google Play**, localised, and this screen renders whatever it
+ *    is given. A hardcoded price is wrong for almost everybody who sees it, so when billing
  *    has not loaded the purchase button is disabled rather than showing a guess.
+ *  - **Each plan says how often it renews and what a trial turns into**, on the plan itself
+ *    and again beside the button. A cheap weekly plan earns its keep only if nobody feels
+ *    tricked by the second charge.
  */
 @Composable
 fun UpgradeScreen(
-    price: String?,
-    period: String,
-    purchaseEnabled: Boolean,
+    plans: List<com.packabunch.billing.PlanOffer>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
     onSubscribe: () -> Unit,
     onRestore: () -> Unit,
     onTerms: () -> Unit,
@@ -133,43 +138,15 @@ fun UpgradeScreen(
         PushDown()
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .background(BrandTint, RoundedCornerShape(22.dp))
-                    .padding(16.dp),
-            ) {
-                Column {
-                    Row(verticalAlignment = Alignment.Bottom) {
-                        Text(
-                            text = price ?: " ",
-                            style = NumeralLarge.copy(fontSize = 26.sp),
-                            color = TextPrimary,
-                        )
-                        Spacer(Modifier.size(8.dp))
-                        Text(
-                            text = period,
-                            color = TextSecondary,
-                            fontFamily = UiFamily,
-                            fontSize = 14.sp,
-                            modifier = Modifier.padding(bottom = 3.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = "Renews every month until you cancel. Billed through Google " +
-                            "Play; cancel there any time. Price shown in your local currency " +
-                            "at checkout.",
-                        color = Color(0xFF7C4223),
-                        fontFamily = UiFamily,
-                        fontSize = 12.5f.sp,
-                        lineHeight = 18.sp,
-                    )
+            val chosen = plans.getOrNull(selected)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                plans.forEachIndexed { index, plan ->
+                    PlanCard(plan = plan, selected = index == selected, onClick = { onSelect(index) })
                 }
             }
-
             Spacer(Modifier.height(12.dp))
 
+            val purchaseEnabled = chosen != null
             if (!purchaseEnabled) {
                 // Products unavailable means no purchase, not a fake success. A beta that
                 // cannot sell is fine; one that pretends to have sold is not.
@@ -182,12 +159,31 @@ fun UpgradeScreen(
             }
 
             PrimaryButton(
-                text = "Subscribe",
+                text = if (chosen?.trial != null) "Start free trial" else "Subscribe",
                 onClick = onSubscribe,
-                enabled = purchaseEnabled && price != null,
+                enabled = purchaseEnabled,
             )
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
+
+            // The selected plan's whole deal, next to the button that commits to it.
+            if (chosen != null) {
+                Text(
+                    text = listOfNotNull(
+                        chosen.trial?.let { "$it." },
+                        chosen.renewal,
+                        "Billed through Google Play; cancel there any time" +
+                            if (chosen.trial != null) ", and before the trial ends to pay nothing." else ".",
+                    ).joinToString(" "),
+                    color = Color(0xFF7C4223),
+                    fontFamily = UiFamily,
+                    fontSize = 12.5f.sp,
+                    lineHeight = 18.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(6.dp))
+            }
 
             Text(
                 text = "Free keeps ${TierLimits.FREE.maxSavedPacks} pack, up to " +
@@ -218,6 +214,49 @@ fun UpgradeScreen(
         }
 
         Spacer(Modifier.height(Spacing.sm))
+    }
+}
+
+/**
+ * One plan to choose. The price is the plan's own; the per-month line is only there so a
+ * weekly and a monthly plan can be compared, never in place of the price actually charged.
+ */
+@Composable
+private fun PlanCard(plan: com.packabunch.billing.PlanOffer, selected: Boolean, onClick: () -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(if (selected) BrandTint else Color.White, RoundedCornerShape(18.dp))
+            .border(
+                if (selected) 2.dp else 1.dp,
+                if (selected) Primary else Color(0xFFE6D9CB),
+                RoundedCornerShape(18.dp),
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = plan.kind.title,
+                color = TextPrimary,
+                fontFamily = UiFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                modifier = Modifier.weight(1f),
+            )
+            Text(text = plan.price, style = NumeralLarge.copy(fontSize = 19.sp), color = TextPrimary)
+            Spacer(Modifier.size(5.dp))
+            Text(text = plan.kind.per, color = TextSecondary, fontFamily = UiFamily, fontSize = 13.sp)
+        }
+        val details = listOfNotNull(plan.trial, plan.perMonth, plan.renewal)
+        Text(
+            text = details.joinToString(" · "),
+            color = TextTertiary,
+            fontFamily = UiFamily,
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            modifier = Modifier.padding(top = 3.dp),
+        )
     }
 }
 
