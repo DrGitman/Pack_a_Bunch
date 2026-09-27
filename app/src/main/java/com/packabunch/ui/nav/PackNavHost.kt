@@ -286,14 +286,22 @@ fun PackNavHost(
     }
 
     notice?.let { message ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { notice = null },
-            title = { androidx.compose.material3.Text("Pack a Bunch") },
-            text = { androidx.compose.material3.Text(message) },
-            confirmButton = { androidx.compose.material3.TextButton(onClick = { notice = null }) {
-                androidx.compose.material3.Text("OK")
-            } },
-        )
+        // The app's own feedback strip, not a system dialog: it rises in above the nav bar,
+        // stays long enough to read, and leaves by itself. Longer messages stay longer.
+        androidx.compose.ui.window.Popup(
+            alignment = androidx.compose.ui.Alignment.BottomCenter,
+            offset = androidx.compose.ui.unit.IntOffset(0, -with(androidx.compose.ui.platform.LocalDensity.current) { 104.dp.roundToPx() }),
+            properties = androidx.compose.ui.window.PopupProperties(focusable = false),
+        ) {
+            androidx.compose.runtime.key(message) {
+                com.packabunch.ui.components.PackToast(
+                    message = message,
+                    dwellMillis = (2_500L + message.length * 45L).coerceAtMost(8_000L),
+                    onDismiss = { notice = null },
+                    modifier = androidx.compose.ui.Modifier.padding(horizontal = 16.dp),
+                )
+            }
+        }
     }
     var editItemId by rememberSaveable { mutableStateOf<String?>(null) }
     var packMenuOpen by rememberSaveable { mutableStateOf(false) }

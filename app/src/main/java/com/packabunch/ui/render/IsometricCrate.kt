@@ -3,7 +3,6 @@ package com.packabunch.ui.render
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -130,11 +129,11 @@ fun IsometricCrate(
     if (showControls) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
             PackingView.entries.forEach { mode ->
-                FilterChip(selected = camera == mode, onClick = { camera = mode; yaw = 0f }, label = { Text(mode.label, fontSize = 12.sp) })
+                com.packabunch.ui.components.SelectableChip(text = mode.label, selected = camera == mode, onClick = { camera = mode; yaw = 0f })
             }
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            FilterChip(selected = seeThrough, onClick = { seeThrough = !seeThrough }, label = { Text("See-through", fontSize = 12.sp) })
+            com.packabunch.ui.components.SelectableChip(text = "See-through", selected = seeThrough, onClick = { seeThrough = !seeThrough })
             Text(if (camera == PackingView.ISOMETRIC) "Drag to turn" else if (camera == PackingView.SIDE) "View from left" else "Nearest items in front", fontSize = 11.sp, color = TextSecondary, modifier = Modifier.padding(top = 14.dp))
         }
     }

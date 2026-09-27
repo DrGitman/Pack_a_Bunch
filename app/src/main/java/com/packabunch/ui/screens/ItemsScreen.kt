@@ -93,6 +93,7 @@ fun ItemsScreen(
 ) {
     var editing by remember { mutableStateOf<ItemSpec?>(null) }
     var editorOpen by remember { mutableStateOf(false) }
+    var editorSession by remember { mutableStateOf(0) }
     androidx.compose.runtime.LaunchedEffect(initialEditItemId) {
         if (initialEditItemId != null) {
             editing = state.items.firstOrNull { it.id == initialEditItemId }
@@ -218,6 +219,8 @@ fun ItemsScreen(
         }
 
         AnimatedVisibility(visible = editorOpen, enter = sheetEnter, exit = sheetExit) {
+          // A new session for each new item, so "Save & add another" opens a clean sheet.
+          androidx.compose.runtime.key(editorSession) {
             ItemEditorSheet(
                 existing = editing,
                 unit = unit,
@@ -233,7 +236,9 @@ fun ItemsScreen(
                 onDuplicate = editing?.let { spec ->
                     { onDuplicateItem(spec.id); editorOpen = false }
                 },
+                onSaveAndAddAnother = { spec -> onUpsertItem(spec); editorSession++ },
             )
+          }
         }
     }
 }

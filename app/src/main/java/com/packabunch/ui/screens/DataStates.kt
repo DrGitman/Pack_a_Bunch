@@ -88,13 +88,20 @@ fun DeleteConfirmDialog(
                 .background(Color.White, RoundedCornerShape(28.dp))
                 .padding(Spacing.lg),
         ) {
-            IconTile(
-                icon = PackIcons.Trash,
-                tint = ErrorRed,
-                background = ErrorTint,
-                size = 48.dp,
-                iconSize = 22.dp,
-            )
+            Box(
+                Modifier.size(48.dp).background(ErrorTint, RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                // The lid lifts as the sheet arrives, so the warning reads before the words do.
+                com.packabunch.ui.components.LottieTapIcon(
+                    animation = com.packabunch.R.raw.icon_delete,
+                    contentDescription = null,
+                    onClick = null,
+                    size = 22.dp,
+                    tint = ErrorRed,
+                    playOnAppear = true,
+                )
+            }
 
             Spacer(Modifier.height(Spacing.base))
 
@@ -230,11 +237,14 @@ fun InterruptedSessionCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp),
         ) {
-            androidx.compose.material3.Icon(
-                PackIcons.Clock,
+            // Plays once as the card appears: the clock ticking round is the "you were away" cue.
+            com.packabunch.ui.components.LottieTapIcon(
+                animation = com.packabunch.R.raw.icon_resume_clock,
                 contentDescription = null,
+                onClick = null,
+                size = 14.dp,
                 tint = HeroEyebrow,
-                modifier = Modifier.size(14.dp),
+                playOnAppear = true,
             )
             Text(
                 text = "PICK UP WHERE YOU LEFT OFF",

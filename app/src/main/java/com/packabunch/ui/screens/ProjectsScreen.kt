@@ -194,13 +194,13 @@ fun ProjectsScreen(
             )
             if (projects.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("All", "In progress", "Packed").forEach { candidate ->
-                    androidx.compose.material3.FilterChip(selected = filter == candidate,
-                        onClick = { filter = candidate }, label = { Text(candidate, fontFamily = UiFamily, fontSize = 13.sp) },
-                        shape = RoundedCornerShape(99.dp), colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
-                            containerColor = Color.White, selectedContainerColor = com.packabunch.ui.theme.ChromeAlt,
-                            selectedLabelColor = com.packabunch.ui.theme.Ground))
-                }
+                // The same sliding pill as the item library's filters, not a second style of chip.
+                val filters = listOf("All", "In progress", "Packed")
+                com.packabunch.ui.components.FilterChips(
+                    options = filters,
+                    selected = filters.indexOf(filter).coerceAtLeast(0),
+                    onSelect = { filter = filters[it] },
+                )
             }
 
             if (loading) {

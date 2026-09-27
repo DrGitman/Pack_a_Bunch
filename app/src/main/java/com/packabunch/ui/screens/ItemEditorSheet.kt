@@ -74,8 +74,13 @@ fun ItemEditorSheet(
     onDelete: (() -> Unit)?,
     onDuplicate: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    /** For a new item: save it and start the next one straight away. */
+    onSaveAndAddAnother: ((ItemSpec) -> Unit)? = null,
 ) {
     var name by remember(existing) { mutableStateOf(existing?.name ?: "") }
+    // True while the name is one the photo suggested and the person has not touched. Only then
+    // does the "Suggested label" chip show, so nobody mistakes a guess for what they typed.
+    var nameSuggested by remember(existing) { mutableStateOf(false) }
     var width by remember(existing) {
         mutableStateOf(existing?.dimensions?.widthMm?.let { formatLength(it, unit) } ?: "")
     }
@@ -94,6 +99,13 @@ fun ItemEditorSheet(
     ) { picked ->
         if (picked != null) scope.launch {
             photoPath = com.packabunch.data.ItemPhotos.store(context, itemId, picked)
+            // An unnamed item takes its name from what the photo shows. A name the person
+            // already typed is never replaced.
+            if (name.isBlank()) photoPath?.let { path ->
+                com.packabunch.ui.render.PhotoLabels.of(path)?.let { label ->
+                    if (name.isBlank()) { name = label.replaceFirstChar { it.uppercase() }; nameSuggested = true }
+                }
+            }
         }
     }
 
@@ -240,25 +252,38 @@ fun ItemEditorSheet(
                     LabelledTextField(
                         label = "Name",
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = { name = it; nameSuggested = false },
                         placeholder = "Item ${nextIndex + 1}",
                         focused = true,
                     )
                     Row(
                         modifier = Modifier
                             .background(Color(0xFFF4EDE4), RoundedCornerShape(12.dp))
+                            // "Tap to change": clears the guess so the field is ready to type in.
+                            .clickable(enabled = nameSuggested) { name = ""; nameSuggested = false }
                             .padding(horizontal = 11.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(7.dp),
                     ) {
-                        Icon(
-                            PackIcons.Sparkle,
-                            contentDescription = null,
-                            tint = Color(0xFF8A7565),
-                            modifier = Modifier.size(15.dp),
-                        )
+                        if (nameSuggested) {
+                            // The "Feedback / Suggested label" spinner, played as the guess lands.
+                            com.packabunch.ui.components.LottieTapIcon(
+                                animation = com.packabunch.R.raw.icon_suggestion_spinner,
+                                contentDescription = null,
+                                onClick = null,
+                                size = 15.dp,
+                                playOnAppear = true,
+                            )
+                        } else {
+                            Icon(
+                                PackIcons.Sparkle,
+                                contentDescription = null,
+                                tint = Color(0xFF8A7565),
+                                modifier = Modifier.size(15.dp),
+                            )
+                        }
                         Text(
-                            "A photo doesn't set the size",
+                            if (nameSuggested) "Suggested label — tap to change" else "A photo doesn't set the size",
                             color = Color(0xFF7C6857),
                             fontFamily = UiFamily,
                             fontSize = 12.sp,
@@ -366,8 +391,26 @@ fun ItemEditorSheet(
 
             Spacer(Modifier.height(18.dp))
 
+            val draft = {
+                ItemSpec(
+                    id = itemId,
+                    name = name.ifBlank { "Item ${nextIndex + 1}" },
+                    dimensions = Dimensions(widthMm ?: 0, depthMm ?: 0, heightMm ?: 0),
+                    quantity = quantity,
+                    keepUpright = keepUpright,
+                    maySupportItems = !nothingOnTop,
+                    measurementSource = com.packabunch.packing.MeasurementSource.TYPED_IN,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (onDuplicate != null) {
+                if (existing == null && onSaveAndAddAnother != null) {
+                    SecondaryButton(
+                        text = "Save & add another",
+                        onClick = { onSaveAndAddAnother(draft()) },
+                        modifier = Modifier.weight(1f),
+                        enabled = valid,
+                    )
+                } else if (onDuplicate != null) {
                     SecondaryButton(
                         text = "Duplicate",
                         onClick = onDuplicate,

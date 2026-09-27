@@ -56,6 +56,8 @@ fun PrimaryButton(
     height: Dp = 56.dp,
     /** A quiet pill inside the button, for a count that belongs to the action. */
     trailing: String? = null,
+    /** A Lottie to play in place of [icon]; by default the icon's own animation, if it has one. */
+    motion: Int? = icon?.let { motionFor(it) },
 ) {
     val interaction = remembered()
     val view = LocalView.current
@@ -84,7 +86,9 @@ fun PrimaryButton(
         horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) {
+        if (motion != null) {
+            LottieTapIcon(motion, null, onClick = null, size = 22.dp, tint = content, interactionSource = interaction)
+        } else if (icon != null) {
             Icon(icon, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
         }
         Text(
@@ -153,8 +157,9 @@ fun SecondaryButton(
         horizontalArrangement = Arrangement.spacedBy(9.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (motion != null) {
-            com.packabunch.ui.components.LottieTapIcon(motion, null, onClick = null, size = 22.dp,
+        val played = motion ?: icon?.let { motionFor(it) }
+        if (played != null) {
+            com.packabunch.ui.components.LottieTapIcon(played, null, onClick = null, size = 22.dp,
                 interactionSource = interaction)
         } else if (icon != null) {
             Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
@@ -240,8 +245,40 @@ fun PackIconButton(
             ),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(iconSize))
+        val motion = motionFor(icon)
+        if (motion != null) {
+            // Plays from the button's own press, so the whole 44 dp target triggers it.
+            LottieTapIcon(
+                animation = motion,
+                contentDescription = contentDescription,
+                onClick = null,
+                size = iconSize,
+                tint = tint,
+                interactionSource = interaction,
+            )
+        } else {
+            Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(iconSize))
+        }
     }
+}
+
+/**
+ * The animated version of an icon, from its "Icon … · Motion" frame, where one exists.
+ *
+ * Decided here, once, rather than at each button: a close button animates the same way in
+ * the item editor, a sheet or anywhere added later, and no screen can quietly fall back to
+ * the still icon because somebody forgot to pass the animation.
+ */
+private fun motionFor(icon: ImageVector): Int? = when (icon) {
+    PackIcons.Close -> com.packabunch.R.raw.icon_close
+    PackIcons.Back -> com.packabunch.R.raw.icon_back
+    PackIcons.Search -> com.packabunch.R.raw.icon_search
+    PackIcons.Plus -> com.packabunch.R.raw.icon_plus
+    PackIcons.Settings -> com.packabunch.R.raw.icon_gear
+    PackIcons.Camera -> com.packabunch.R.raw.icon_camera
+    PackIcons.Info -> com.packabunch.R.raw.icon_info
+    PackIcons.Bell -> com.packabunch.R.raw.icon_bell
+    else -> null
 }
 
 @Composable

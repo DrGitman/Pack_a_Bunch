@@ -1,5 +1,11 @@
 package com.packabunch.ui.screens
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import com.packabunch.ui.components.PackTextButton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -270,6 +276,29 @@ fun DoesntFitScreen(
     ScreenScaffold(modifier) {
         PackAppBar(title = "It doesn't fit", onBack = onBack)
 
+        // Pick first, then act: the list is the "Selection / Packing issue" component, so a
+        // tap only moves the selection and the button below says what will happen. Somebody
+        // mid-pack reads the four causes before committing to one, instead of being sent
+        // off by the first row their thumb lands on.
+        val issues = remember(itemName) {
+            listOf(
+                FitIssue("The item is bigger than I said",
+                    "Takes you to $itemName's measurements. Handles and lids catch people out.",
+                    "Check the ${itemName.lowercase()}", onItemBigger),
+                FitIssue("The space is smaller than I said",
+                    "Back to the space measurements. Inside walls are often thicker than they look.",
+                    "Check the space", onSpaceSmaller),
+                FitIssue("Something's in the way",
+                    "A lip, a handle inside, a bar across the top. The plan assumes an empty, clear space.",
+                    "Mark what's in the way", onObstruction),
+                FitIssue("It fits, just not like that",
+                    "Review the item's turning and stacking settings, then plan again. A new plan may " +
+                        "move pieces you have already packed.",
+                    "Plan it again", onReplan),
+            )
+        }
+        var picked by rememberSaveable(itemName) { mutableStateOf(0) }
+
         Column(
             Modifier
                 .verticalScroll(rememberScrollState())
@@ -312,36 +341,13 @@ fun DoesntFitScreen(
 
             Spacer(Modifier.height(Spacing.base))
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FixRow(
-                    icon = PackIcons.Cube,
-                    title = "The item is bigger than I said",
-                    detail = "Takes you to $itemName's measurements. Handles and lids catch " +
-                        "people out.",
-                    onClick = onItemBigger,
-                )
-                FixRow(
-                    icon = PackIcons.Ruler,
-                    title = "The space is smaller than I said",
-                    detail = "Back to the space measurements. Inside walls are often thicker " +
-                        "than they look.",
-                    onClick = onSpaceSmaller,
-                )
-                FixRow(
-                    icon = PackIcons.Warning,
-                    title = "Something's in the way",
-                    detail = "A lip, a handle inside, a bar across the top. The plan assumes " +
-                        "an empty, clear space.",
-                    onClick = onObstruction,
-                )
-                FixRow(
-                    icon = PackIcons.Rotate,
-                    title = "It fits, just not like that",
-                    detail = "Review the item's turning and stacking settings, then plan again. " +
-                        "A new plan may move pieces you have already packed.",
-                    onClick = onReplan,
-                )
-            }
+            com.packabunch.ui.components.OptionList(
+                options = issues,
+                selected = issues[picked],
+                onSelect = { picked = issues.indexOf(it) },
+                title = { it.title },
+                detail = { it.detail },
+            )
 
             Spacer(Modifier.height(Spacing.base))
 
@@ -356,12 +362,18 @@ fun DoesntFitScreen(
         }
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            SecondaryButton(text = "Skip it and carry on", onClick = onSkipAndCarryOn)
+            PrimaryButton(text = issues[picked].action, onClick = issues[picked].go)
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                PackTextButton(text = "Skip it and carry on", onClick = onSkipAndCarryOn)
+            }
         }
 
         Spacer(Modifier.height(Spacing.base))
     }
 }
+
+/** One cause on the Doesn't-fit screen: what it says, what the button says, where it goes. */
+private data class FitIssue(val title: String, val detail: String, val action: String, val go: () -> Unit)
 
 /**
  * Oversize item — `design/artboards/OversizeItem.dc.html`.

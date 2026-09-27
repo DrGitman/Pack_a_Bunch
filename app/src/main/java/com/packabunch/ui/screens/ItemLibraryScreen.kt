@@ -139,6 +139,7 @@ fun ItemLibraryScreen(
                 text = "Measure a new one",
                 onClick = onMeasureNew,
                 icon = PackIcons.Plus,
+                motion = com.packabunch.R.raw.icon_measure_plus,
             )
         }
 

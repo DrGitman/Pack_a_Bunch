@@ -60,11 +60,16 @@ fun SettingsScreen(
     if (showGap) AlertDialog(onDismissRequest = { showGap = false }, title = { Text("Gap around the edges") },
         text = { Column {
             Text("Default for new spaces. Existing packs keep their own gap.")
-            listOf(0, 2, 5, 10, 20, 50).forEach { mm ->
-                Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f).clickable { onDefaultEdgeGapChange(mm); showGap = false }.padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(selected = settings.defaultEdgeGapMm == mm, onClick = { onDefaultEdgeGapChange(mm); showGap = false })
-                    Text("$mm mm", fontFamily = NumericFamily)
+            // The app's own chips, as everywhere else a single value is picked from a few.
+            listOf(listOf(0, 2, 5), listOf(10, 20, 50)).forEach { row ->
+                Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { mm ->
+                        com.packabunch.ui.components.SelectableChip(
+                            text = "$mm mm",
+                            selected = settings.defaultEdgeGapMm == mm,
+                            onClick = { onDefaultEdgeGapChange(mm); showGap = false },
+                        )
+                    }
                 }
             }
         } }, confirmButton = { TextButton(onClick = { showGap = false }) { Text("Cancel") } })
@@ -117,7 +122,7 @@ fun SettingsScreen(
                             Text(if (settings.cameraMeasuring) "Checks support when opened" else "Typed measurements only",
                                 color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp)
                         }
-                        Switch(settings.cameraMeasuring, onCameraMeasuringChange)
+                        com.packabunch.ui.components.PackSwitch(settings.cameraMeasuring, onCameraMeasuringChange)
                     }
                     SettingsDivider()
                     Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f).clickable { showGap = true }.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
