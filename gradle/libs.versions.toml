@@ -28,7 +28,7 @@ mlkitBarcode = "17.3.0"
 mlkitObjects = "17.0.2"
 
 junit = "4.13.2"
-kotlinTest = "2.2.20"
+kotlinTest = "2.4.20"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
