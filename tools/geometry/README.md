@@ -13,27 +13,27 @@ Canonical box 1000 × 1000 × 1000 mm, origin at the minimum corner, X width, Y 
 | `lying_cylinder` | 126 | 1 | A cylinder on its side, along the width. |
 | `bottle` | 222 | 1 | Body, shoulder, neck, cap. Neck ratio 0.34 of the body width. |
 | `tight_roll` | 238 | 1 | Sleeping bag, rolled towel: a lying roll held by two straps. |
-| `soft_pouch` | 20 | 2 | Wash bag, pencil case, soft bag: a pillow section with a zip ridge. |
+| `soft_pouch` | 198 | 3 | Wash bag or pencil case: a plump soft body, the zip along its top and the pull tab. |
 | `cable_coil` | 384 | 1 | A coiled cable or hose: a flat torus. |
-| `thin_bundle` | 18 | 3 | Cutlery, tent poles, a sheaf of rods: long bars side by side, ends staggered. |
+| `thin_bundle` | 84 | 6 | A bundle of cutlery, poles or rods: round bars side by side, their ends staggered. |
 | `shallow_tray` | 30 | 5 | Baking tray, pan, drawer organiser: a floor and four low walls. |
 | `suitcase` | 318 | 9 | Hard-shell case standing on four spinner wheels, with a pull handle and a carry handle. |
 | `duffel_bag` | 196 | 2 | A barrel bag lying along its width, with a strap handle on top. |
 | `backpack` | 374 | 5 | Rounded main body, a front pocket, two side pockets and a grab loop. |
 | `cooler_box` | 214 | 5 | Cool box: moulded body, an overhanging lid and a carry handle across the top. |
-| `folded_chair` | 18 | 3 | A folding chair folded flat: two frames and the hinge between them. |
+| `folded_chair` | 152 | 4 | Folding chair folded flat: two tube frames, the seat slats and the back panel. |
 | `yoga_mat` | 154 | 3 | A rolled mat: the roll, with its core showing at both ends. |
-| `toolbox` | 30 | 5 | Box body, sloped lid, carry handle. |
+| `toolbox` | 234 | 5 | Toolbox: a rounded body, a lid with two latches, and the carry handle on top. |
 | `ball` | 512 | 1 | Football, globe, any ball. |
 | `crate` | 78 | 13 | Open-top slatted crate: base, corner posts, two boards per side. |
-| `appliance_slab` | 74 | 3 | Washing machine, dishwasher: body, round door, control strip. |
+| `appliance_slab` | 288 | 4 | Washing machine: a rounded cabinet, the control panel and dial, and the round porthole door. |
 | `upright_fridge` | 30 | 5 | Tall fridge: body, fridge and freezer doors, handles. |
 | `mattress` | 156 | 2 | A mattress: plump rounded edges and a quilted top panel. |
 | `plank_stack` | 24 | 4 | Boards stacked flat, each a little offset. |
 | `ladder` | 42 | 7 | Two rails and five rungs, lying flat as it is carried. |
 | `barrel` | 222 | 1 | Drum or barrel: bulging body with rims. |
-| `bicycle` | 166 | 9 | Two wheels, a triangle frame, saddle and handlebar — seen side on along its width. |
-| `lawnmower` | 144 | 8 | Deck, four wheels, and a handle rising to the back. |
+| `bicycle` | 1008 | 36 | Bicycle side on: tyres and rims, hubs, a diamond frame, fork, bars, saddle and cranks. |
+| `lawnmower` | 838 | 11 | Push lawnmower: a rounded deck on four wheels, the engine, a grass box and the handle. |
 | `sofa` | 556 | 14 | Sofa: base, three seat cushions, three back cushions against the frame, padded arms. |
 | `armchair` | 516 | 10 | Armchair: a deep seat cushion between padded arms, a back cushion and short legs. |
 | `dining_table` | 194 | 7 | Table: a top with rounded edges, an apron under it and four turned legs. |
@@ -44,14 +44,14 @@ Canonical box 1000 × 1000 × 1000 mm, origin at the minimum corner, X width, Y 
 | `tv_stand` | 18 | 3 | A TV on its stand: cabinet, neck, screen. |
 | `plant_pot` | 126 | 1 | Tapered pot with a rim — also how a cup or tumbler is drawn. |
 | `piano` | 24 | 4 | Upright piano: case, keyboard shelf, legs under it. |
-| `kettle` | 118 | 5 | Jug kettle: round body, spout, a handle on the back reaching over the lid. |
+| `kettle` | 487 | 5 | Jug kettle on its power base: a tapered body, lid and knob, a curved spout, a tall handle. |
 | `coffee_maker` | 112 | 4 | Drip coffee maker: base plate, water tower at the back, hood over a round carafe. |
 | `microwave` | 106 | 3 | Microwave or countertop oven: a rounded body, a door window and the control strip beside it. |
 | `toaster` | 232 | 4 | Pop-up toaster: a rounded body, two slot rims on top and the lever on its side. |
 | `cooker` | 144 | 8 | Free-standing cooker: body, four rings on the hob, splashback, oven door and handle. |
 | `cooking_pot` | 106 | 3 | Saucepan or stock pot: round body, a lid knob and a long handle. |
 | `frying_pan` | 68 | 2 | Frying pan or skillet: a shallow flared disc and a long handle. |
-| `plate_stack` | 248 | 4 | A stack of plates or dishes: four shallow flared discs. |
+| `plate_stack` | 752 | 8 | A stack of four dinner plates: each with its foot ring, a shallow well and a flared rim. |
 | `bowl` | 126 | 1 | A bowl: a foot ring and a wide flared body. |
 | `pillow` | 158 | 1 | Pillow or cushion: plump in the middle, thinning to rounded edges all round. |
 | `folded_stack` | 24 | 4 | Folded clothes, towels or a blanket: four soft layers, none quite squared up. |
@@ -60,20 +60,20 @@ Canonical box 1000 × 1000 × 1000 mm, origin at the minimum corner, X width, Y 
 | `desk` | 36 | 6 | Desk: top, a drawer pedestal on one side, two legs on the other. |
 | `stool` | 258 | 7 | Stool or bar stool: a round padded seat on four splayed turned legs and a foot ring. |
 | `ottoman` | 214 | 5 | Ottoman, pouf or bench: a plump padded block on four short turned feet. |
-| `clothes_rail` | 36 | 6 | Clothes rail or coat stand: feet, two uprights, the top bar and the clothes hanging on it. |
+| `clothes_rail` | 574 | 17 | Clothes rail: two feet, two uprights, the rail, and coats hanging from it. |
 | `framed_panel` | 30 | 5 | Mirror, picture, whiteboard or a door: a frame round a recessed panel, drawn lying flat. |
 | `disc` | 126 | 1 | Clock, platter, frisbee, anything round and flat: a disc with a raised rim. |
 | `monitor` | 74 | 3 | Monitor or flat-screen TV: a rounded foot, a neck and a thin screen with softened corners. |
 | `printer` | 24 | 4 | Printer: body, scanner lid, output tray at the front and paper feed behind. |
 | `helmet` | 213 | 2 | Helmet: a dome with a short peak at the front. |
-| `shoe` | 18 | 3 | Shoe or boot: sole, a heel and ankle block, and the toe sloping down to the front. |
-| `tote_bag` | 24 | 4 | Handbag, tote or shopping bag: a body wider at the top and two handles. |
+| `shoe` | 424 | 9 | Trainer: a thick sole, the heel counter and collar, the toe box, the tongue and laces. |
+| `tote_bag` | 230 | 3 | Tote or shopping bag: a soft body that widens to its top, and two strap handles. |
 | `guitar` | 136 | 4 | Guitar or violin lying on its back: lower and upper bouts, neck and headstock. |
-| `upright_vacuum` | 24 | 4 | Upright vacuum cleaner: floor head, body, stick and handle. |
-| `long_handle` | 12 | 2 | Broom, mop, rake or umbrella: a long pole and its head, lying along the width. |
-| `watering_can` | 92 | 6 | Watering can: body, a long spout with its rose, and the handle at the back. |
+| `upright_vacuum` | 342 | 5 | Upright vacuum: a wide floor head, the motor body with its dust bin, the stick and handle. |
+| `long_handle` | 152 | 4 | Broom or mop lying down: a long handle with its threaded collar, the head and its bristles. |
+| `watering_can` | 374 | 5 | Watering can: an oval body with its filler, a long spout with the rose, an arched handle. |
 | `power_drill` | 328 | 4 | Cordless drill: rounded motor housing, a round chuck, the grip and the battery pack. |
-| `hand_tool` | 12 | 2 | Hammer, spanner, screwdriver or pliers: a handle and a heavier head, lying along the width. |
+| `hand_tool` | 304 | 4 | Hammer lying flat: a shaped wooden handle and the steel head with its face and claw. |
 | `mug` | 276 | 2 | Mug: a straight-sided body with a rolled foot, a coffee line below the rim, a D handle. |
 | `wine_glass` | 382 | 1 | Wine glass: a round foot, a thin stem, and a tulip bowl. |
 | `vase` | 446 | 1 | Vase: a foot ring, a full shoulder, a narrow neck and a flared lip. |

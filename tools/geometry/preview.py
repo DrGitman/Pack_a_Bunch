@@ -53,24 +53,24 @@ SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "..", "..", "app"
 files = sorted(glob.glob(os.path.join(SRC, "family_*.json")))
 dims = {  # realistic sizes (mm) so proportions read as they will in the app
  "flat_rectangle":(240,170,30),"slim_slab":(160,75,9),"small_carton":(300,200,180),"upright_cylinder":(70,70,120),
- "lying_cylinder":(300,120,120),"bottle":(80,80,300),"tight_roll":(450,220,220),"soft_pouch":(250,90,140),
- "cable_coil":(300,300,60),"thin_bundle":(250,60,30),"shallow_tray":(400,300,40),"suitcase":(450,250,650),
- "duffel_bag":(600,300,300),"backpack":(320,220,480),"cooler_box":(500,350,380),"folded_chair":(450,80,800),
- "yoga_mat":(610,150,150),"toolbox":(450,220,220),"ball":(220,220,220),"crate":(500,350,300),
- "appliance_slab":(600,600,850),"upright_fridge":(600,650,1800),"mattress":(1900,1400,250),"plank_stack":(1800,150,100),
- "ladder":(2400,400,120),"barrel":(600,600,880),"bicycle":(1750,600,1050),"lawnmower":(1400,550,1000),
+ "lying_cylinder":(300,120,120),"bottle":(80,80,300),"tight_roll":(450,220,220),"soft_pouch":(250,90,146),
+ "cable_coil":(300,300,60),"thin_bundle":(250,54,29),"shallow_tray":(400,300,40),"suitcase":(450,250,650),
+ "duffel_bag":(600,300,300),"backpack":(320,220,480),"cooler_box":(500,350,380),"folded_chair":(432,64,805),
+ "yoga_mat":(610,150,150),"toolbox":(458,236,267),"ball":(220,220,220),"crate":(500,350,300),
+ "appliance_slab":(600,604,850),"upright_fridge":(600,650,1800),"mattress":(1900,1400,250),"plank_stack":(1800,150,100),
+ "ladder":(2400,400,120),"barrel":(600,600,880),"bicycle":(1765,480,912),"lawnmower":(1395,630,995),
  "sofa":(2000,900,850),"armchair":(850,850,900),"dining_table":(1600,900,750),"chair":(450,500,900),
  "wardrobe":(1200,600,2000),"bed_frame":(1500,2100,1000),"lamp":(400,400,1500),"tv_stand":(1200,400,1100),
  "plant_pot":(300,300,280),"piano":(1500,600,1250),
- "kettle":(250,170,250),"coffee_maker":(250,260,360),"microwave":(480,360,280),"toaster":(300,180,200),
- "cooker":(600,600,900),"cooking_pot":(380,220,180),"frying_pan":(480,280,60),"plate_stack":(270,270,80),
+ "kettle":(244,168,247),"coffee_maker":(250,260,360),"microwave":(480,360,280),"toaster":(300,180,200),
+ "cooker":(600,600,900),"cooking_pot":(380,220,180),"frying_pan":(480,280,60),"plate_stack":(270,270,71),
  "bowl":(200,200,90),"pillow":(700,450,150),"folded_stack":(350,300,200),"bookcase":(800,300,1800),
  "chest_of_drawers":(800,450,900),"desk":(1200,600,750),"stool":(400,400,650),"ottoman":(800,450,420),
- "clothes_rail":(1200,450,1600),"framed_panel":(600,900,40),"disc":(300,300,50),"monitor":(600,200,450),
- "printer":(450,380,250),"helmet":(250,300,200),"shoe":(300,110,120),"tote_bag":(400,150,450),
- "guitar":(1000,380,110),"upright_vacuum":(320,300,1100),"long_handle":(1300,300,120),
- "watering_can":(550,200,400),"power_drill":(250,90,240),"hand_tool":(320,120,35),
- "mug":(112,82,95),"wine_glass":(76,76,212),"vase":(150,150,296),"teapot":(225,160,162),"blender":(180,168,360),"stand_mixer":(330,220,370),"air_fryer":(290,350,344),"knife_block":(120,220,291),"dish_rack":(450,320,258),"laundry_basket":(600,400,410),"bucket":(309,300,423),"pedal_bin":(304,338,462),"clothes_iron":(260,104,172),"ironing_board":(1220,380,82),"pedestal_fan":(449,320,1274),"oil_heater":(366,150,690),"desk_lamp":(445,180,387),"speaker":(180,231,300),"camera":(158,182,124),"headphones":(194,90,164),"alarm_clock":(132,52,158),"book_stack":(250,177,120),"potted_plant":(401,410,598),"umbrella":(932,76,130),"storage_bin":(652,412,350),"boot":(290,105,420),"hair_dryer":(232,90,225),"skateboard":(800,210,122),"kick_scooter":(770,280,836),"tennis_racket":(702,282,28),"golf_bag":(285,247,1137),"snowboard":(1480,290,139),"lantern":(160,160,313),"gas_cylinder":(320,320,667),"stroller":(320,214,941),"child_car_seat":(440,480,720),"high_chair":(607,607,906),"office_chair":(623,595,1080),"bean_bag":(720,720,610),"side_table":(450,450,555),"coffee_table":(1100,600,440),"filing_cabinet":(470,628,1320),"robot_vacuum":(350,350,104),"dumbbell":(360,120,120),"kettlebell":(220,220,286),"sewing_machine":(436,190,320),"paint_can":(199,190,250),"wheelbarrow":(1514,560,651),"bbq_grill":(584,584,1033),"pet_carrier":(330,489,371),"dog_bed":(820,820,200),"aquarium":(608,308,440)}
+ "clothes_rail":(1192,450,1610),"framed_panel":(600,900,40),"disc":(300,300,50),"monitor":(600,200,450),
+ "printer":(450,380,250),"helmet":(250,300,200),"shoe":(300,116,127),"tote_bag":(400,150,431),
+ "guitar":(1000,380,110),"upright_vacuum":(330,300,1162),"long_handle":(1080,300,120),
+ "watering_can":(468,170,352),"power_drill":(250,90,240),"hand_tool":(302,144,35),
+ "mug":(112,82,95),"wine_glass":(76,76,212),"vase":(150,150,296),"teapot":(225,160,162),"blender":(180,168,360),"stand_mixer":(330,220,370),"air_fryer":(290,350,344),"knife_block":(120,220,291),"dish_rack":(450,320,258),"laundry_basket":(600,400,410),"bucket":(309,300,423),"pedal_bin":(304,338,462),"clothes_iron":(260,104,172),"ironing_board":(1220,380,82),"pedestal_fan":(449,320,1274),"oil_heater":(366,150,690),"desk_lamp":(445,180,387),"speaker":(180,231,300),"camera":(158,182,124),"headphones":(194,90,164),"alarm_clock":(132,52,157),"book_stack":(250,177,120),"potted_plant":(401,410,598),"umbrella":(932,76,130),"storage_bin":(652,412,350),"boot":(290,105,420),"hair_dryer":(232,90,225),"skateboard":(800,210,122),"kick_scooter":(770,280,836),"tennis_racket":(702,282,28),"golf_bag":(285,247,1137),"snowboard":(1480,290,139),"lantern":(160,160,313),"gas_cylinder":(320,320,667),"stroller":(320,214,941),"child_car_seat":(440,480,720),"high_chair":(607,607,906),"office_chair":(623,595,1080),"bean_bag":(720,720,610),"side_table":(450,450,555),"coffee_table":(1100,600,440),"filing_cabinet":(470,628,1320),"robot_vacuum":(350,350,104),"dumbbell":(360,120,120),"kettlebell":(220,220,286),"sewing_machine":(436,190,320),"paint_can":(199,190,250),"wheelbarrow":(1514,560,651),"bbq_grill":(584,584,1033),"pet_carrier":(330,489,371),"dog_bed":(820,820,200),"aquarium":(608,308,440)}
 cols = 8; rows = math.ceil(len(files)/cols)
 fig, axes = plt.subplots(rows, cols, figsize=(cols*2.4, rows*2.6), facecolor="#F7EFE6")
 wrong = []

@@ -223,12 +223,16 @@ def lathe(profile, sides, axis, centre, radii):
             # Outward in the (r, t) plane when walking the profile from start to end: (dt, −dr).
             out = tuple(radial[i] * dt + axis_dir(1)[i] * (-dr) for i in range(3))
             faces.append(SmoothFace(orient(quad, out)))
+    # The caps face the way the profile runs overall, not the way its last step runs: a mug's
+    # profile ends by dipping from the rim down to the coffee line, and judging by that last
+    # step turned the coffee's surface upside down, where it was culled and left a hole.
+    ascending = profile[-1][1] >= profile[0][1]
     if profile[0][0] > 0:
         ring = [point(profile[0][0], profile[0][1], k) for k in range(sides)]
-        faces += [SmoothFace(orient(f, axis_dir(-1 if profile[1][1] >= profile[0][1] else 1))) for f in fan(ring)]
+        faces += [SmoothFace(orient(f, axis_dir(-1 if ascending else 1))) for f in fan(ring)]
     if profile[-1][0] > 0:
         ring = [point(profile[-1][0], profile[-1][1], k) for k in range(sides)]
-        faces += [SmoothFace(orient(f, axis_dir(1 if profile[-1][1] >= profile[-2][1] else -1))) for f in fan(ring)]
+        faces += [SmoothFace(orient(f, axis_dir(1 if ascending else -1))) for f in fan(ring)]
     return faces
 
 
@@ -379,10 +383,10 @@ def tight_roll():
 
 
 def soft_pouch():
-    """Wash bag, pencil case, soft bag: a pillow section with a zip ridge."""
-    # The polygon is (y, z): width across depth, height up; the zip ridge sits on top.
-    m = Mesh().add(prism([(0, 0.18), (0.12, 0), (0.88, 0), (1, 0.18), (1, 0.74), (0.86, 0.9), (0.14, 0.9), (0, 0.74)], "x", 0, 1))
-    return m.add(box(0.04, 0.96, 0.44, 0.56, 0.9, 1))
+    """Wash bag or pencil case: a plump soft body, the zip along its top and the pull tab."""
+    m = Mesh().add(soft_box(0, 250, 0, 90, 0, 140, 30, 24, 40, segs=4, arc=3))
+    m.add(tube((20, 45, 138), (230, 45, 138), 5, 6))
+    return m.add(soft_box(222, 246, 38, 52, 118, 146, 4, 2, 2, segs=1, arc=1))
 
 
 def cable_coil():
@@ -391,8 +395,13 @@ def cable_coil():
 
 
 def thin_bundle():
-    """Cutlery, tent poles, a sheaf of rods: long bars side by side, ends staggered."""
-    return Mesh().add(box(0, 0.96, 0, 0.3, 0, 1)).add(box(0.02, 1, 0.35, 0.65, 0, 0.8)).add(box(0.04, 0.98, 0.7, 1, 0, 0.9))
+    """A bundle of cutlery, poles or rods: round bars side by side, their ends staggered."""
+    m = Mesh()
+    for k in range(6):
+        row, col = divmod(k, 3)
+        x0 = (k * 37) % 30
+        m.add(tube((x0, 10 + col * 20, 7 + row * 15), (250 - (k * 23) % 26, 10 + col * 20, 7 + row * 15), 7, 8))
+    return m
 
 
 def shallow_tray():
@@ -438,8 +447,12 @@ def cooler_box():
 
 
 def folded_chair():
-    """A folding chair folded flat: two frames and the hinge between them."""
-    return Mesh().add(box(0, 1, 0, 0.42, 0, 0.94)).add(box(0, 1, 0.58, 1, 0.06, 1)).add(box(0.1, 0.9, 0.42, 0.58, 0.44, 0.56))
+    """Folding chair folded flat: two tube frames, the seat slats and the back panel."""
+    m = Mesh()
+    m.add(sweep([(20, 20, 0), (20, 20, 800), (430, 20, 800), (430, 20, 0)], 11, 8))
+    m.add(sweep([(40, 62, 0), (40, 62, 460), (410, 62, 460), (410, 62, 0)], 11, 8))
+    m.add(soft_box(40, 410, 28, 54, 470, 780, 12, 6, 10, segs=2, arc=1))
+    return m.add(soft_box(50, 400, 30, 60, 200, 460, 12, 6, 8, segs=2, arc=1))
 
 
 def yoga_mat():
@@ -450,11 +463,12 @@ def yoga_mat():
 
 
 def toolbox():
-    """Box body, sloped lid, carry handle."""
-    m = Mesh().add(box(0, 1, 0, 1, 0, 0.72))
-    m.add(prism([(0, 0.72), (1, 0.72), (0.88, 0.88), (0.12, 0.88)], "x", 0, 1))
-    m.add(box(0.2, 0.26, 0.45, 0.55, 0.88, 1)).add(box(0.74, 0.8, 0.45, 0.55, 0.88, 1))
-    return m.add(box(0.26, 0.74, 0.45, 0.55, 0.95, 1))
+    """Toolbox: a rounded body, a lid with two latches, and the carry handle on top."""
+    m = Mesh().add(soft_box(0, 450, 0, 220, 0, 160, 20, 10, 10))
+    m.add(soft_box(-4, 454, -4, 224, 160, 205, 22, 10, 12, arc=1))
+    for x in (60, 360):
+        m.add(soft_box(x, x + 30, 222, 232, 130, 180, 5, 2, 3, segs=1, arc=1))
+    return m.add(sweep([(120, 110, 200), (140, 110, 255), (310, 110, 255), (330, 110, 200)], 12, 8))
 
 
 def ball():
@@ -475,10 +489,11 @@ def crate():
 
 
 def appliance_slab():
-    """Washing machine, dishwasher: body, round door, control strip."""
-    m = Mesh().add(box(0, 1, 0.05, 1, 0, 1))
-    m.add(lathe([(1, 0), (1, 0.05)], 12, "y", (0.5, 0.42), (0.3, 0.3)))
-    return m.add(box(0.08, 0.92, 0.02, 0.05, 0.84, 0.95))
+    """Washing machine: a rounded cabinet, the control panel and dial, and the round porthole door."""
+    m = Mesh().add(soft_box(0, 600, 0, 580, 0, 850, 20, 8, 10))
+    m.add(box(20, 580, 580, 590, 720, 830))
+    m.add(lathe([(1, 590), (0.8, 604)], 12, "y", (470, 775), (34, 34)))
+    return m.add(lathe([(1, 580), (1, 596), (0.86, 604), (0.8, 598)], 12, "y", (300, 400), (210, 210)))
 
 
 def upright_fridge():
@@ -518,26 +533,37 @@ def barrel():
 
 
 def bicycle():
-    """Two wheels, a triangle frame, saddle and handlebar — seen side on along its width."""
+    """Bicycle side on: tyres and rims, hubs, a diamond frame, fork, bars, saddle and cranks."""
     m = Mesh()
-    for cx in (0.22, 0.78):
-        m.add(lathe([(1, 0.44), (1, 0.56)], 10, "y", (cx, 0.36), (0.22, 0.36)))
-    hub_r, hub_f = (0.22, 0.5, 0.36), (0.78, 0.5, 0.36)
-    crank, seat, head = (0.44, 0.5, 0.36), (0.38, 0.5, 0.78), (0.72, 0.5, 0.8)
-    m.add(bar(hub_r, crank, 0.012, 0.012)).add(bar(crank, seat, 0.012, 0.012)).add(bar(seat, head, 0.012, 0.012))
-    m.add(bar(crank, head, 0.012, 0.012)).add(bar(head, hub_f, 0.012, 0.012))
-    m.add(box(0.31, 0.45, 0.44, 0.56, 0.8, 0.86))
-    return m.add(box(0.7, 0.76, 0, 1, 0.9, 1))
+    y = 280
+    for cx in (330, 1420):
+        m.add(sweep(arc((cx, y, 340), 322, 0, 360, 28)[:-1], 18, 6, closed=True))
+        m.add(sweep(arc((cx, y, 340), 298, 0, 360, 28)[:-1], 6, 4, closed=True))
+        m.add(lathe([(1, y - 50), (1, y + 50)], 8, "y", (cx, 340), (22, 22)))
+        for k in range(8):
+            a = math.radians(k * 45)
+            m.add(tube((cx, y, 340), (cx + 296 * math.cos(a), y, 340 + 296 * math.sin(a)), 3, 4))
+    bb, seat, head_top, head_bot = (800, y, 300), (720, y, 780), (1260, y, 820), (1300, y, 640)
+    for a, b in ((bb, seat), (seat, head_top), (bb, head_bot), ((330, y, 340), bb), ((330, y, 340), (735, y, 740)),
+                 (head_bot, (1420, y, 340)), (head_top, head_bot), (head_top, (1240, y, 900)), (seat, (705, y, 850))):
+        m.add(tube(a, b, 18, 8))
+    m.add(tube((1240, 40, 900), (1240, 520, 900), 14, 8))
+    m.add(soft_box(640, 820, y - 60, y + 60, 850, 895, 30, 16, 12, segs=2, arc=1))
+    m.add(lathe([(1, y + 25), (1, y + 40)], 12, "y", (800, 300), (95, 95)))
+    return m.add(box(760, 860, y + 60, y + 110, 180, 200)).add(box(740, 840, y - 110, y - 60, 400, 420))
 
 
 def lawnmower():
-    """Deck, four wheels, and a handle rising to the back."""
-    m = Mesh().add(box(0.08, 0.84, 0.12, 0.88, 0.08, 0.44))
-    for cx in (0.15, 0.72):
-        for y0, y1 in ((0, 0.12), (0.88, 1)):
-            m.add(lathe([(1, y0), (1, y1)], 6, "y", (cx, 0.16), (0.15, 0.16)))
-    m.add(bar((0.84, 0.2, 0.38), (0.98, 0.2, 0.97), 0.015, 0.015)).add(bar((0.84, 0.8, 0.38), (0.98, 0.8, 0.97), 0.015, 0.015))
-    return m.add(box(0.95, 1, 0.16, 0.84, 0.94, 1))
+    """Push lawnmower: a rounded deck on four wheels, the engine, a grass box and the handle."""
+    m = Mesh().add(soft_box(0, 620, 0, 550, 80, 290, 60, 30, 40))
+    m.add(lathe([(1, 290), (1, 380), (0.8, 420)], 12, "z", (300, 275), (110, 110)))
+    m.add(soft_box(620, 1000, 90, 460, 70, 400, 50, 24, 40))
+    for x in (100, 520):
+        for y0, y1 in ((-40, 0), (550, 590)):
+            m.add(lathe([(0.8, y0), (1, y0 + 6), (1, y1 - 6), (0.8, y1)], 12, "y", (x, 100), (100, 100)))
+    for y in (90, 460):
+        m.add(tube((600, y, 260), (1380, y, 980), 15, 8))
+    return m.add(tube((1380, 70, 980), (1380, 480, 980), 15, 8)).add(tube((1100, 90, 700), (1100, 460, 700), 12, 6))
 
 
 def sofa():
@@ -639,11 +665,12 @@ def piano():
 
 
 def kettle():
-    """Jug kettle: round body, spout, a handle on the back reaching over the lid."""
-    m = Mesh().add(lathe([(1, 0), (1, 0.7), (0.8, 0.82)], 10, "z", (0.46, 0.5), (0.34, 0.5)))
-    m.add(box(0, 0.14, 0.44, 0.56, 0.5, 0.7))
-    m.add(box(0.9, 1, 0.44, 0.56, 0.25, 1)).add(box(0.62, 0.9, 0.44, 0.56, 0.9, 1))
-    return m.add(box(0.78, 0.9, 0.44, 0.56, 0.25, 0.33))
+    """Jug kettle on its power base: a tapered body, lid and knob, a curved spout, a tall handle."""
+    m = Mesh().add(lathe([(1, -14), (1, -2), (0.9, 0)], 12, "z", (100, 80), (84, 84)))
+    m.add(lathe([(0.86, 0), (0.95, 4), (1, 22), (0.93, 168), (0.76, 200), (0.7, 206)], 12, "z", (100, 80), (76, 76)))
+    m.add(lathe([(1, 206), (0.95, 214), (0.3, 220), (0.36, 230), (0, 233)], 10, "z", (100, 80), (54, 54)))
+    m.add(sweep([(38, 80, 60), (18, 80, 120), (0, 80, 165), (-16, 80, 186)], [15, 11, 8, 7], 8))
+    return m.add(sweep([(168, 80, 55), (206, 80, 95), (212, 80, 185), (150, 80, 214)], 11, 8))
 
 
 def coffee_maker():
@@ -687,11 +714,15 @@ def frying_pan():
 
 
 def plate_stack():
-    """A stack of plates or dishes: four shallow flared discs."""
+    """A stack of four dinner plates: each with its foot ring, a shallow well and a flared rim."""
     m = Mesh()
     for i in range(4):
-        z0 = i * 0.25
-        m.add(lathe([(0.62, z0), (1, z0 + 0.25)], 10, "z", (0.5, 0.5), (0.5, 0.5)))
+        z = i * 17
+        m.add(lathe([(0.45, z), (0.5, z + 3), (0.56, z + 6), (0.66, z + 9), (0.93, z + 14)], 8, "z", (135, 135), (135, 135)))
+        # The rim keeps its edge lines, so each plate reads as its own layer rather than the
+        # stack blurring into one smooth drum.
+        rim = lathe([(0.93, z + 14), (1, z + 18), (0.96, z + 20)], 8, "z", (135, 135), (135, 135))
+        m.add([Face(f) if abs(unit(newell(f))[2]) < 0.95 else f for f in rim])
     return m
 
 
@@ -775,30 +806,41 @@ def helmet():
 
 
 def shoe():
-    """Shoe or boot: sole, a heel and ankle block, and the toe sloping down to the front."""
-    m = Mesh().add(box(0, 1, 0, 1, 0, 0.12)).add(box(0, 0.4, 0.05, 0.95, 0.12, 1))
-    return m.add(hexahedron([
-        (0.4, 0.05, 0.12), (1, 0.1, 0.12), (1, 0.9, 0.12), (0.4, 0.95, 0.12),
-        (0.4, 0.05, 0.7), (1, 0.1, 0.35), (1, 0.9, 0.35), (0.4, 0.95, 0.7)]))
+    """Trainer: a thick sole, the heel counter and collar, the toe box, the tongue and laces."""
+    m = Mesh().add(soft_box(0, 300, 0, 110, 0, 26, 45, 14, 8, arc=1))
+    m.add(soft_box(0, 150, 4, 106, 26, 120, 45, 20, 20))
+    m.add(soft_box(100, 298, 6, 104, 22, 82, 48, 30, 30))
+    m.add(soft_box(120, 200, 30, 80, 70, 118, 20, 12, 12, segs=2))
+    for k in range(4):
+        x = 125 + k * 20
+        m.add(tube((x, 22, 84 + 6 * (3 - k)), (x, 88, 84 + 6 * (3 - k)), 3, 4))
+    return m.add(sweep(arc((75, 55, 120), 50, 0, 360, 16, "xy")[:-1], 8, 6, closed=True))
 
 
 def upright_vacuum():
-    """Upright vacuum cleaner: floor head, body, stick and handle."""
-    m = Mesh().add(box(0, 1, 0, 0.5, 0, 0.1)).add(box(0.25, 0.75, 0.4, 1, 0.1, 0.6))
-    return m.add(box(0.44, 0.56, 0.75, 0.87, 0.6, 0.94)).add(box(0.3, 0.7, 0.75, 0.87, 0.94, 1))
+    """Upright vacuum: a wide floor head, the motor body with its dust bin, the stick and handle."""
+    m = Mesh().add(soft_box(0, 330, 0, 260, 0, 90, 40, 20, 20))
+    m.add(rounded_loft(70, 260, 130, 300, 60, [(10, 90), (0, 120), (0, 620), (20, 660)]))
+    m.add(lathe([(0.9, 250), (1, 262), (1, 510), (0.9, 522)], 12, "z", (165, 130), (68, 68)))
+    m.add(tube((165, 240, 650), (165, 240, 1080), 16, 8))
+    return m.add(sweep([(165, 240, 1070), (165, 240, 1140), (165, 160, 1150), (165, 150, 1090)], 14, 8))
 
 
 def long_handle():
-    """Broom, mop, rake or umbrella: a long pole and its head, lying along the width."""
-    return Mesh().add(box(0, 0.85, 0.44, 0.56, 0.44, 0.56)).add(box(0.85, 1, 0, 1, 0, 1))
+    """Broom or mop lying down: a long handle with its threaded collar, the head and its bristles."""
+    m = Mesh().add(tube((0, 150, 60), (1000, 150, 60), 13, 8))
+    m.add(lathe([(1, 980), (1, 1020)], 8, "x", (150, 60), (20, 20)))
+    m.add(soft_box(1010, 1070, 0, 300, 50, 120, 14, 8, 8, segs=2, arc=1))
+    return m.add(soft_box(1000, 1080, 8, 292, 0, 52, 10, 4, 4, segs=2, arc=1))
 
 
 def watering_can():
-    """Watering can: body, a long spout with its rose, and the handle at the back."""
-    m = Mesh().add(lathe([(1, 0), (1, 0.7)], 10, "z", (0.5, 0.5), (0.25, 0.5)))
-    m.add(bar((0.28, 0.5, 0.2), (0.07, 0.5, 0.78), 0.03, 0.03)).add(box(0, 0.08, 0.42, 0.58, 0.76, 0.86))
-    m.add(box(0.92, 1, 0.45, 0.55, 0.25, 1)).add(box(0.6, 0.92, 0.45, 0.55, 0.92, 1))
-    return m.add(box(0.75, 0.92, 0.45, 0.55, 0.25, 0.33))
+    """Watering can: an oval body with its filler, a long spout with the rose, an arched handle."""
+    m = Mesh().add(lathe([(0.94, 0), (1, 8), (1, 240), (0.9, 262), (0.55, 270)], 12, "z", (200, 90), (110, 85)))
+    m.add(lathe([(1, 262), (1, 284)], 10, "z", (170, 90), (32, 32)))
+    m.add(sweep([(110, 90, 40), (40, 90, 160), (-60, 90, 300)], [20, 14, 10], 8))
+    m.add(lathe([(0.3, -100), (1, -74), (1, -64)], 10, "x", (90, 306), (34, 34)))
+    return m.add(sweep([(250, 90, 262), (320, 90, 340), (356, 90, 250), (330, 90, 120), (300, 90, 80)], 12, 8))
 
 
 def power_drill():
@@ -810,8 +852,12 @@ def power_drill():
 
 
 def hand_tool():
-    """Hammer, spanner, screwdriver or pliers: a handle and a heavier head, lying along the width."""
-    return Mesh().add(box(0, 0.82, 0.42, 0.58, 0.35, 0.65)).add(box(0.82, 1, 0, 1, 0, 1))
+    """Hammer lying flat: a shaped wooden handle and the steel head with its face and claw."""
+    m = Mesh().add(lathe([(0.8, 0), (1, 20), (1, 120), (0.8, 180), (0.75, 270)], 10, "x", (60, 17), (15, 15)))
+    m.add(soft_box(268, 302, 0, 76, 0, 35, 10, 4, 4, segs=2, arc=1))
+    m.add(lathe([(1, 76), (1, 96), (0.9, 100)], 10, "y", (285, 17), (16, 16)))
+    return m.add(hexahedron([(270, -44, 6), (300, -44, 6), (300, 0, 0), (270, 0, 0),
+                             (270, -44, 22), (300, -44, 22), (300, 0, 35), (270, 0, 35)]))
 
 
 def guitar():
@@ -822,10 +868,11 @@ def guitar():
 
 
 def tote_bag():
-    """Handbag, tote or shopping bag: a body wider at the top and two handles."""
-    m = Mesh().add(prism([(0.08, 0), (0.92, 0), (1, 0.72), (0, 0.72)], "y", 0, 1))
-    m.add(box(0.28, 0.34, 0.45, 0.55, 0.72, 0.94)).add(box(0.66, 0.72, 0.45, 0.55, 0.72, 0.94))
-    return m.add(box(0.28, 0.72, 0.45, 0.55, 0.94, 1))
+    """Tote or shopping bag: a soft body that widens to its top, and two strap handles."""
+    m = Mesh().add(rounded_loft(0, 400, 0, 150, 30, [(24, 0), (4, 20), (0, 330), (2, 340)]))
+    for y in (22, 128):
+        m.add(sweep(arc((200, y, 330), 95, 180, 0, 12), 7, 6))
+    return m
 
 
 def stool():
@@ -847,10 +894,17 @@ def ottoman():
 
 
 def clothes_rail():
-    """Clothes rail or coat stand: feet, two uprights, the top bar and the clothes hanging on it."""
-    m = Mesh().add(box(0, 0.08, 0, 1, 0, 0.05)).add(box(0.92, 1, 0, 1, 0, 0.05))
-    m.add(box(0.02, 0.06, 0.46, 0.54, 0.05, 0.94)).add(box(0.94, 0.98, 0.46, 0.54, 0.05, 0.94))
-    return m.add(box(0, 1, 0.46, 0.54, 0.94, 1)).add(box(0.1, 0.9, 0.2, 0.8, 0.3, 0.92))
+    """Clothes rail: two feet, two uprights, the rail, and coats hanging from it."""
+    m = Mesh()
+    for x in (20, 1180):
+        m.add(tube((x, 0, 20), (x, 450, 20), 16, 8)).add(tube((x, 225, 20), (x, 225, 1600), 14, 8))
+    m.add(tube((20, 225, 1600), (1180, 225, 1600), 14, 8))
+    for k in range(6):
+        x = 150 + k * 170
+        length = 700 + (k % 3) * 180
+        m.add(sweep(arc((x, 225, 1560), 30, 180, 0, 6), 3, 4))
+        m.add(rounded_loft(x - 75, x + 75, 150, 300, 45, [(20, 1540 - length), (0, 1500), (35, 1540)]))
+    return m
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1149,7 +1203,7 @@ def alarm_clock():
     for x in (25, 105):
         m.add(lathe([(1, 128), (0.9, 142), (0.6, 152), (0, 156)], 10, "z", (x, 22), (26, 26)))
     m.add(tube((65, 22, 128), (65, 22, 150), 4, 6))
-    return m.add(tube((30, 22, 18), (18, 22, 0), 5, 6)).add(tube((100, 22, 18), (112, 22, 0), 5, 6))
+    return m.add(tube((42, 22, 22), (34, 22, 0), 5, 6)).add(tube((88, 22, 22), (96, 22, 0), 5, 6))
 
 
 def book_stack():
@@ -1485,7 +1539,7 @@ def facing_viewer(fn):
     return wrapped
 
 
-for _f in ("appliance_slab", "upright_fridge", "wardrobe", "piano", "backpack", "sofa", "armchair", "chair", "bed_frame",
+for _f in ("upright_fridge", "wardrobe", "piano", "backpack", "sofa", "armchair", "chair", "bed_frame",
            "coffee_maker", "microwave", "cooker", "bookcase", "chest_of_drawers", "desk", "monitor", "printer",
            "helmet"):
     globals()[_f] = facing_viewer(globals()[_f])
