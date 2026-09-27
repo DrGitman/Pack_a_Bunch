@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -41,7 +42,9 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The packed crate, drawn from the actual solver output.
@@ -82,9 +85,27 @@ fun IsometricCrate(
     // says what it is — a sofa as a sofa, a bottle as a bottle — and as the plain box
     // otherwise. Display only: see FamilyMeshes.
     val context = LocalContext.current
-    val families = remember(items) { items.filter { surfaces[it.id] == null }.mapNotNull { item ->
-        FamilyMeshes.surfaceFor(context, item)?.let { item.id to it }
+    // When the name says nothing ("Item 3"), what the item's photo shows chooses the shape
+    // instead. A name that does say something always wins: the person chose it.
+    val photoLabels by produceState(emptyMap<String, String>(), items) {
+        value = items.filter { surfaces[it.id] == null && chooseFamily(it) == null }.mapNotNull { item ->
+            com.packabunch.data.ItemPhotos.pathFor(context, item.id)?.let { PhotoLabels.of(it) }?.let { item.id to it }
+        }.toMap()
+    }
+    val families = remember(items, photoLabels) { items.filter { surfaces[it.id] == null }.mapNotNull { item ->
+        (FamilyMeshes.surfaceFor(context, item)
+            ?: photoLabels[item.id]?.let { FamilyMeshes.surfaceFor(context, item.copy(name = it)) })
+            ?.let { item.id to it }
     }.toMap() }
+    // Each item is drawn in its own photo's colour, so the blue cup is blue in the plan.
+    // Items without a photo keep the plan's palette. Read off the main thread, once per photo.
+    val photoColours by produceState(emptyMap<String, Color>(), items) {
+        value = withContext(Dispatchers.IO) {
+            items.mapNotNull { item ->
+                com.packabunch.data.ItemPhotos.pathFor(context, item.id)?.let(PhotoColours::of)?.let { item.id to it }
+            }.toMap()
+        }
+    }
     val scannedSurface = remember(space.scan) { space.scan?.effectiveGrid?.let { grid ->
         voxelSurface(grid.countX, grid.countY, grid.countZ, grid.resolutionMm) { x,y,z ->
             grid.cellAt(x,y,z) == com.packabunch.packing.Cell.SOLID
@@ -144,7 +165,7 @@ fun IsometricCrate(
             val surface = surfaces[placement.specId]
             if (surface != null) {
                 drawSurface(view, surface.map { face -> face.copy(points = face.points.map { it.placed(placement).let { p -> p.copy(z = p.z + (1f - itemProgress) * view.heightMm * 0.22f) } }) },
-                    itemColorFor(placement), itemProgress * if (selectedInstanceId != null && placement.instanceId != selectedInstanceId) 0.34f else 1f)
+                    photoColours[placement.specId] ?: itemColorFor(placement), itemProgress * if (selectedInstanceId != null && placement.instanceId != selectedInstanceId) 0.34f else 1f)
                 val index = items.indexOfFirst { it.id == placement.specId } + 1
                 val point = view.project(placement.xMm + placement.orientedWidthMm / 2f,
                     placement.yMm + placement.orientedDepthMm / 2f, placement.zMm + placement.orientedHeightMm.toFloat())
@@ -152,7 +173,7 @@ fun IsometricCrate(
             } else drawPlacement(
                 view = view,
                 placement = placement,
-                base = itemColorFor(placement),
+                base = photoColours[placement.specId] ?: itemColorFor(placement),
                 progress = itemProgress,
                 dimmed = selectedInstanceId != null && placement.instanceId != selectedInstanceId,
                 textMeasurer = textMeasurer,
