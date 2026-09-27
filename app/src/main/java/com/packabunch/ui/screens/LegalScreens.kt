@@ -110,6 +110,9 @@ private val privacySections = listOf(
                 "room is recorded or sent.",
             "Item recognition. When the app suggests a name for something you photograph, that " +
                 "happens on your phone.",
+            "\"It doesn't fit\" reports. When you tell us why a planned item didn't fit, we keep " +
+                "the reason you picked and the sizes of the item and the space, so we can make plans " +
+                "better. Never the item's name or anything you typed.",
         ),
     ),
     Section(
@@ -128,8 +131,9 @@ private val privacySections = listOf(
         listOf(
             "Your packs stay until you delete them or delete your account.",
             "You can delete every saved pack from Settings. You can delete your whole account " +
-                "and everything in it from your profile. Deleting your account removes your " +
-                "packs from our side as well, and it cannot be undone.",
+                "and everything in it from your profile. It is deleted 30 days after you ask, " +
+                "with your packs on our side; signing in again before then stops it. After that " +
+                "it cannot be undone.",
         ),
     ),
     Section(

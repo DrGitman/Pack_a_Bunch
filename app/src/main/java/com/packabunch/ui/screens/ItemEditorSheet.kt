@@ -1,13 +1,8 @@
 package com.packabunch.ui.screens
 
-import com.packabunch.ui.components.swallowTaps
 import androidx.compose.foundation.background
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
 import com.packabunch.ui.motion.pressScale
 import kotlinx.coroutines.launch
@@ -118,14 +113,6 @@ fun ItemEditorSheet(
         }
     }
 
-    // Swiped down by its handle: follows the finger, and goes if pulled far or flung.
-    val sheetDrag = remember { androidx.compose.animation.core.Animatable(0f) }
-    var sheetHeight by remember { mutableStateOf(0) }
-    val dismissAt = with(androidx.compose.ui.platform.LocalDensity.current) { 110.dp.toPx() }
-    val dragState = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
-        scope.launch { sheetDrag.snapTo((sheetDrag.value + delta).coerceAtLeast(0f)) }
-    }
-
     // Set here for this item only. The account's own unit is what the sheet opens in.
     var entryUnit by remember(existing) { mutableStateOf(unit) }
     var quantity by remember(existing) { mutableStateOf(existing?.quantity ?: 1) }
@@ -139,54 +126,13 @@ fun ItemEditorSheet(
     // placeholder has been promising all along. Only the three sizes actually gate saving.
     val valid = widthMm != null && depthMm != null && heightMm != null
 
-    Box(modifier.fillMaxSize()) {
-        // Scrim. Tapping it dismisses, which is the Android expectation for a sheet.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = 1f - (sheetDrag.value / sheetHeight.coerceAtLeast(1)).coerceIn(0f, 1f) }
-                .background(Color(0x7A2B1D14))
-                .clickable(indication = null, interactionSource = remember {
-                    androidx.compose.foundation.interaction.MutableInteractionSource()
-                }) { onDismiss() },
-        )
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .offset { androidx.compose.ui.unit.IntOffset(0, sheetDrag.value.toInt()) }
-                .onSizeChanged { sheetHeight = it.height }
-                .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                .swallowTaps()
-                .padding(horizontal = Spacing.gutter)
-                .padding(top = 14.dp, bottom = 30.dp),
-        ) {
-            Column(
-                Modifier.draggable(
-                    state = dragState,
-                    orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
-                    onDragStopped = { velocity ->
-                        if (sheetDrag.value > dismissAt || velocity > 1800f) {
-                            sheetDrag.animateTo(sheetHeight.toFloat().coerceAtLeast(dismissAt), androidx.compose.animation.core.tween(180))
-                            onDismiss()
-                        } else {
-                            sheetDrag.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f))
-                        }
-                    },
-                ),
-            ) {
-            Box(Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier
-                        .size(width = 40.dp, height = 4.dp)
-                        .background(Color(0xFFE2D5C6), RoundedCornerShape(999.dp)),
-                )
-            }
-
-            Spacer(Modifier.height(4.dp))
-
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+    // In the shared sheet: swiped away by its handle, and clear of the phone's own buttons —
+    // "Remove this item" used to sit right on the navigation bar.
+    com.packabunch.ui.components.PackSheet(
+        onDismiss = onDismiss,
+        modifier = modifier,
+        header = {
+            Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = if (existing == null) "Add an item" else "Edit item",
                     color = TextPrimary,
@@ -206,8 +152,8 @@ fun ItemEditorSheet(
                     tint = Color(0xFF5C4A3A),
                 )
             }
-            }
-
+        },
+    ) {
             Spacer(Modifier.height(Spacing.base))
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -521,7 +467,6 @@ fun ItemEditorSheet(
                     )
                 }
             }
-        }
     }
 }
 

@@ -68,76 +68,50 @@ fun DeleteConfirmDialog(
     onConfirm: () -> Unit,
     onCancel: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Whether it has a plan to lose as well. */
+    hasPlan: Boolean = true,
 ) {
-    Box(modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color(0x942B1D14))
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                ) { onCancel() },
-        )
-
-        Column(
-            Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = Spacing.xl)
-                .warmShadow(24.dp, RoundedCornerShape(28.dp))
-                .background(Color.White, RoundedCornerShape(28.dp))
-                .padding(Spacing.lg),
-        ) {
-            Box(
-                Modifier.size(48.dp).background(ErrorTint, RoundedCornerShape(16.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                // The lid lifts as the sheet arrives, so the warning reads before the words do.
-                com.packabunch.ui.components.LottieTapIcon(
-                    animation = com.packabunch.R.raw.icon_delete,
-                    contentDescription = null,
-                    onClick = null,
-                    size = 22.dp,
-                    tint = ErrorRed,
-                    playOnAppear = true,
-                )
-            }
-
-            Spacer(Modifier.height(Spacing.base))
-
+    com.packabunch.ui.components.PackPopup(
+        icon = PackIcons.Trash,
+        iconTint = ErrorRed,
+        iconBackground = ErrorTint,
+        title = "Delete \u201C${packName.ifBlank { "this pack" }}\u201D?",
+        // Synced packs live on this phone and in the account; deleting takes both.
+        body = "It goes from this phone and your account. Nothing else keeps a copy.",
+        detailContent = {
             Text(
-                text = "Delete “$packName”?",
-                color = TextPrimary,
+                "GOES WITH IT",
+                color = com.packabunch.ui.theme.TextTertiary,
                 fontFamily = UiFamily,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 21.sp,
-                letterSpacing = (-0.4).sp,
+                fontSize = 10.5f.sp,
+                letterSpacing = 0.6.sp,
             )
+            GoesLine(PackIcons.Cube, "$itemCount ${if (itemCount == 1) "item" else "items"} and their measurements")
+            if (photoCount > 0) GoesLine(PackIcons.Camera, "$photoCount ${if (photoCount == 1) "photo" else "photos"} stored in the app")
+            if (hasPlan) GoesLine(PackIcons.Copy, "Its saved arrangement and packing order")
+        },
+        footnote = "You get a few seconds to undo, then it's gone for good.",
+        footnoteIcon = PackIcons.Undo,
+        footnoteFirst = true,
+        primary = "Delete it",
+        onPrimary = onConfirm,
+        destructive = true,
+        secondary = "Keep it",
+        onSecondary = onCancel,
+        onDismiss = onCancel,
+        modifier = modifier,
+    )
+}
 
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                text = buildString {
-                    append("Its $itemCount ")
-                    append(if (itemCount == 1) "item goes" else "items go")
-                    if (photoCount > 0) {
-                        append(" and $photoCount ")
-                        append(if (photoCount == 1) "photo goes" else "photos go")
-                    }
-                    append(" with it. This can't be undone once you leave the screen.")
-                },
-                color = TextSecondary,
-                fontFamily = UiFamily,
-                fontSize = 14.5f.sp,
-                lineHeight = 21.sp,
-            )
-
-            Spacer(Modifier.height(Spacing.lg))
-
-            PrimaryButton(text = "Delete it", onClick = onConfirm)
-            Spacer(Modifier.height(8.dp))
-            SecondaryButton(text = "Keep it", onClick = onCancel)
-        }
+@Composable
+private fun GoesLine(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+    androidx.compose.foundation.layout.Row(
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.material3.Icon(icon, null, tint = TextSecondary, modifier = Modifier.size(15.dp))
+        Text(text, color = TextPrimary, fontFamily = UiFamily, fontSize = 13.5f.sp, lineHeight = 19.sp)
     }
 }
 

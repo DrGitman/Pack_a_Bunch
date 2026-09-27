@@ -57,6 +57,7 @@ data class ArMeasureState(
     /** Confirmed lengths, keyed by edge. */
     val measured: Map<EdgeStage, Int> = emptyMap(),
     val fatalError: String? = null,
+    val torchOn: Boolean = false,
 ) {
     val allEdgesMeasured: Boolean get() = EdgeStage.entries.all { measured.containsKey(it) }
 }
@@ -86,6 +87,8 @@ class ArMeasureController(private val context: Context) : GLSurfaceView.Renderer
     val state: StateFlow<ArMeasureState> = _state.asStateFlow()
 
     private var session: Session? = null
+    private var config: Config? = null
+    @Volatile private var pendingTorch: Boolean? = null
     private val background = CameraBackgroundRenderer()
 
     private val anchors = mutableListOf<Anchor>()
@@ -112,7 +115,7 @@ class ArMeasureController(private val context: Context) : GLSurfaceView.Renderer
             if (session == null) {
                 session = Session(context).apply {
                     configure(
-                        Config(this).apply {
+                        Config(this).also { config = it }.apply {
                             // Latest image, so a tap lines up with what is on screen.
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                             planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
@@ -162,6 +165,9 @@ class ArMeasureController(private val context: Context) : GLSurfaceView.Renderer
     }
 
     // -- user actions --------------------------------------------------------------------------
+
+    /** The phone's torch, for measuring the inside of a dark cupboard or boot. Applied on the next frame. */
+    fun setTorch(on: Boolean) { pendingTorch = on }
 
     /** Capture happens on the GL thread, on the next frame, so it uses that frame's pose. */
     fun capturePoint() {
@@ -234,6 +240,16 @@ class ArMeasureController(private val context: Context) : GLSurfaceView.Renderer
             if (geometryDirty) {
                 active.setDisplayGeometry(displayRotation, viewportWidth, viewportHeight)
                 geometryDirty = false
+            }
+            pendingTorch?.let { on ->
+                pendingTorch = null
+                config?.let { c ->
+                    runCatching {
+                        c.flashMode = if (on) Config.FlashMode.TORCH else Config.FlashMode.OFF
+                        active.configure(c)
+                        _state.value = _state.value.copy(torchOn = on)
+                    }.onFailure { Log.w(AR_TAG, "torch", it) }
+                }
             }
 
             val frame = active.update()

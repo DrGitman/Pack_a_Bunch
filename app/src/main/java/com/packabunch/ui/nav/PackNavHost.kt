@@ -560,7 +560,16 @@ fun PackNavHost(
                     viewModel.openPack(project.id) { navController.navigate(Routes.MEASURE_REVIEW) }
                 },
                 onShare = { project -> sharePack(context, project, settings.unit) },
-                onDeletedExpired = { deletedForUndo = null },
+                onDeletedExpired = {
+                    // Past undo: the deleted pack's photos go too, except any another pack still uses.
+                    deletedForUndo?.let { gone ->
+                        val stillUsed = projects.flatMap { p -> p.items.map { it.id } }.toSet()
+                        gone.items.filter { it.id !in stillUsed }.forEach { item ->
+                            com.packabunch.data.ItemPhotos.remove(com.packabunch.data.ItemPhotos.pathFor(context, item.id))
+                        }
+                    }
+                    deletedForUndo = null
+                },
                 onResumePacking = { project ->
                     viewModel.openPack(project.id) {
                         viewModel.resumeGuide()
@@ -786,6 +795,9 @@ fun PackNavHost(
             val current = placements.getOrNull(editor.guideStep)
             val item = editor.items.firstOrNull { it.id == current?.specId }
             DoesntFitScreen(
+                itemNumber = editor.items.indexOfFirst { it.id == item?.id } + 1,
+                spaceNoun = com.packabunch.ui.screens.spaceNoun(editor.space?.name, standingInside = false),
+                onReport = viewModel::reportFit,
                 itemName = item?.name ?: "This item",
                 itemSummary = item?.let { formatDimensions(it.dimensions, settings.unit) }.orEmpty(),
                 stepNumber = editor.guideStep + 1,
@@ -796,7 +808,7 @@ fun PackNavHost(
                 onObstruction = {
                     navController.navigate(if (editor.space?.scan != null) Routes.SPACE_OBSTRUCTIONS else Routes.MEASURE_REVIEW)
                 },
-                onReplan = { items() },
+                onReplan = { editItemId = item?.id; items() },
                 onSkipAndCarryOn = {
                     if (editor.guideStep + 1 < placements.size) {
                         viewModel.setGuideStep(editor.guideStep + 1)
@@ -876,7 +888,9 @@ fun PackNavHost(
                 com.packabunch.ui.screens.DeleteConfirmDialog(
                     packName = pack.name,
                     itemCount = pack.items.size,
-                    photoCount = 0,
+                    // The item photos kept on this phone go with the pack.
+                    photoCount = pack.items.count { com.packabunch.data.ItemPhotos.pathFor(context, it.id) != null },
+                    hasPlan = pack.plan != null,
                     onConfirm = {
                         confirmDeletePack = null
                         viewModel.deleteProject(pack.id)

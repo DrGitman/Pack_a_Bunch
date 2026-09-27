@@ -4,6 +4,7 @@ import com.packabunch.BuildConfig
 import com.packabunch.auth.SupabaseAccount
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -25,7 +26,12 @@ data class RemoteSettings(val unit: String, val habit: String?, val avatarUrl: S
  */
 class CloudSettings(private val account: SupabaseAccount, private val owner: String) {
 
-    suspend fun load(): RemoteSettings? = runCatching {
+    /**
+     * The account's settings: a success holding null when it has never saved any, a failure
+     * when they could not be read. The two must not be confused — a failed read taken for
+     * "never saved" once pushed a new phone's blanks over the account, profile photo and all.
+     */
+    suspend fun load(): Result<RemoteSettings?> = runCatching {
         withContext(Dispatchers.IO) {
             val rows = JSONArray(request("/rest/v1/user_settings?select=unit,habit,avatar_url&user_id=eq.$owner"))
             if (rows.length() == 0) return@withContext null
@@ -36,9 +42,12 @@ class CloudSettings(private val account: SupabaseAccount, private val owner: Str
                 avatarUrl = row.optString("avatar_url").takeIf { it.isNotBlank() },
             )
         }
-    }.getOrNull()
+    }
 
-    suspend fun save(unit: String, habit: String?, avatarUrl: String? = null) {
+    /** Saves go one at a time, in the order they were asked for, so an older one never lands last. */
+    private val order = kotlinx.coroutines.sync.Mutex()
+
+    suspend fun save(unit: String, habit: String?, avatarUrl: String? = null) = order.withLock {
         runCatching {
             withContext(Dispatchers.IO) {
                 request(

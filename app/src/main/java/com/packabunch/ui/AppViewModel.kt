@@ -187,15 +187,38 @@ class AppViewModel(
      */
     init {
         if (cloudSettings != null) viewModelScope.launch {
-            val remote = cloudSettings.load()
-            if (remote == null) {
-                cloudSettings.save(_settings.value.unit.name, _settings.value.packingHabit?.name,
-                    _settings.value.avatarUrl)
-            } else {
-                LengthUnit.entries.firstOrNull { it.name == remote.unit }?.let(::setUnit)
-                PackingHabit.entries.firstOrNull { it.name == remote.habit }?.let(::setPackingHabit)
-                remote.avatarUrl?.let(::setAvatar)
+            cloudSettings.load().onSuccess { remote ->
+                if (remote == null) {
+                    cloudSettings.save(_settings.value.unit.name, _settings.value.packingHabit?.name,
+                        _settings.value.avatarUrl)
+                } else {
+                    applyRemoteSettings(remote)
+                }
             }
+            // A failed read changes nothing, here or in the account: it is tried again next launch.
+        }
+    }
+
+    /**
+     * Takes the account's settings onto this phone, all at once and without saving them back.
+     * Applying them one by one through the setters saved each in turn, with the photo not yet
+     * applied — and a save that said "no photo" could land last and erase it from the account.
+     * That is how the profile photo vanished on a second phone.
+     */
+    private fun applyRemoteSettings(remote: com.packabunch.data.cloud.RemoteSettings) {
+        val unit = LengthUnit.entries.firstOrNull { it.name == remote.unit }
+        val habit = PackingHabit.entries.firstOrNull { it.name == remote.habit }
+        preferences.edit().apply {
+            unit?.let { putString("unit", it.name) }
+            habit?.let { putString("habit", it.name) }
+            remote.avatarUrl?.let { putString("avatar", it) }
+        }.apply()
+        _settings.update { current ->
+            current.copy(
+                unit = unit ?: current.unit,
+                packingHabit = habit ?: current.packingHabit,
+                avatarUrl = remote.avatarUrl ?: current.avatarUrl,
+            )
         }
     }
 
@@ -523,6 +546,31 @@ class AppViewModel(
     }
 
     private fun autosave() = save()
+
+    private val fitReports = account?.let { com.packabunch.data.cloud.CloudFitReports(it) }
+
+    /**
+     * Records why the item at the current guide step didn't fit — the reason and the sizes,
+     * nothing else — so plans can be checked against what really happened.
+     */
+    fun reportFit(reason: com.packabunch.data.cloud.FitReason) {
+        val reports = fitReports ?: return
+        val state = _editor.value
+        val placements = state.plan?.placements?.sortedBy { it.sequenceIndex }.orEmpty()
+        val item = state.items.firstOrNull { it.id == placements.getOrNull(state.guideStep)?.specId }
+        val space = state.space
+        viewModelScope.launch {
+            reports.send(
+                reason = reason,
+                item = item?.dimensions,
+                space = space?.dimensions,
+                spaceMeasured = space?.measurementSource?.name,
+                spaceScanned = space?.scan != null,
+                step = state.guideStep + 1,
+                steps = placements.size,
+            )
+        }
+    }
 
     fun deleteProject(id: String) {
         viewModelScope.launch { repository.delete(id) }

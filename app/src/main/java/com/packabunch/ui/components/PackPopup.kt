@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.AnnotatedString
@@ -71,8 +72,16 @@ fun PackPopup(
     detailIcon: ImageVector? = null,
     detailIconTint: Color = TextSecondary,
     footnote: String? = null,
+    /** An icon before [footnote] — the undo arrow beside "you get a few seconds to undo". */
+    footnoteIcon: ImageVector? = null,
     /** Back and a tap on the dimmed page; null when the pop-up must be answered. */
     onDismiss: (() -> Unit)? = null,
+    /** The filled button in red: the action cannot be taken back. */
+    destructive: Boolean = false,
+    /** Richer detail than [detail] — a list with its own heading. Drawn in the same tinted box. */
+    detailContent: (@Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit)? = null,
+    /** The footnote before the buttons rather than under them. */
+    footnoteFirst: Boolean = false,
 ) {
     if (onDismiss != null) BackHandler(onBack = onDismiss)
     val shown = remember { Animatable(0f) }
@@ -120,6 +129,18 @@ fun PackPopup(
             )
             Spacer(Modifier.height(8.dp))
             Text(body, color = TextSecondary, fontFamily = UiFamily, fontSize = 14.sp, lineHeight = 20.sp, textAlign = TextAlign.Center)
+            if (detailContent != null) {
+                Spacer(Modifier.height(14.dp))
+                Column(
+                    Modifier.fillMaxWidth().background(SurfaceMuted, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    content = detailContent,
+                )
+            }
+            if (footnote != null && footnoteFirst) {
+                Spacer(Modifier.height(12.dp))
+                Footnote(footnote, footnoteIcon, TextAlign.Start)
+            }
             if (detail != null) {
                 Spacer(Modifier.height(14.dp))
                 Row(
@@ -132,15 +153,45 @@ fun PackPopup(
                 }
             }
             Spacer(Modifier.height(18.dp))
-            PrimaryButton(text = primary, onClick = onPrimary, height = 50.dp)
+            if (destructive) DestructiveButton(primary, onPrimary)
+            else PrimaryButton(text = primary, onClick = onPrimary, height = 50.dp)
             if (secondary != null) {
                 Spacer(Modifier.height(8.dp))
                 SecondaryButton(text = secondary, onClick = onSecondary, height = 48.dp, contentColor = TextPrimary)
             }
-            if (footnote != null) {
+            if (footnote != null && !footnoteFirst) {
                 Spacer(Modifier.height(10.dp))
-                Text(footnote, color = TextTertiary, fontFamily = UiFamily, fontSize = 12.sp, lineHeight = 17.sp, textAlign = TextAlign.Center)
+                Footnote(footnote, footnoteIcon, TextAlign.Center)
             }
         }
+    }
+}
+
+@Composable
+private fun Footnote(text: String, icon: ImageVector?, align: TextAlign) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, if (align == TextAlign.Center) Alignment.CenterHorizontally else Alignment.Start),
+        verticalAlignment = Alignment.Top,
+    ) {
+        if (icon != null) Icon(icon, null, tint = TextTertiary, modifier = Modifier.padding(top = 1.dp).size(15.dp))
+        Text(text, color = TextTertiary, fontFamily = UiFamily, fontSize = 12.sp, lineHeight = 17.sp, textAlign = align)
+    }
+}
+
+/** The red filled button, for the one action on a pop-up that cannot be taken back. */
+@Composable
+private fun DestructiveButton(text: String, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(25.dp)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(50.dp)
+            .background(com.packabunch.ui.theme.ErrorRed, shape)
+            .clip(shape)
+            .clickable(role = androidx.compose.ui.semantics.Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = Color.White, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 16.sp)
     }
 }

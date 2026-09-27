@@ -143,6 +143,8 @@ Three dashboard settings go with the migrations:
 - **Integrations → Cron** switched on *before* running `202609270004_account_deletion_grace.sql`,
   so the nightly sweep that deletes accounts 30 days after they asked is scheduled. If Cron
   was off when it ran, switch it on and run the last block of that file again.
+- `202609270005_fit_reports.sql` keeps the "It doesn't fit" reports: the reason picked and the
+  sizes, never names. Read them in Table Editor → `fit_reports`; the app cannot read them back.
 - **Authentication → URL Configuration → Redirect URLs** → add `packabunch://reset-password`.
   The password-reset email sends people back into the app with it; without it the link opens
   the Site URL instead and the reset cannot be finished on the phone.

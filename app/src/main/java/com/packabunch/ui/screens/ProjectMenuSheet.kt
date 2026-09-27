@@ -1,15 +1,12 @@
 package com.packabunch.ui.screens
 
-import com.packabunch.ui.components.swallowTaps
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -61,36 +58,11 @@ fun ProjectMenuSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Box(modifier.fillMaxSize()) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Color(0x7A2B1D14))
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() },
-                ) { onDismiss() },
-        )
-
-        Column(
-            Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
-                .swallowTaps()
-                .padding(horizontal = Spacing.gutter)
-                .padding(top = 14.dp, bottom = 30.dp),
-        ) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Box(
-                    Modifier
-                        .size(width = 40.dp, height = 4.dp)
-                        .background(Color(0xFFE2D5C6), RoundedCornerShape(999.dp)),
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
+    com.packabunch.ui.components.PackSheet(
+        onDismiss = onDismiss,
+        modifier = modifier,
+        header = {
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = project.name.ifEmpty { "Untitled pack" },
                 color = TextPrimary,
@@ -106,42 +78,41 @@ fun ProjectMenuSheet(
                 color = TextTertiary,
                 modifier = Modifier.padding(top = 2.dp),
             )
-
             Spacer(Modifier.height(Spacing.base))
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                MenuRow(PackIcons.Pencil, "Rename this pack", null, onRename)
-                MenuRow(
-                    PackIcons.Copy,
-                    "Duplicate it",
-                    "Same space and items, fresh plan",
-                    onDuplicate,
-                )
-                MenuRow(
-                    PackIcons.Camera,
-                    "Measure the space again",
-                    "Replans once you confirm the new size",
-                    onRemeasure,
-                )
-                MenuRow(
-                    PackIcons.Mail,
-                    "Share the packing list",
-                    "Plain text, for whoever is helping",
-                    onShare,
-                )
-                MenuRow(
-                    PackIcons.Trash,
-                    "Delete this pack",
-                    "Takes its items and photos with it",
-                    onDelete,
-                    tint = ErrorRed,
-                )
-            }
-
-            Spacer(Modifier.height(Spacing.base))
-
-            SecondaryButton(text = "Close", onClick = onDismiss)
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            MenuRow(PackIcons.Pencil, "Rename this pack", null, onRename)
+            MenuRow(
+                PackIcons.Copy,
+                "Duplicate it",
+                "Same space and items, fresh plan",
+                onDuplicate,
+            )
+            MenuRow(
+                PackIcons.Camera,
+                "Measure the space again",
+                "Replans once you confirm the new size",
+                onRemeasure,
+            )
+            MenuRow(
+                PackIcons.Mail,
+                "Share the packing list",
+                "Plain text, for whoever is helping",
+                onShare,
+            )
+            MenuRow(
+                PackIcons.Trash,
+                "Delete this pack",
+                "Takes its items and photos with it",
+                onDelete,
+                tint = ErrorRed,
+            )
         }
+
+        Spacer(Modifier.height(Spacing.base))
+
+        SecondaryButton(text = "Close", onClick = onDismiss)
     }
 }
 

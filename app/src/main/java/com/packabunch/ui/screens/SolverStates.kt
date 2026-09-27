@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -272,6 +273,12 @@ fun DoesntFitScreen(
     onSkipAndCarryOn: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The item's number in the pack, for its tile. */
+    itemNumber: Int = 1,
+    /** The space as the page names it — "the crate", "the car boot". */
+    spaceNoun: String = "the space",
+    /** Told which reason was acted on, so the misfit can be recorded. */
+    onReport: (com.packabunch.data.cloud.FitReason) -> Unit = {},
 ) {
     ScreenScaffold(modifier) {
         PackAppBar(title = "It doesn't fit", onBack = onBack)
@@ -283,18 +290,20 @@ fun DoesntFitScreen(
         val issues = remember(itemName) {
             listOf(
                 FitIssue("The item is bigger than I said",
-                    "Takes you to $itemName's measurements. Handles and lids catch people out.",
-                    "Check the ${itemName.lowercase()}", onItemBigger),
-                FitIssue("The space is smaller than I said",
+                    "Takes you to the ${itemName.lowercase()}'s measurements. Handles and lids catch people out.",
+                    "Check the ${itemName.lowercase()}", com.packabunch.data.cloud.FitReason.ITEM_BIGGER, onItemBigger),
+                FitIssue("${spaceNoun.replaceFirstChar { it.uppercase() }} is smaller than I said",
                     "Back to the space measurements. Inside walls are often thicker than they look.",
-                    "Check the space", onSpaceSmaller),
+                    "Check ${spaceNoun}", com.packabunch.data.cloud.FitReason.SPACE_SMALLER, onSpaceSmaller),
                 FitIssue("Something's in the way",
-                    "A lip, a handle inside, a bar across the top. The plan assumes an empty, clear space.",
-                    "Mark what's in the way", onObstruction),
+                    "A lip, a handle inside, a bar across the top. The plan assumes an empty, clear ${spaceNoun.removePrefix("the ")}.",
+                    "Mark what's in the way", com.packabunch.data.cloud.FitReason.IN_THE_WAY, onObstruction),
                 FitIssue("It fits, just not like that",
-                    "Review the item's turning and stacking settings, then plan again. A new plan may " +
-                        "move pieces you have already packed.",
-                    "Plan it again", onReplan),
+                    // The planner gives the same answer to the same question, so the way to a
+                    // different arrangement is a different question: how the item may turn or
+                    // stack. Said plainly that a new plan may move what is already in.
+                    "Let it turn or stack differently and we'll plan again. A new plan may move what's already in.",
+                    "Change how it packs", com.packabunch.data.cloud.FitReason.OTHER_ARRANGEMENT, onReplan),
             )
         }
         var picked by rememberSaveable(itemName) { mutableStateOf(0) }
@@ -306,28 +315,48 @@ fun DoesntFitScreen(
         ) {
             Spacer(Modifier.height(Spacing.sm))
 
-            Text(
-                text = itemName,
-                color = TextPrimary,
-                fontFamily = UiFamily,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 22.sp,
-                letterSpacing = (-0.4).sp,
-            )
-            Text(
-                text = "$itemSummary · step $stepNumber of $totalSteps",
-                style = com.packabunch.ui.theme.NumeralChip,
-                color = TextTertiary,
-            )
+            // The item in question, as the guide showed it: its numbered tile, name and size.
+            androidx.compose.foundation.layout.Row(
+                Modifier
+                    .fillMaxWidth()
+                    .background(androidx.compose.ui.graphics.Color.White, androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                com.packabunch.ui.components.ItemNumberTile(
+                    number = itemNumber,
+                    color = com.packabunch.ui.theme.itemColor((itemNumber - 1).coerceAtLeast(0)),
+                    size = 40.dp,
+                    cornerRadius = 13.dp,
+                    fontSize = 16,
+                )
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = itemName,
+                        color = TextPrimary,
+                        fontFamily = UiFamily,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 17.sp,
+                        letterSpacing = (-0.3).sp,
+                    )
+                    Text(
+                        text = "$itemSummary · step $stepNumber of $totalSteps",
+                        style = com.packabunch.ui.theme.NumeralChip,
+                        color = TextTertiary,
+                    )
+                }
+            }
 
-            Spacer(Modifier.height(Spacing.base))
+            Spacer(Modifier.height(Spacing.lg))
 
             Text(
                 text = "What's actually wrong?",
                 color = TextPrimary,
                 fontFamily = UiFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                letterSpacing = (-0.4).sp,
             )
             Spacer(Modifier.height(4.dp))
             Text(
@@ -352,7 +381,8 @@ fun DoesntFitScreen(
             Spacer(Modifier.height(Spacing.base))
 
             Note(
-                text = "Your pack, its items and the $piecesAlreadyIn " +
+                text = if (piecesAlreadyIn == 0) "Your pack and its items stay saved."
+                else "Your pack, its items and the ${countWord(piecesAlreadyIn)} " +
                     "${if (piecesAlreadyIn == 1) "piece" else "pieces"} already in stay saved.",
                 tone = NoteTone.Confirmed,
                 icon = PackIcons.Check,
@@ -362,9 +392,15 @@ fun DoesntFitScreen(
         }
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            PrimaryButton(text = issues[picked].action, onClick = issues[picked].go)
+            PrimaryButton(text = issues[picked].action, onClick = {
+                onReport(issues[picked].reason)
+                issues[picked].go()
+            })
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PackTextButton(text = "Skip it and carry on", onClick = onSkipAndCarryOn)
+                PackTextButton(text = "Skip it and carry on", onClick = {
+                    onReport(com.packabunch.data.cloud.FitReason.SKIPPED)
+                    onSkipAndCarryOn()
+                })
             }
         }
 
@@ -373,7 +409,16 @@ fun DoesntFitScreen(
 }
 
 /** One cause on the Doesn't-fit screen: what it says, what the button says, where it goes. */
-private data class FitIssue(val title: String, val detail: String, val action: String, val go: () -> Unit)
+private data class FitIssue(
+    val title: String,
+    val detail: String,
+    val action: String,
+    val reason: com.packabunch.data.cloud.FitReason,
+    val go: () -> Unit,
+)
+
+/** "two pieces" rather than "2 pieces" in a sentence, up to ten. */
+private fun countWord(n: Int): String = listOf("no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten").getOrNull(n) ?: n.toString()
 
 /**
  * Oversize item — `design/artboards/OversizeItem.dc.html`.
