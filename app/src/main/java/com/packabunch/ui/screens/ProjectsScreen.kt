@@ -84,6 +84,10 @@ fun ProjectsScreen(
     onDelete: (Project) -> Unit = {},
     onRestore: (Project) -> Unit = {},
     onSettings: () -> Unit = {},
+    /** The bell: opens the notifications page. */
+    onNotifications: () -> Unit = {},
+    /** Notifications not yet read, for the dot on the bell. */
+    unreadNotifications: Int = 0,
     onRename: (Project, String) -> Unit = { _, _ -> },
     onDuplicate: (Project) -> Unit = {},
     onRemeasure: (Project) -> Unit = {},
@@ -137,6 +141,18 @@ fun ProjectsScreen(
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text("Projects", Modifier.weight(1f), color = TextPrimary, fontFamily = UiFamily,
                     fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-.7).sp)
+                Box {
+                    com.packabunch.ui.components.LottieTapIcon(
+                        animation = com.packabunch.R.raw.icon_bell,
+                        contentDescription = if (unreadNotifications > 0) "Notifications, $unreadNotifications new" else "Notifications",
+                        onClick = onNotifications,
+                        size = 52.dp,
+                    )
+                    if (unreadNotifications > 0) Box(
+                        Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 12.dp).size(9.dp)
+                            .background(com.packabunch.ui.theme.Primary, androidx.compose.foundation.shape.CircleShape),
+                    )
+                }
                 com.packabunch.ui.components.LottieTapIcon(
                     animation = com.packabunch.R.raw.icon_search,
                     contentDescription = "Search packs",

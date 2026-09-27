@@ -91,6 +91,94 @@ class AppViewModel(
 
     fun clearPurchaseOutcome() { _purchaseOutcome.value = null }
 
+    // Pack Plus comes from a Google Play subscription or a promo code; either switches it on.
+    private var storePlus = false
+    private var promoPlusUntil: java.time.Instant? = null
+    private fun refreshTier() {
+        val promo = promoPlusUntil?.isAfter(java.time.Instant.now()) == true
+        val plus = storePlus || promo
+        if (plus && _settings.value.tier != Tier.PLUS) preferences.edit().putLong("plusSeenAt", System.currentTimeMillis()).apply()
+        setTier(if (plus) Tier.PLUS else Tier.FREE)
+    }
+
+    /** Redeems a promo code; tells [onResult] until when Plus now runs, or null if refused. */
+    fun redeemPromo(code: String, onResult: (java.time.Instant?, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = runCatching { account?.redeemPromo(code) }
+            result.onSuccess { until -> if (until != null) { promoPlusUntil = until; refreshTier() }; onResult(until, null) }
+                .onFailure { onResult(null, it.message ?: "Couldn't check the code. Try again when you're connected.") }
+        }
+    }
+
+    // -- notifications ------------------------------------------------------------------------
+
+    private val readNotifications = MutableStateFlow(preferences.getStringSet("readNotifications", emptySet())!!.toSet())
+    private val lastBackup = MutableStateFlow(preferences.getLong("lastBackupAt", 0L) to preferences.getInt("lastBackupPacks", 0))
+
+    /**
+     * What the app has to tell you, worked out from what is actually true: a pack left part
+     * packed, the last completed backup, Pack Plus switching on. Nothing seeded or made up.
+     */
+    val notifications: StateFlow<List<com.packabunch.ui.screens.AppNotification>> by lazy {
+        kotlinx.coroutines.flow.combine(repository.projects, _settings, lastBackup, readNotifications) { projects, settings, backup, read ->
+            buildList {
+                for (p in projects) {
+                    val total = p.plan?.placements?.size ?: 0
+                    val packed = p.packedInstanceIds.size
+                    if (total == 0 || packed == 0 || packed >= total) continue
+                    val name = p.name.ifBlank { "pack" }
+                    val how = if (packed * 2 in total - 1..total + 1) "half packed" else "$packed of $total packed"
+                    add(com.packabunch.ui.screens.AppNotification(
+                        id = "progress-${p.id}-$packed",
+                        icon = com.packabunch.ui.components.PackIcons.Clock,
+                        title = "The ${name.lowercase()} is $how",
+                        body = "You stopped at step ${packed + 1} of $total. ${total - packed} ${if (total - packed == 1) "piece" else "pieces"} still to go in.",
+                        whenText = whenText(p.updatedAtMillis), unread = false,
+                        tint = com.packabunch.ui.theme.Caution, tile = com.packabunch.ui.theme.CautionTint, atMillis = p.updatedAtMillis,
+                    ))
+                }
+                if (backup.first > 0) add(com.packabunch.ui.screens.AppNotification(
+                    id = "backup-${backup.first}",
+                    icon = com.packabunch.ui.components.PackIcons.Download,
+                    title = "Backup finished",
+                    body = "${backup.second} ${if (backup.second == 1) "pack is" else "packs are"} safe in your account.",
+                    whenText = whenText(backup.first), unread = false,
+                    tint = com.packabunch.ui.theme.Success, tile = com.packabunch.ui.theme.SuccessTint, atMillis = backup.first,
+                ))
+                if (settings.tier == Tier.PLUS) {
+                    val until = promoPlusUntil
+                    add(com.packabunch.ui.screens.AppNotification(
+                        id = "plus-${until?.toEpochMilli() ?: "store"}",
+                        icon = com.packabunch.ui.components.PackIcons.Cube,
+                        title = "Pack Plus is on",
+                        body = if (until != null) "From a promo code, until ${java.time.format.DateTimeFormatter.ofPattern("d MMMM").format(until.atZone(java.time.ZoneId.systemDefault()))}."
+                        else "Billed by Google Play. Manage it there any time.",
+                        whenText = whenText(preferences.getLong("plusSeenAt", System.currentTimeMillis())), unread = false,
+                        atMillis = preferences.getLong("plusSeenAt", 0L),
+                    ))
+                }
+            }.map { it.copy(unread = it.id !in read) }.sortedByDescending { it.atMillis }
+        }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
+    }
+
+    fun markNotificationsRead() {
+        val all = readNotifications.value + notifications.value.map { it.id }
+        preferences.edit().putStringSet("readNotifications", all).apply()
+        readNotifications.value = all
+    }
+
+    private fun whenText(millis: Long): String {
+        val zone = java.time.ZoneId.systemDefault()
+        val at = java.time.Instant.ofEpochMilli(millis).atZone(zone)
+        val days = java.time.temporal.ChronoUnit.DAYS.between(at.toLocalDate(), java.time.LocalDate.now(zone))
+        val time = java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(at)
+        return when (days) {
+            0L -> "Today, $time"
+            1L -> "Yesterday, $time"
+            else -> java.time.format.DateTimeFormatter.ofPattern("d MMMM").format(at)
+        }
+    }
+
     /** Set once this phone is being cleared for an account deletion; no sync runs after it. */
     private var syncStopped = false
 
@@ -149,6 +237,13 @@ class AppViewModel(
         pendingSync = viewModelScope.launch {
             kotlinx.coroutines.delay(afterMillis)
             sync.sync()
+            // A completed backup is worth telling about, once each time it happens.
+            if (sync.state.value.backedUp) {
+                val now = System.currentTimeMillis()
+                val count = projects.value.count { it.id != "sample" }
+                preferences.edit().putLong("lastBackupAt", now).putInt("lastBackupPacks", count).apply()
+                lastBackup.value = now to count
+            }
             // Whether it worked or not, the packs have had their chance to turn up.
             _firstSyncDone.value = true
         }
@@ -236,7 +331,9 @@ class AppViewModel(
             if (runCatching { account?.cancelPendingDeletion() }.getOrNull() == true) {
                 _accountNotice.value = "Welcome back. Your account is no longer being deleted — everything is still here."
             }
-            com.packabunch.billing.Billing.identify(userId) { active -> setTier(if (active) Tier.PLUS else Tier.FREE) }
+            promoPlusUntil = runCatching { account?.promoPlusUntil() }.getOrNull()
+            refreshTier()
+            com.packabunch.billing.Billing.identify(userId) { active -> storePlus = active; refreshTier() }
             _plans.value = com.packabunch.billing.Billing.plans()
         }
     }

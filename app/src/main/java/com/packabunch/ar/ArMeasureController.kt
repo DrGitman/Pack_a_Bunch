@@ -115,7 +115,7 @@ class ArMeasureController(private val context: Context) : GLSurfaceView.Renderer
             if (session == null) {
                 session = Session(context).apply {
                     configure(
-                        Config(this).also { config = it }.apply {
+                        Config(this).also { this@ArMeasureController.config = it }.apply {
                             // Latest image, so a tap lines up with what is on screen.
                             updateMode = Config.UpdateMode.LATEST_CAMERA_IMAGE
                             planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL

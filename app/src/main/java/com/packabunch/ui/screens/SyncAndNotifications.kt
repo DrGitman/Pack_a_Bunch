@@ -229,6 +229,11 @@ data class AppNotification(
     val body: String,
     val whenText: String,
     val unread: Boolean,
+    /** The icon's colour and its tile's; the brand's by default. */
+    val tint: Color = Primary,
+    val tile: Color = BrandTint,
+    /** When it happened, for ordering. */
+    val atMillis: Long = 0L,
 )
 
 /**
@@ -337,22 +342,25 @@ fun NotificationsScreen(
 
 @Composable
 private fun NotificationRow(notification: AppNotification, onClick: () -> Unit) {
+    // `Notifications`: white cards; new ones carry a dot at the left edge, earlier ones sit
+    // back a little on a softer white.
     val shape = RoundedCornerShape(20.dp)
     Row(
         Modifier
             .fillMaxWidth()
             .pressScale(pressedScale = 0.97f)
-            .background(if (notification.unread) BrandTint else Color.White, shape)
+            .background(if (notification.unread) Color.White else Color.White.copy(alpha = 0.6f), shape)
             .clip(shape).clickable(onClick = onClick)
-            .padding(14.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+            .padding(start = 8.dp, end = 14.dp, top = 14.dp, bottom = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(
-            notification.icon,
-            contentDescription = null,
-            tint = Primary,
-            modifier = Modifier.size(20.dp),
-        )
+        Box(Modifier.padding(top = 16.dp).size(6.dp).background(if (notification.unread) Primary else Color.Transparent, androidx.compose.foundation.shape.CircleShape))
+        Box(
+            Modifier.size(40.dp).background(notification.tile, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(notification.icon, contentDescription = null, tint = notification.tint, modifier = Modifier.size(19.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(
                 text = notification.title,

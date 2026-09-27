@@ -242,6 +242,7 @@ fun PackNavHost(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var notice by remember { mutableStateOf<String?>(null) }
+    var promoOpen by remember { mutableStateOf(false) }
     // A deletion stopped by signing in again is said once, as a notice.
     val accountNotice by viewModel.accountNotice.collectAsStateWithLifecycle()
     androidx.compose.runtime.LaunchedEffect(accountNotice) {
@@ -395,14 +396,32 @@ fun PackNavHost(
         }
 
         composable(Routes.NOTIFICATIONS) {
-            NotificationsScreen(
-                // Empty until something has actually happened. No seeded fake messages.
-                notifications = emptyList(),
-                onMarkAllRead = {},
-                onOpen = {},
-                onChooseWhatShows = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
-                onBack = { navController.popBackStack() },
-            )
+            WithNavBar(
+                here = com.packabunch.ui.components.NavSlots.Notifications,
+                onProjects = ::home,
+                onSettings = { navController.navigate(Routes.SETTINGS) { launchSingleTop = true } },
+                onNewPack = { newPack() },
+            ) { pageModifier ->
+                val notifications by viewModel.notifications.collectAsStateWithLifecycle()
+                NotificationsScreen(
+                    modifier = pageModifier,
+                    // Worked out from what is true of this account; nothing seeded.
+                    notifications = notifications,
+                    onMarkAllRead = viewModel::markNotificationsRead,
+                    onOpen = { n ->
+                        when {
+                            n.id.startsWith("progress-") -> {
+                                val packId = n.id.removePrefix("progress-").substringBeforeLast('-')
+                                viewModel.openPack(packId) { viewModel.resumeGuide(); navController.navigate(Routes.PACKING_GUIDE) }
+                            }
+                            n.id.startsWith("plus-") -> navController.navigate(Routes.PLAN_COMPARISON)
+                            else -> Unit
+                        }
+                    },
+                    onChooseWhatShows = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
         }
 
         composable(Routes.SIGN_IN) {
@@ -548,7 +567,10 @@ fun PackNavHost(
             val sync by viewModel.syncState.collectAsStateWithLifecycle()
             // Read once per arrival: greet after a sign in, stay quiet on every later visit.
             val greet = remember { com.packabunch.auth.JustSignedIn.consume() }
+            val notificationList by viewModel.notifications.collectAsStateWithLifecycle()
             ProjectsScreen(
+                onNotifications = { navController.navigate(Routes.NOTIFICATIONS) },
+                unreadNotifications = notificationList.count { it.unread },
                 greet = greet,
                 deleted = deletedForUndo,
                 refreshing = sync.running,
@@ -1171,7 +1193,45 @@ fun PackNavHost(
                 onPrivacy = { navController.navigate(Routes.PRIVACY) },
                 onCompare = { navController.navigate(Routes.PLAN_COMPARISON) },
                 onBack = { navController.popBackStack() },
+                onHaveCode = { promoOpen = true },
             )
+            if (promoOpen) {
+                var code by remember { mutableStateOf("") }
+                var checking by remember { mutableStateOf(false) }
+                var problem by remember { mutableStateOf<String?>(null) }
+                androidx.compose.material3.AlertDialog(
+                    onDismissRequest = { if (!checking) promoOpen = false },
+                    title = { androidx.compose.material3.Text("Promo code") },
+                    text = {
+                        androidx.compose.foundation.layout.Column {
+                            androidx.compose.material3.OutlinedTextField(
+                                value = code, onValueChange = { code = it; problem = null },
+                                singleLine = true, label = { androidx.compose.material3.Text("Code") },
+                            )
+                            problem?.let { androidx.compose.material3.Text(it, color = com.packabunch.ui.theme.ErrorRed) }
+                        }
+                    },
+                    confirmButton = {
+                        androidx.compose.material3.TextButton(enabled = code.isNotBlank() && !checking, onClick = {
+                            checking = true
+                            viewModel.redeemPromo(code.trim()) { until, error ->
+                                checking = false
+                                when {
+                                    error != null -> problem = error
+                                    until == null -> problem = "That code isn't valid, has been used up or has expired."
+                                    else -> {
+                                        promoOpen = false
+                                        notice = "Pack Plus is on until " + java.time.format.DateTimeFormatter.ofPattern("d MMMM yyyy")
+                                            .format(until.atZone(java.time.ZoneId.systemDefault())) + "."
+                                        navController.popBackStack()
+                                    }
+                                }
+                            }
+                        }) { androidx.compose.material3.Text(if (checking) "Checking…" else "Use code") }
+                    },
+                    dismissButton = { androidx.compose.material3.TextButton(onClick = { promoOpen = false }) { androidx.compose.material3.Text("Cancel") } },
+                )
+            }
             // What the purchase did, over the page it was made from.
             outcome?.let { attempt ->
                 val context = androidx.compose.ui.platform.LocalContext.current

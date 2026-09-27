@@ -85,6 +85,8 @@ fun UpgradeScreen(
     onSelect: (Int) -> Unit,
     onSubscribe: () -> Unit,
     onRestore: () -> Unit,
+    /** "Have a promo code?" — for judges and testers; Pack Plus without a Play purchase. */
+    onHaveCode: () -> Unit = {},
     onTerms: () -> Unit,
     onPrivacy: () -> Unit,
     onCompare: () -> Unit = {},
@@ -159,6 +161,9 @@ fun UpgradeScreen(
                 PackTextButton(text = "Terms", onClick = onTerms, color = Primary)
                 Text("·", color = TextTertiary, fontFamily = UiFamily)
                 PackTextButton(text = "Privacy", onClick = onPrivacy, color = Primary)
+            }
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                PackTextButton(text = "Have a promo code?", onClick = onHaveCode, color = TextSecondary)
             }
         }
     }

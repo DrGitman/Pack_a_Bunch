@@ -74,6 +74,20 @@ class SupabaseAccount(context: Context) {
         request("/rest/v1/rpc/request_account_deletion", JSONObject(), accessTokenNow()).optString("deletes_at").ifBlank { null }
     }
 
+    /** Redeems a Pack Plus promo code. Returns when Plus now runs until, or null if the code was refused. */
+    suspend fun redeemPromo(code: String): java.time.Instant? = mutex.withLock {
+        check(configured) { "Account service is not configured." }
+        val r = request("/rest/v1/rpc/redeem_promo_code", JSONObject().put("p_code", code), accessTokenNow())
+        if (!r.optBoolean("ok")) null else runCatching { java.time.OffsetDateTime.parse(r.getString("until")).toInstant() }.getOrNull()
+    }
+
+    /** Until when a promo code has switched Pack Plus on for this account, or null. */
+    suspend fun promoPlusUntil(): java.time.Instant? = mutex.withLock {
+        if (!configured || session == null) return@withLock null
+        val r = request("/rest/v1/rpc/my_plus_grant", JSONObject(), accessTokenNow())
+        r.optString("until").takeIf { it.isNotBlank() && it != "null" }?.let { runCatching { java.time.OffsetDateTime.parse(it).toInstant() }.getOrNull() }
+    }
+
     /** Stops a deletion this account asked for, if there is one. True when there was. */
     suspend fun cancelPendingDeletion(): Boolean = mutex.withLock {
         if (!configured || session == null) return@withLock false
