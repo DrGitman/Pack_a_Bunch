@@ -1,7 +1,7 @@
 [versions]
 # Pinned deliberately. AGP 9.x is stable but is a major DSL shift; 8.13.2 is the last
 # 8.x stable and supports compileSdk 36, which Play requires for new submissions.
-agp = "8.13.2"
+agp = "9.4.1"
 kotlin = "2.2.20"
 ksp = "2.2.20-2.0.4"
 
