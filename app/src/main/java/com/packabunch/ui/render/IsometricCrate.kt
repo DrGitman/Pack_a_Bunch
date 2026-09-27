@@ -163,8 +163,9 @@ fun IsometricCrate(
 
         if (scannedSurface == null) drawCrateShell(view, front = true, seeThrough = seeThrough)
         // A scan used to be drawn only behind the load, so "solid" never hid anything in a car
-        // boot. Its near side and roof now go over the items, the same as a crate's near walls.
-        else if (!seeThrough) drawSurface(view, scannedSurface.filter { view.isNearSide(it) }, CrateBackLeft, 1f)
+        // boot. Its near walls now go over the items, the same as a crate's. Only walls: the
+        // space stays open from above in both modes, so the load can always be seen from there.
+        else if (!seeThrough) drawSurface(view, scannedSurface.filter { it.side < 4 && view.isNearSide(it) }, CrateBackLeft, 1f)
     }
     }
 }
@@ -278,10 +279,8 @@ private fun DrawScope.quadOutline(a: Offset, b: Offset, c: Offset, d: Offset, co
  * of one.
  */
 private fun DrawScope.drawCrateShell(view: CrateView, front: Boolean, seeThrough: Boolean) {
-    // The open top is left off while see-through is on, so the load shows. Solid closes it:
-    // with only the walls opaque you still looked straight in over them, which read as
-    // see-through whichever way the toggle was set.
-    val faces = cuboidFaces(0f, view.widthMm, 0f, view.depthMm, 0f, view.heightMm).filter { it.side != 5 || !seeThrough }
+    // The top is always open, in both modes: solid makes the walls and floor opaque, never a lid.
+    val faces = cuboidFaces(0f, view.widthMm, 0f, view.depthMm, 0f, view.heightMm).filter { it.side != 5 }
     faces.filter { face -> view.isNearSide(face) == front }
         .sortedBy { face -> face.points.sumOf { view.depth(it.x,it.y,it.z).toDouble() } }
         .forEach { face ->
