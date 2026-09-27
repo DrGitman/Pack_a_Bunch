@@ -162,6 +162,9 @@ fun IsometricCrate(
         }
 
         if (scannedSurface == null) drawCrateShell(view, front = true, seeThrough = seeThrough)
+        // A scan used to be drawn only behind the load, so "solid" never hid anything in a car
+        // boot. Its near side and roof now go over the items, the same as a crate's near walls.
+        else if (!seeThrough) drawSurface(view, scannedSurface.filter { view.isNearSide(it) }, CrateBackLeft, 1f)
     }
     }
 }
@@ -243,6 +246,10 @@ internal class CrateView(val space: Space, canvas: Size, val yaw: Float, val cam
     fun depthKey(box: Box) = depth((box.minXMm + box.maxXMm) / 2f,
         (box.minYMm + box.maxYMm) / 2f, (box.minZMm + box.maxZMm) / 2f)
 
+    /** True for a face on the half of the space nearer the viewer: the part that hides the load. */
+    fun isNearSide(face: SurfaceFace): Boolean =
+        face.points.map { depth(it.x, it.y, it.z) }.average() > depth(w / 2f, d / 2f, h / 2f)
+
     val floorZ: Float get() = 0f
     val widthMm: Float get() = w
     val depthMm: Float get() = d
@@ -271,9 +278,11 @@ private fun DrawScope.quadOutline(a: Offset, b: Offset, c: Offset, d: Offset, co
  * of one.
  */
 private fun DrawScope.drawCrateShell(view: CrateView, front: Boolean, seeThrough: Boolean) {
-    val faces = cuboidFaces(0f, view.widthMm, 0f, view.depthMm, 0f, view.heightMm).filter { it.side != 5 }
-    val centreDepth = view.depth(view.widthMm / 2f, view.depthMm / 2f, view.heightMm / 2f)
-    faces.filter { face -> (face.points.map { view.depth(it.x, it.y, it.z) }.average() > centreDepth) == front }
+    // The open top is left off while see-through is on, so the load shows. Solid closes it:
+    // with only the walls opaque you still looked straight in over them, which read as
+    // see-through whichever way the toggle was set.
+    val faces = cuboidFaces(0f, view.widthMm, 0f, view.depthMm, 0f, view.heightMm).filter { it.side != 5 || !seeThrough }
+    faces.filter { face -> view.isNearSide(face) == front }
         .sortedBy { face -> face.points.sumOf { view.depth(it.x,it.y,it.z).toDouble() } }
         .forEach { face ->
             val p = face.points.map { view.project(it.x,it.y,it.z) }
