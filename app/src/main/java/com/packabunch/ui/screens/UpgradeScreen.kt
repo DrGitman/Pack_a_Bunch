@@ -1,39 +1,57 @@
 package com.packabunch.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.packabunch.billing.PlanOffer
 import com.packabunch.packing.TierLimits
 import com.packabunch.ui.components.Note
 import com.packabunch.ui.components.NoteTone
-import com.packabunch.ui.components.PackAppBar
 import com.packabunch.ui.components.PackIcons
 import com.packabunch.ui.components.PackTextButton
 import com.packabunch.ui.components.PrimaryButton
-import com.packabunch.ui.components.ScreenScaffold
+import com.packabunch.ui.components.SelectableChip
+import com.packabunch.ui.motion.Motion
 import com.packabunch.ui.theme.BrandTint
+import com.packabunch.ui.theme.Chrome
+import com.packabunch.ui.theme.HeroBody
+import com.packabunch.ui.theme.HeroEyebrow
 import com.packabunch.ui.theme.NumeralLarge
 import com.packabunch.ui.theme.Primary
+import com.packabunch.ui.theme.PrimaryDark
 import com.packabunch.ui.theme.Spacing
 import com.packabunch.ui.theme.TextPrimary
 import com.packabunch.ui.theme.TextSecondary
@@ -41,25 +59,28 @@ import com.packabunch.ui.theme.TextTertiary
 import com.packabunch.ui.theme.UiFamily
 
 /**
- * Pack a Bunch Pro — `design/artboards/Upgrade.dc.html`.
+ * Pack Plus — the `Pack Plus` frame: a dark card that says what it is, three things it adds,
+ * the price with its renewal, and one button.
  *
  * Rules this screen follows, all of which are easy to break and expensive to break:
  *
  *  - **Shown only after a result.** Never on launch, never before a plan has been delivered.
- *  - **The price, the period and the renewal terms are together**, not split up so the
- *    period is easy to miss.
- *  - **Nothing is sold that does not exist yet.** No cloud sync, no "AI optimisation", no
- *    unlimited precision. Each line here maps to a real field on [TierLimits].
- *  - **Every price comes from Google Play**, localised, and this screen renders whatever it
- *    is given. A hardcoded price is wrong for almost everybody who sees it, so when billing
- *    has not loaded the purchase button is disabled rather than showing a guess.
- *  - **Each plan says how often it renews and what a trial turns into**, on the plan itself
- *    and again beside the button. A cheap weekly plan earns its keep only if nobody feels
- *    tricked by the second charge.
+ *  - **The price, the period and the renewal terms are together**, in one card, so the period
+ *    cannot be missed.
+ *  - **Nothing is sold that does not exist yet.** Each line maps to a real field on [TierLimits].
+ *  - **Every price comes from Google Play.** Play charges each country its own price, in its
+ *    own currency, from the one base price set in the Play Console — so someone in Namibia
+ *    sees N$ and someone in Germany sees €, and both are the same amount once converted. The
+ *    app never works out where anyone is: the Play account already knows, and the price it
+ *    returns is the price charged. A hardcoded price would be wrong for almost everybody, so
+ *    when billing has not loaded the button is disabled rather than showing a guess.
+ *  - **Each plan says how often it renews and what a trial turns into**, in the price card
+ *    beside the button. A cheap weekly plan earns its keep only if nobody feels tricked by the
+ *    second charge.
  */
 @Composable
 fun UpgradeScreen(
-    plans: List<com.packabunch.billing.PlanOffer>,
+    plans: List<PlanOffer>,
     selected: Int,
     onSelect: (Int) -> Unit,
     onSubscribe: () -> Unit,
@@ -71,120 +92,53 @@ fun UpgradeScreen(
     modifier: Modifier = Modifier,
 ) {
     ArtboardPage(modifier) {
-        PackAppBar(title = "", onBack = onBack)
-
-        Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            Text(
-                text = "PACK-A-BUNCH PRO",
-                color = Primary,
-                fontFamily = UiFamily,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 12.5f.sp,
-                letterSpacing = 1.2.sp,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = "Keep every pack you plan",
-                color = TextPrimary,
-                fontFamily = UiFamily,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 29.sp,
-                lineHeight = 36.sp,
-                letterSpacing = (-0.9).sp,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = "For people who pack more than once.",
-                color = TextSecondary,
-                fontFamily = UiFamily,
-                fontSize = 15.sp,
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.xl))
-
         Column(
-            Modifier.padding(horizontal = Spacing.gutter),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .padding(horizontal = Spacing.gutter)
+                .padding(top = 8.dp),
         ) {
-            Benefit(
-                icon = PackIcons.Projects,
-                title = "As many saved packs as you like",
-                detail = "Free keeps ${TierLimits.FREE.maxSavedPacks}.",
-            )
-            Benefit(
-                icon = PackIcons.Cube,
-                title = "As many pieces as the planner can search",
-                detail = "Free stops at ${TierLimits.FREE.maxPiecesPerPack} pieces a pack.",
-            )
-            Benefit(
-                icon = PackIcons.Camera,
-                title = "Scan a space of any size",
-                detail = "Free scans up to ${TierLimits.FREE.maxScannedSpaceLitres} litres " +
-                    "a crate, but not a car boot.",
-            )
-            Benefit(
-                icon = PackIcons.Rotate,
-                title = "Scan as often as you need",
-                detail = "Free allows ${TierLimits.FREE.maxScansPerDay} scans a day.",
-            )
-            Benefit(
-                icon = PackIcons.Library,
-                title = "Reuse items across packs",
-                detail = "Measure a thing once, use it anywhere.",
-            )
-        }
-
-        PushDown()
-
-        Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            val chosen = plans.getOrNull(selected)
+            Hero()
+            Spacer(Modifier.height(10.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                plans.forEachIndexed { index, plan ->
-                    PlanCard(plan = plan, selected = index == selected, onClick = { onSelect(index) })
-                }
+                val saved = TierLimits.FREE.maxSavedPacks
+                Benefit(PackIcons.Projects, "As many saved packs as you like", "Free keeps ${if (saved == 1) "one" else saved.toString()}.")
+                Benefit(PackIcons.Copy, "Reuse items across packs", "Measure a thing once, use it anywhere.")
+                Benefit(PackIcons.Cube, "New kinds of space as they land", "Only once they're tested and shipped.")
             }
-            Spacer(Modifier.height(12.dp))
 
-            val purchaseEnabled = chosen != null
-            if (!purchaseEnabled) {
-                // Products unavailable means no purchase, not a fake success. A beta that
-                // cannot sell is fine; one that pretends to have sold is not.
+            Spacer(Modifier.height(14.dp))
+            val chosen = plans.getOrNull(selected)
+            // Weekly, monthly and yearly, whichever Google Play offers here.
+            if (plans.size > 1) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    plans.forEachIndexed { index, plan ->
+                        SelectableChip(text = plan.kind.title, selected = index == selected, onClick = { onSelect(index) })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+            if (chosen != null) {
+                PriceCard(chosen)
+            } else {
+                // Products unavailable means no purchase, not a fake success.
                 Note(
                     text = "Subscriptions aren't available right now. Nothing has been charged.",
                     tone = NoteTone.Caution,
                     icon = PackIcons.Warning,
                 )
-                Spacer(Modifier.height(10.dp))
             }
+        }
 
+        PushDown()
+
+        Column(Modifier.padding(horizontal = Spacing.gutter)) {
             PrimaryButton(
-                text = if (chosen?.trial != null) "Start free trial" else "Subscribe",
+                text = if (chosen(plans, selected)?.trial != null) "Start free trial" else "Subscribe",
                 onClick = onSubscribe,
-                enabled = purchaseEnabled,
+                enabled = chosen(plans, selected) != null,
             )
-
-            Spacer(Modifier.height(8.dp))
-
-            // The selected plan's whole deal, next to the button that commits to it.
-            if (chosen != null) {
-                Text(
-                    text = listOfNotNull(
-                        chosen.trial?.let { "$it." },
-                        chosen.renewal,
-                        "Billed through Google Play; cancel there any time" +
-                            if (chosen.trial != null) ", and before the trial ends to pay nothing." else ".",
-                    ).joinToString(" "),
-                    color = Color(0xFF7C4223),
-                    fontFamily = UiFamily,
-                    fontSize = 12.5f.sp,
-                    lineHeight = 18.sp,
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(6.dp))
-            }
-
+            Spacer(Modifier.height(10.dp))
             Text(
                 text = "Free keeps ${TierLimits.FREE.maxSavedPacks} pack, up to " +
                     "${TierLimits.FREE.maxPiecesPerPack} pieces, and the whole packing guide.",
@@ -192,101 +146,156 @@ fun UpgradeScreen(
                 fontFamily = UiFamily,
                 fontSize = 12.5f.sp,
                 lineHeight = 18.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
             )
-
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                PackTextButton(text = "Compare the two plans", onClick = onCompare)
-            }
-
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                PackTextButton(text = "Restore purchases", onClick = onRestore)
+                PackTextButton(text = "Restore purchases", onClick = onRestore, color = Primary)
                 Text("·", color = TextTertiary, fontFamily = UiFamily)
-                PackTextButton(text = "Terms", onClick = onTerms)
+                PackTextButton(text = "Terms", onClick = onTerms, color = Primary)
                 Text("·", color = TextTertiary, fontFamily = UiFamily)
-                PackTextButton(text = "Privacy", onClick = onPrivacy)
+                PackTextButton(text = "Privacy", onClick = onPrivacy, color = Primary)
             }
         }
-
-        Spacer(Modifier.height(Spacing.sm))
     }
 }
 
-/**
- * One plan to choose. The price is the plan's own; the per-month line is only there so a
- * weekly and a monthly plan can be compared, never in place of the price actually charged.
- */
+private fun chosen(plans: List<PlanOffer>, selected: Int) = plans.getOrNull(selected)
+
+/** The dark card at the top: the name, the promise, and the crate with one thing packed. */
 @Composable
-private fun PlanCard(plan: com.packabunch.billing.PlanOffer, selected: Boolean, onClick: () -> Unit) {
-    Column(
+private fun Hero() {
+    Box(
         Modifier
             .fillMaxWidth()
-            .background(if (selected) BrandTint else Color.White, RoundedCornerShape(18.dp))
-            .border(
-                if (selected) 2.dp else 1.dp,
-                if (selected) Primary else Color(0xFFE6D9CB),
-                RoundedCornerShape(18.dp),
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .background(Brush.linearGradient(listOf(Color(0xFF4A2E1F), Chrome)), RoundedCornerShape(24.dp))
+            .padding(start = 18.dp, end = 12.dp, top = 16.dp, bottom = 18.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(end = 92.dp)) {
+            Row(
+                Modifier
+                    .background(Color(0x33E8A76B), RoundedCornerShape(999.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Canvas(Modifier.size(11.dp)) {
+                    // The little hexagon mark beside the name.
+                    val r = size.minDimension / 2; val c = Offset(size.width / 2, size.height / 2)
+                    val hex = Path().apply {
+                        for (i in 0..5) {
+                            val a = Math.toRadians(60.0 * i - 90).toFloat()
+                            val p = Offset(c.x + r * kotlin.math.cos(a), c.y + r * kotlin.math.sin(a))
+                            if (i == 0) moveTo(p.x, p.y) else lineTo(p.x, p.y)
+                        }
+                        close()
+                    }
+                    drawPath(hex, HeroEyebrow, style = Stroke(1.4.dp.toPx()))
+                }
+                Text("PACK PLUS", color = HeroEyebrow, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 10.5f.sp, letterSpacing = 0.8.sp)
+            }
+            Spacer(Modifier.height(12.dp))
             Text(
-                text = plan.kind.title,
-                color = TextPrimary,
+                "Keep every pack you plan",
+                color = Color.White,
                 fontFamily = UiFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                modifier = Modifier.weight(1f),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 27.sp,
+                lineHeight = 31.sp,
+                letterSpacing = (-0.8).sp,
             )
-            Text(text = plan.price, style = NumeralLarge.copy(fontSize = 19.sp), color = TextPrimary)
-            Spacer(Modifier.size(5.dp))
-            Text(text = plan.kind.per, color = TextSecondary, fontFamily = UiFamily, fontSize = 13.sp)
+            Spacer(Modifier.height(8.dp))
+            Text("For people who pack more than once.", color = HeroBody, fontFamily = UiFamily, fontSize = 14.sp, lineHeight = 19.sp)
         }
-        val details = listOfNotNull(plan.trial, plan.perMonth, plan.renewal)
-        Text(
-            text = details.joinToString(" · "),
-            color = TextTertiary,
-            fontFamily = UiFamily,
-            fontSize = 12.sp,
-            lineHeight = 17.sp,
-            modifier = Modifier.padding(top = 3.dp),
-        )
+        HeroCrate(Modifier.align(Alignment.BottomEnd).size(width = 88.dp, height = 64.dp))
+    }
+}
+
+/** An open crate seen from above at an angle, with one orange box in it. */
+@Composable
+private fun HeroCrate(modifier: Modifier) {
+    Canvas(modifier) {
+        val w = size.width; val h = size.height
+        fun p(x: Float, y: Float) = Offset(w * x, h * y)
+        fun quad(a: Offset, b: Offset, c: Offset, d: Offset) = Path().apply { moveTo(a.x, a.y); lineTo(b.x, b.y); lineTo(c.x, c.y); lineTo(d.x, d.y); close() }
+        // Crate: rim, then the two outer walls.
+        val rimBack = p(0.5f, 0.12f); val rimRight = p(0.98f, 0.36f); val rimFront = p(0.5f, 0.6f); val rimLeft = p(0.02f, 0.36f)
+        drawPath(quad(rimBack, rimRight, rimFront, rimLeft), Color(0xFF5A3825))
+        drawPath(quad(rimLeft, rimFront, p(0.5f, 0.98f), p(0.02f, 0.74f)), Color(0xFF3A2317))
+        drawPath(quad(rimFront, rimRight, p(0.98f, 0.74f), p(0.5f, 0.98f)), Color(0xFF301D12))
+        drawPath(quad(rimBack, rimRight, rimFront, rimLeft), Color(0x33FFFFFF), style = Stroke(1.dp.toPx()))
+        // The packed box, standing in the crate.
+        val t0 = p(0.34f, 0.16f); val t1 = p(0.58f, 0.28f); val t2 = p(0.42f, 0.4f); val t3 = p(0.18f, 0.28f)
+        drawPath(quad(t0, t1, t2, t3), Color(0xFFF0A160))
+        drawPath(quad(t3, t2, p(0.42f, 0.58f), p(0.18f, 0.46f)), Color(0xFFD9803E))
+        drawPath(quad(t2, t1, p(0.58f, 0.46f), p(0.42f, 0.58f)), Color(0xFFB9652C))
     }
 }
 
 @Composable
 private fun Benefit(icon: ImageVector, title: String, detail: String) {
-    Row(horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-        Box(
-            Modifier
-                .size(40.dp)
-                .background(BrandTint, RoundedCornerShape(14.dp)),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(18.dp))
+            .padding(horizontal = 12.dp, vertical = 11.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(34.dp).background(BrandTint, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, tint = Primary, modifier = Modifier.size(17.dp))
         }
         Column {
+            Text(title, color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 14.5f.sp)
+            Text(detail, color = TextTertiary, fontFamily = UiFamily, fontSize = 12.5f.sp, lineHeight = 17.sp)
+        }
+    }
+}
+
+/**
+ * The chosen plan's whole deal in one place: Google Play's price as given, how often it is
+ * charged, what a trial turns into, and where to cancel.
+ */
+@Composable
+private fun PriceCard(plan: PlanOffer) {
+    AnimatedContent(
+        targetState = plan,
+        transitionSpec = { fadeIn(tween(Motion.SHORT_MS)) togetherWith fadeOut(tween(Motion.SHORT_MS)) },
+        label = "planPrice",
+    ) { p ->
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(20.dp))
+                .border(1.5.dp, Primary, RoundedCornerShape(20.dp))
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(p.price, style = NumeralLarge.copy(fontSize = 26.sp, fontWeight = FontWeight.ExtraBold), color = TextPrimary)
+                Spacer(Modifier.size(6.dp))
+                Text(p.kind.per, color = TextSecondary, fontFamily = UiFamily, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
+            }
+            Spacer(Modifier.height(6.dp))
             Text(
-                text = title,
-                color = TextPrimary,
-                fontFamily = UiFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-            )
-            Text(
-                text = detail,
-                color = TextTertiary,
+                text = listOfNotNull(
+                    p.trial?.let { "$it." },
+                    p.renewal,
+                    "Billed through Google Play; cancel there any time" + if (p.trial != null) ", and before the trial ends to pay nothing." else ".",
+                    "Price shown in your local currency at checkout.",
+                ).joinToString(" "),
+                color = TextSecondary,
                 fontFamily = UiFamily,
                 fontSize = 12.5f.sp,
                 lineHeight = 18.sp,
-                modifier = Modifier.padding(top = 2.dp),
             )
+            p.perMonth?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, color = PrimaryDark, fontFamily = UiFamily, fontWeight = FontWeight.SemiBold, fontSize = 12.5f.sp)
+            }
         }
     }
 }

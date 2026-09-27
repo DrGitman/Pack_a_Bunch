@@ -102,6 +102,14 @@ that ceiling applies to everyone — it must never be left out when describing P
 Tier limits live in `TierLimits`, deliberately outside the solver: the engine produces the
 same arrangement whatever anyone paid, and there is a test asserting it.
 
+**Prices by country.** Pack Plus is sold weekly and monthly (and yearly, if one is set up), and
+the app never states a price of its own: it shows the one Google Play returns for the buyer's
+Play account, in their currency — N$ in Namibia, € in Germany. Set each subscription's base
+price once in the Play Console (Monetize → Subscriptions → the plan → Set prices) and let Play
+convert it for every other country at current rates, so the prices differ on screen but are
+the same once converted. No location permission is needed; Play already knows the country.
+The offering itself (which of weekly, monthly and yearly exist) is set in RevenueCat.
+
 ## Getting started
 
 ```bash
@@ -120,6 +128,24 @@ Configuration lives in `local.properties`, which is never committed. See
 `local.properties.example` for the keys: the Supabase URL and publishable key, the Google
 web client id, and the RevenueCat key. A `test_` RevenueCat key works only in debug builds;
 RevenueCat shuts the app down if one reaches a release build.
+
+### The database
+
+Every file in `supabase/migrations/` is run once, in name order, in the Supabase SQL editor
+(Dashboard → SQL Editor → New query → paste the file → Run). A file that says a table or
+constraint "already exists" has been run before; skip it. Never run `supabase/tests/` there —
+those are for a throwaway local database only.
+
+Three dashboard settings go with the migrations:
+
+- **Authentication → Hooks → Before User Created** → `hook_block_disposable_email`
+  (from `202609270003`), so throwaway inboxes cannot sign up.
+- **Integrations → Cron** switched on *before* running `202609270004_account_deletion_grace.sql`,
+  so the nightly sweep that deletes accounts 30 days after they asked is scheduled. If Cron
+  was off when it ran, switch it on and run the last block of that file again.
+- **Authentication → URL Configuration → Redirect URLs** → add `packabunch://reset-password`.
+  The password-reset email sends people back into the app with it; without it the link opens
+  the Site URL instead and the reset cannot be finished on the phone.
 
 ### Running it on your phone from VS Code (Windows PowerShell)
 
@@ -165,8 +191,9 @@ If something goes wrong:
 
 - **A privacy policy and terms at a public URL.** Both exist in the app
   (`ui/screens/LegalScreens.kt`) but Play needs a web address as well.
-- **Account deletion.** Play requires it in-app and on the web; deleting the account row
-  needs a Supabase edge function.
+- **Account deletion.** In the app it is done: the account is deleted 30 days after it is
+  asked for, and signing in again within them stops it. Play also wants a web page where
+  someone without the app can ask for the same.
 - **Your own email sender.** Supabase's built-in mail sends about two messages an hour,
   which will not survive real sign-ups. Set SMTP in the Supabase dashboard.
 - **Measurement accuracy.** The tape-measure check needs a phone that supports ARCore

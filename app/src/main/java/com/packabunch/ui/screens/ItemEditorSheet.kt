@@ -2,6 +2,12 @@ package com.packabunch.ui.screens
 
 import com.packabunch.ui.components.swallowTaps
 import androidx.compose.foundation.background
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.draw.clip
 import com.packabunch.ui.motion.pressScale
 import kotlinx.coroutines.launch
@@ -45,7 +51,6 @@ import com.packabunch.ui.components.UnitToggle
 import com.packabunch.ui.format.LengthUnit
 import com.packabunch.ui.format.formatEditableLength as formatLength
 import com.packabunch.ui.format.parseLengthToMm
-import com.packabunch.ui.theme.ItemTints
 import com.packabunch.ui.theme.Primary
 import com.packabunch.ui.theme.Spacing
 import com.packabunch.ui.theme.SurfaceField
@@ -94,19 +99,31 @@ fun ItemEditorSheet(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val itemId = remember(existing) { existing?.id ?: "item-${System.currentTimeMillis()}" }
     var photoPath by remember(itemId) { mutableStateOf(com.packabunch.data.ItemPhotos.pathFor(context, itemId)) }
+    // What the photo shows, once it has been looked at, and whether that is still going on.
+    var photoLabel by remember(itemId) { mutableStateOf<String?>(null) }
+    var readingPhoto by remember(itemId) { mutableStateOf(false) }
     val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
     ) { picked ->
         if (picked != null) scope.launch {
             photoPath = com.packabunch.data.ItemPhotos.store(context, itemId, picked)
+            photoLabel = null
+            readingPhoto = true
+            val label = photoPath?.let { com.packabunch.ui.render.PhotoLabels.of(it) }?.replaceFirstChar { it.uppercase() }
+            readingPhoto = false
+            photoLabel = label
             // An unnamed item takes its name from what the photo shows. A name the person
-            // already typed is never replaced.
-            if (name.isBlank()) photoPath?.let { path ->
-                com.packabunch.ui.render.PhotoLabels.of(path)?.let { label ->
-                    if (name.isBlank()) { name = label.replaceFirstChar { it.uppercase() }; nameSuggested = true }
-                }
-            }
+            // already typed is never replaced; the label is offered beside it instead.
+            if (label != null && name.isBlank()) { name = label; nameSuggested = true }
         }
+    }
+
+    // Swiped down by its handle: follows the finger, and goes if pulled far or flung.
+    val sheetDrag = remember { androidx.compose.animation.core.Animatable(0f) }
+    var sheetHeight by remember { mutableStateOf(0) }
+    val dismissAt = with(androidx.compose.ui.platform.LocalDensity.current) { 110.dp.toPx() }
+    val dragState = androidx.compose.foundation.gestures.rememberDraggableState { delta ->
+        scope.launch { sheetDrag.snapTo((sheetDrag.value + delta).coerceAtLeast(0f)) }
     }
 
     // Set here for this item only. The account's own unit is what the sheet opens in.
@@ -127,6 +144,7 @@ fun ItemEditorSheet(
         Box(
             Modifier
                 .fillMaxSize()
+                .graphicsLayer { alpha = 1f - (sheetDrag.value / sheetHeight.coerceAtLeast(1)).coerceIn(0f, 1f) }
                 .background(Color(0x7A2B1D14))
                 .clickable(indication = null, interactionSource = remember {
                     androidx.compose.foundation.interaction.MutableInteractionSource()
@@ -136,13 +154,29 @@ fun ItemEditorSheet(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
+                .offset { androidx.compose.ui.unit.IntOffset(0, sheetDrag.value.toInt()) }
+                .onSizeChanged { sheetHeight = it.height }
                 .fillMaxWidth()
                 .background(Color.White, RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp))
                 .swallowTaps()
                 .padding(horizontal = Spacing.gutter)
                 .padding(top = 14.dp, bottom = 30.dp),
         ) {
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Column(
+                Modifier.draggable(
+                    state = dragState,
+                    orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                    onDragStopped = { velocity ->
+                        if (sheetDrag.value > dismissAt || velocity > 1800f) {
+                            sheetDrag.animateTo(sheetHeight.toFloat().coerceAtLeast(dismissAt), androidx.compose.animation.core.tween(180))
+                            onDismiss()
+                        } else {
+                            sheetDrag.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.8f))
+                        }
+                    },
+                ),
+            ) {
+            Box(Modifier.fillMaxWidth().height(18.dp), contentAlignment = Alignment.Center) {
                 Box(
                     Modifier
                         .size(width = 40.dp, height = 4.dp)
@@ -150,7 +184,7 @@ fun ItemEditorSheet(
                 )
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(4.dp))
 
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -172,6 +206,7 @@ fun ItemEditorSheet(
                     tint = Color(0xFF5C4A3A),
                 )
             }
+            }
 
             Spacer(Modifier.height(Spacing.base))
 
@@ -179,11 +214,19 @@ fun ItemEditorSheet(
                 Box(
                     modifier = Modifier
                         .size(96.dp)
-                        .background(
-                            ItemTints[nextIndex % ItemTints.size],
-                            RoundedCornerShape(20.dp),
-                        )
-                        .border(1.5.dp, Color(0xFFD3BEA6), RoundedCornerShape(20.dp))
+                        // The `Photo` tile: always the brand's peach with a dashed edge. It used
+                        // to take the item's own colour, which made it green for item two.
+                        .background(PhotoTile, RoundedCornerShape(20.dp))
+                        .drawBehind {
+                            if (photoPath == null) drawRoundRect(
+                                color = PhotoTileEdge,
+                                cornerRadius = androidx.compose.ui.geometry.CornerRadius(20.dp.toPx()),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = 1.5.dp.toPx(),
+                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(5.dp.toPx(), 4.dp.toPx())),
+                                ),
+                            )
+                        }
                         .clip(RoundedCornerShape(20.dp))
                         .pressScale(pressedScale = 0.96f)
                         .clickable {
@@ -213,6 +256,7 @@ fun ItemEditorSheet(
                                 .clickable {
                                     com.packabunch.data.ItemPhotos.remove(photoPath)
                                     photoPath = null
+                                    photoLabel = null
                                 },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -256,38 +300,63 @@ fun ItemEditorSheet(
                         placeholder = "Item ${nextIndex + 1}",
                         focused = true,
                     )
-                    Row(
-                        modifier = Modifier
-                            .background(Color(0xFFF4EDE4), RoundedCornerShape(12.dp))
-                            // "Tap to change": clears the guess so the field is ready to type in.
-                            .clickable(enabled = nameSuggested) { name = ""; nameSuggested = false }
-                            .padding(horizontal = 11.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    ) {
-                        if (nameSuggested) {
-                            // The "Feedback / Suggested label" spinner, played as the guess lands.
-                            com.packabunch.ui.components.LottieTapIcon(
-                                animation = com.packabunch.R.raw.icon_suggestion_spinner,
-                                contentDescription = null,
-                                onClick = null,
-                                size = 15.dp,
-                                playOnAppear = true,
-                            )
-                        } else {
-                            Icon(
-                                PackIcons.Sparkle,
-                                contentDescription = null,
-                                tint = Color(0xFF8A7565),
-                                modifier = Modifier.size(15.dp),
+                    // What the photo told us, or that it cannot tell us the size. Fades from one
+                    // to the next as a photo is added, read and labelled.
+                    val hint = when {
+                        photoPath == null -> NameHint.SizeNote
+                        readingPhoto -> NameHint.Reading
+                        photoLabel == null -> NameHint.SizeNote
+                        nameSuggested -> NameHint.Suggested
+                        name.trim().equals(photoLabel, ignoreCase = true) -> NameHint.SizeNote
+                        else -> NameHint.Offer
+                    }
+                    androidx.compose.animation.AnimatedContent(
+                        targetState = hint,
+                        transitionSpec = {
+                            androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220, delayMillis = 60)) togetherWith
+                                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150))
+                        },
+                        label = "nameHint",
+                    ) { shown ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFFF4EDE4), RoundedCornerShape(12.dp))
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(enabled = shown == NameHint.Suggested || shown == NameHint.Offer) {
+                                    if (shown == NameHint.Suggested) { name = ""; nameSuggested = false }       // tap to change
+                                    else { name = photoLabel.orEmpty(); nameSuggested = true }                // tap to use
+                                }
+                                .padding(horizontal = 11.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            if (shown == NameHint.Reading || shown == NameHint.Suggested) {
+                                // The "Feedback / Suggested label" spinner, played as the guess lands.
+                                com.packabunch.ui.components.LottieTapIcon(
+                                    animation = com.packabunch.R.raw.icon_suggestion_spinner,
+                                    contentDescription = null,
+                                    onClick = null,
+                                    size = 15.dp,
+                                    playOnAppear = true,
+                                )
+                            } else {
+                                Icon(PackIcons.Sparkle, contentDescription = null, tint = Color(0xFF8A7565), modifier = Modifier.size(15.dp))
+                            }
+                            Text(
+                                when (shown) {
+                                    NameHint.SizeNote -> "A photo doesn't set the size"
+                                    NameHint.Reading -> "Looking at the photo…"
+                                    NameHint.Suggested -> "Suggested label — tap to change"
+                                    NameHint.Offer -> "Suggested: ${photoLabel.orEmpty().lowercase()} — tap to use"
+                                },
+                                color = Color(0xFF7C6857),
+                                fontFamily = UiFamily,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             )
                         }
-                        Text(
-                            if (nameSuggested) "Suggested label — tap to change" else "A photo doesn't set the size",
-                            color = Color(0xFF7C6857),
-                            fontFamily = UiFamily,
-                            fontSize = 12.sp,
-                        )
                     }
                 }
             }
@@ -455,3 +524,10 @@ fun ItemEditorSheet(
         }
     }
 }
+
+/** The line under the name: about the size, reading the photo, or what the photo shows. */
+private enum class NameHint { SizeNote, Reading, Suggested, Offer }
+
+/** The `Photo` tile's peach and its dashed edge. */
+private val PhotoTile = Color(0xFFF3DFD2)
+private val PhotoTileEdge = Color(0xFFD9BFA8)

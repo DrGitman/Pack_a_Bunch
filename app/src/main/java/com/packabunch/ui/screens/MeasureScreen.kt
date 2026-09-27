@@ -87,6 +87,8 @@ fun MeasureScreen(
     onTypeInstead: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** The space's own name, for "Lost track of the cake box". */
+    spaceName: String? = null,
 ) {
     val context = LocalContext.current
     val activity = context.findActivity()
@@ -143,6 +145,7 @@ fun MeasureScreen(
 
         support is ArSupport.Ready -> ArMeasureSurface(
             unit = unit,
+            spaceName = spaceName,
             onMeasured = onMeasured,
             onTypeInstead = onTypeInstead,
             onBack = onBack,
@@ -156,6 +159,7 @@ fun MeasureScreen(
 @Composable
 private fun ArMeasureSurface(
     unit: LengthUnit,
+    spaceName: String?,
     onMeasured: (Dimensions, MeasurementSource) -> Unit,
     onTypeInstead: () -> Unit,
     onBack: () -> Unit,
@@ -316,6 +320,27 @@ private fun ArMeasureSurface(
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 PackTextButton(text = "Type it instead", onClick = onTypeInstead)
             }
+        }
+
+        // Lost for more than a moment: say so plainly, keep what is measured, offer both routes.
+        val (lostShowing, dismissLost) = rememberLostTrack(state.status == TrackingStatus.LOST)
+        if (lostShowing) {
+            val edge = state.stage.label.lowercase()
+            LostTrackPopup(
+                // Measured edge by edge, so it is a box-shaped thing: a crate unless it has a name.
+                what = if (spaceName.isNullOrBlank()) "the crate" else spaceNoun(spaceName, standingInside = false),
+                reason = state.failureReason,
+                saved = savedLengths(
+                    com.packabunch.ar.EdgeStage.entries.mapNotNull { e ->
+                        state.measured[e]?.let { e.label to formatLengthWithUnit(it, unit) }
+                    },
+                ),
+                retry = "Try the $edge again",
+                onRetry = { controller.restartCurrentEdge(); dismissLost() },
+                typeInstead = "Type the $edge",
+                onTypeInstead = { dismissLost(); onTypeInstead() },
+                onDismiss = dismissLost,
+            )
         }
     }
 }

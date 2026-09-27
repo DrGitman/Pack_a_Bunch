@@ -127,15 +127,24 @@ fun IsometricCrate(
 
     Column(modifier) {
     if (showControls) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            PackingView.entries.forEach { mode ->
-                com.packabunch.ui.components.SelectableChip(text = mode.label, selected = camera == mode, onClick = { camera = mode; yaw = 0f })
-            }
+        // One even track for the four views, then the see-through switch with what the view
+        // does beside it — two tidy lines instead of chips wrapping into each other.
+        com.packabunch.ui.components.SegmentedChips(
+            options = PackingView.entries.map { it.label },
+            selected = PackingView.entries.indexOf(camera),
+            onSelect = { camera = PackingView.entries[it]; yaw = 0f },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(8.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            com.packabunch.ui.components.ToggleChip(text = "See-through", on = seeThrough, onToggle = { seeThrough = !seeThrough })
+            Spacer(Modifier.weight(1f))
+            Text(
+                if (camera == PackingView.ISOMETRIC) "Drag to turn" else if (camera == PackingView.SIDE) "View from left" else "Nearest items in front",
+                fontSize = 12.sp, color = TextSecondary, fontFamily = com.packabunch.ui.theme.UiFamily,
+            )
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-            com.packabunch.ui.components.SelectableChip(text = "See-through", selected = seeThrough, onClick = { seeThrough = !seeThrough })
-            Text(if (camera == PackingView.ISOMETRIC) "Drag to turn" else if (camera == PackingView.SIDE) "View from left" else "Nearest items in front", fontSize = 11.sp, color = TextSecondary, modifier = Modifier.padding(top = 14.dp))
-        }
+        Spacer(Modifier.height(4.dp))
     }
     Canvas(
         modifier = Modifier.fillMaxWidth().weight(1f).then(

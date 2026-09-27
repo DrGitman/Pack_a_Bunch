@@ -3,7 +3,9 @@ package com.packabunch.ui.screens
 import com.packabunch.ui.motion.pressScale
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -68,19 +70,6 @@ private fun GoogleButton(onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun TrustCard(title: String? = null, rows: List<String>, modifier: Modifier = Modifier) {
-    Column(modifier.fillMaxWidth().background(Surface, RoundedCornerShape(24.dp)).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (title != null) AuthText(title, 14.5f, color = TextPrimary, weight = FontWeight.Bold)
-        rows.forEach { text ->
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Icon(PackIcons.Check, null, Modifier.padding(top = 2.dp).size(19.dp), tint = Success)
-                AuthText(text, 14f, 21, BodyInk, modifier = Modifier.weight(1f))
-            }
-        }
-    }
-}
 
 /** The terms and privacy links, wrapping like a sentence rather than sitting in a card. */
 @Composable
@@ -276,37 +265,105 @@ fun CreateAccountScreen(onCreate: (String, String, Boolean, Boolean) -> Unit, on
     }
 }
 
+/**
+ * Reset password — the `Reset password` frame. One field, one button, and what to do when
+ * nothing arrives. After sending, it says so and offers to send again once a minute has passed
+ * (Supabase sends at most one reset email a minute to an address).
+ */
 @Composable
 fun ForgotPasswordScreen(sent: Boolean = false, onSend: (String) -> Unit, onBack: () -> Unit,
-    modifier: Modifier = Modifier) {
-    var email by remember { mutableStateOf("") }
+    modifier: Modifier = Modifier,
+    /** When the last link was sent; each send restarts the minute before another. */
+    sentAtMillis: Long = 0L) {
+    var email by rememberSaveable { mutableStateOf("") }
+    var wait by remember { mutableStateOf(0) }
+    LaunchedEffect(sent, sentAtMillis) {
+        if (sent) { wait = 60; while (wait > 0) { kotlinx.coroutines.delay(1_000); wait-- } }
+    }
     ArtboardPage(modifier) {
         PackAppBar("Reset password", onBack)
-        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(88.dp).background(ItemTints.first(), RoundedCornerShape(30.dp)), contentAlignment = Alignment.Center) {
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(64.dp).background(BrandTint, RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
                 com.packabunch.ui.components.LottieTapIcon(
                     animation = com.packabunch.R.raw.icon_reset_email,
                     contentDescription = null,
                     onClick = null,
-                    size = 46.dp,
+                    size = 30.dp,
+                    tint = Primary,
+                    playOnAppear = true,
                 )
             }
-            Spacer(Modifier.height(22.dp))
-            AuthText(if (sent) "Check your email" else "We'll email you a link", 26f, 33, TextPrimary,
+            Spacer(Modifier.height(18.dp))
+            AuthText(if (sent) "Check your email" else "We'll email you a link", 23f, 29, TextPrimary,
                 FontWeight.ExtraBold, centered = true)
-            Spacer(Modifier.height(11.dp))
-            AuthText(if (sent) "If this address has an account, a reset link is on its way." else "Type the address you signed up with. We'll send you a reset link.", centered = true)
-            Spacer(Modifier.height(26.dp))
-            if (!sent) AuthField("Email", email, { email = it })
+            Spacer(Modifier.height(8.dp))
+            AuthText(
+                if (sent) "If ${email.trim()} has an account, a link is on its way. It works once and expires after an hour."
+                else "Type the address you signed up with. The link works once and expires after an hour.",
+                14.5f, 21, centered = true,
+            )
             Spacer(Modifier.height(20.dp))
-            TrustCard("If nothing arrives", listOf("Check your spam folder",
-                "If you signed up with Google, go back and use the Google button",
-                "We show the same message whether or not the address has an account"))
+            if (!sent) {
+                AuthField("Email", email, { email = it })
+                Spacer(Modifier.height(14.dp))
+            }
+            HelpCard("If nothing arrives", listOf(
+                "Check spam — it comes from a no-reply address",
+                "If you signed up with Google there's no password to reset — go back and use the Google button",
+                "We send the same message whether or not the address has an account",
+            ))
         }
         PushDown()
         Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)) {
-            if (!sent) PrimaryButton("Send the link", { onSend(email.trim()) }, enabled = email.contains('@'))
-            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { PackTextButton("Back to log in", onBack) }
+            if (!sent) PrimaryButton("Send the link", { onSend(email.trim()) }, enabled = email.trim().let { it.contains('@') && it.length > 3 })
+            else PrimaryButton(if (wait > 0) "Send it again in ${wait}s" else "Send it again", { onSend(email.trim()) }, enabled = wait == 0)
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { PackTextButton("Back to log in", onBack, color = Primary) }
+        }
+    }
+}
+
+/** A white card of plain advice with dots, as under the reset field. */
+@Composable
+private fun HelpCard(title: String, rows: List<String>) {
+    Column(Modifier.fillMaxWidth().background(Surface, RoundedCornerShape(20.dp)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AuthText(title, 14f, 20, TextPrimary, FontWeight.Bold)
+        rows.forEach { text ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(Modifier.padding(top = 8.dp).size(4.dp).background(TextTertiary, CircleShape))
+                AuthText(text, 13f, 19, TextSecondary, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/**
+ * The last step of a reset, opened from the email's link: the new password, with the same
+ * strength guide as creating an account.
+ */
+@Composable
+fun NewPasswordScreen(email: String?, onSave: (String) -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    var password by remember { mutableStateOf("") }
+    ArtboardPage(modifier) {
+        PackAppBar("Reset password", onCancel)
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(64.dp).background(BrandTint, RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
+                Icon(PackIcons.Lock, null, Modifier.size(28.dp), tint = Primary)
+            }
+            Spacer(Modifier.height(18.dp))
+            AuthText("Choose a new password", 23f, 29, TextPrimary, FontWeight.ExtraBold, centered = true)
+            Spacer(Modifier.height(8.dp))
+            AuthText(
+                (email?.let { "For $it. " } ?: "") + "Use at least 8 characters; longer is better.",
+                14.5f, 21, centered = true,
+            )
+            Spacer(Modifier.height(20.dp))
+            AuthField("New password", password, { password = it }, password = true, strength = true)
+        }
+        PushDown()
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 24.dp)) {
+            PrimaryButton("Save the new password", { onSave(password) }, enabled = password.length >= 8)
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { PackTextButton("Cancel", onCancel, color = Primary) }
         }
     }
 }

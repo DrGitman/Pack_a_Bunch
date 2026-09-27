@@ -1,6 +1,18 @@
 package com.packabunch.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import com.packabunch.ui.theme.Primary
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,7 +49,6 @@ import com.packabunch.ui.render.IsometricCrate
 import com.packabunch.ui.theme.BrandTint
 import com.packabunch.ui.theme.NumeralChip
 import com.packabunch.ui.theme.Spacing
-import com.packabunch.ui.theme.SurfaceMuted
 import com.packabunch.ui.theme.TextPrimary
 import com.packabunch.ui.theme.TextSecondary
 import com.packabunch.ui.theme.TextTertiary
@@ -129,24 +140,32 @@ fun PackingGuideScreen(
         Spacer(Modifier.height(Spacing.base))
 
         if (current != null && spec != null && space != null) {
-            Column(Modifier.padding(horizontal = Spacing.gutter)) {
+            val nameOf = { placement: Placement -> state.items.firstOrNull { it.id == placement.specId }?.name ?: "item" }
+            // `Guide step`: one white card — who, how big, then how, where and on what.
+            Column(
+                Modifier
+                    .padding(horizontal = Spacing.gutter)
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(24.dp))
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ItemNumberTile(
                         number = itemIndex + 1,
                         color = itemColor(itemIndex.coerceAtLeast(0)),
-                        size = 38.dp,
-                        cornerRadius = 13.dp,
-                        fontSize = 15,
+                        size = 44.dp,
+                        cornerRadius = 14.dp,
+                        fontSize = 17,
                     )
-                    Spacer(Modifier.size(12.dp))
+                    Spacer(Modifier.size(14.dp))
                     Column {
                         Text(
                             text = spec.name,
                             color = TextPrimary,
                             fontFamily = UiFamily,
                             fontWeight = FontWeight.ExtraBold,
-                            fontSize = 20.sp,
-                            letterSpacing = (-0.4).sp,
+                            fontSize = 21.sp,
+                            letterSpacing = (-0.5).sp,
                         )
                         Text(
                             text = buildString {
@@ -166,12 +185,11 @@ fun PackingGuideScreen(
                 }
 
                 Spacer(Modifier.height(14.dp))
-
-                Instruction(text = orientationSentence(current, spec.dimensions))
-                Spacer(Modifier.height(8.dp))
-                Instruction(text = positionSentence(current, space))
-                Spacer(Modifier.height(8.dp))
-                Instruction(text = restingSentence(current, placements))
+                Instruction(GuideIcon.TURN, orientationSentence(current, spec.dimensions))
+                Spacer(Modifier.height(10.dp))
+                Instruction(GuideIcon.WHERE, positionSentence(current, space))
+                Spacer(Modifier.height(10.dp))
+                Instruction(GuideIcon.RESTS, restingSentence(current, placements, space, nameOf))
             }
         }
 
@@ -208,39 +226,69 @@ fun PackingGuideScreen(
     }
 }
 
+private enum class GuideIcon { TURN, WHERE, RESTS }
+
+/** One line of the step: its icon in the brand colour, then the sentence, key words in bold. */
 @Composable
-private fun Instruction(text: String) {
-    Text(
-        text = text,
-        color = TextSecondary,
-        fontFamily = UiFamily,
-        fontSize = 15.sp,
-        lineHeight = 23.sp,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(SurfaceMuted, RoundedCornerShape(14.dp))
-            .padding(12.dp),
-    )
+private fun Instruction(icon: GuideIcon, text: AnnotatedString) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+        Canvas(Modifier.padding(top = 3.dp).size(18.dp)) {
+            val stroke = Stroke(1.7.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+            val w = size.width; val h = size.height
+            when (icon) {
+                // A turning arrow: how it goes in.
+                GuideIcon.TURN -> {
+                    drawArc(Primary, -60f, 300f, false, Offset(w * 0.1f, h * 0.1f), Size(w * 0.8f, h * 0.8f), style = stroke)
+                    val tip = Offset(w * 0.73f, h * 0.2f)
+                    drawLine(Primary, tip, Offset(tip.x + w * 0.02f, tip.y + h * 0.26f), stroke.width, StrokeCap.Round)
+                    drawLine(Primary, tip, Offset(tip.x - w * 0.24f, tip.y + h * 0.04f), stroke.width, StrokeCap.Round)
+                }
+                // A map pin: where it goes.
+                GuideIcon.WHERE -> {
+                    val pin = Path().apply {
+                        moveTo(w * 0.5f, h * 0.95f)
+                        cubicTo(w * 0.12f, h * 0.58f, w * 0.12f, h * 0.35f, w * 0.18f, h * 0.26f)
+                        cubicTo(w * 0.3f, h * 0.04f, w * 0.7f, h * 0.04f, w * 0.82f, h * 0.26f)
+                        cubicTo(w * 0.88f, h * 0.35f, w * 0.88f, h * 0.58f, w * 0.5f, h * 0.95f)
+                        close()
+                    }
+                    drawPath(pin, Primary, style = stroke)
+                    drawCircle(Primary, w * 0.12f, Offset(w * 0.5f, h * 0.38f), style = stroke)
+                }
+                // A floor with walls, and something standing on it: what it rests on.
+                GuideIcon.RESTS -> {
+                    val tray = Path().apply { moveTo(w * 0.08f, h * 0.35f); lineTo(w * 0.08f, h * 0.82f); lineTo(w * 0.92f, h * 0.82f); lineTo(w * 0.92f, h * 0.35f) }
+                    drawPath(tray, Primary, style = stroke)
+                    drawRect(Primary, Offset(w * 0.3f, h * 0.52f), Size(w * 0.4f, h * 0.3f), style = stroke)
+                }
+            }
+        }
+        Text(text = text, color = TextPrimary, fontFamily = UiFamily, fontSize = 15.sp, lineHeight = 22.sp)
+    }
 }
+
+private fun AnnotatedString.Builder.bold(s: String) { withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(s) } }
 
 /** Which way up, described by what the person can see rather than by an axis name. */
 private fun orientationSentence(
     placement: Placement,
     original: com.packabunch.packing.Dimensions,
-): String {
+): AnnotatedString {
     val upright = placement.orientedHeightMm == original.heightMm
     val turned = placement.orientedWidthMm == original.depthMm &&
         placement.orientedDepthMm == original.widthMm
-    return when {
-        upright && !turned -> "Keep it the normal way up, facing you."
-        upright && turned -> "Keep it upright, but turn it a quarter turn so the long side runs front to back."
-        placement.orientedHeightMm == original.widthMm -> "Tip it onto its side."
-        else -> "Lay it flat, long side running left to right."
+    return buildAnnotatedString {
+        when {
+            upright && !turned -> { append("Keep it the "); bold("normal way up"); append(", facing you.") }
+            upright && turned -> { append("Keep it "); bold("upright"); append(", but turn it a quarter turn so the long side runs front to back.") }
+            placement.orientedHeightMm == original.widthMm -> { append("Tip it onto its "); bold("side"); append(".") }
+            else -> { append("Lay it "); bold("flat"); append(", long side running left to right.") }
+        }
     }
 }
 
 /** Named against the container's own edges. Never "left of the screen". */
-private fun positionSentence(placement: Placement, space: Space): String {
+private fun positionSentence(placement: Placement, space: Space): AnnotatedString {
     val bounds = space.volume().boundsMm
     val nearLeft = placement.xMm - bounds.minXMm
     val nearRight = bounds.maxXMm - placement.box.maxXMm
@@ -251,23 +299,50 @@ private fun positionSentence(placement: Placement, space: Space): String {
     val end = if (nearFront <= nearBack) "front" else "back"
     val touching = minOf(nearLeft, nearRight) < 15 && minOf(nearFront, nearBack) < 15
 
-    return if (touching) {
-        "Push it into the $end $side corner, touching both walls."
-    } else {
-        "Set it towards the $end $side."
+    return buildAnnotatedString {
+        if (touching) {
+            append("Push it into the "); bold("$end $side"); append(" corner, touching both walls.")
+        } else {
+            append("Set it towards the "); bold("$end $side"); append(".")
+        }
     }
 }
 
-private fun restingSentence(placement: Placement, all: List<Placement>): String {
-    if (placement.zMm == 0) return "It sits on the floor of the space."
+/**
+ * What it stands on, named: the space's floor or the item under it, and — on the floor —
+ * the thing already beside it, which is what a person actually lines it up against.
+ */
+private fun restingSentence(placement: Placement, all: List<Placement>, space: Space, nameOf: (Placement) -> String): AnnotatedString {
+    val floor = space.name.trim().takeIf { it.isNotEmpty() }?.lowercase()?.let { "the $it floor" } ?: "the floor of the space"
+    if (placement.zMm == 0) {
+        val beside = all
+            .filter { it.sequenceIndex < placement.sequenceIndex && it.zMm == 0 && touchesSideways(it, placement) }
+            .maxByOrNull { it.sequenceIndex }
+        return AnnotatedString(
+            when {
+                beside == null -> "It sits on $floor."
+                beside.sequenceIndex == placement.sequenceIndex - 1 -> "It sits on $floor, beside the ${nameOf(beside).lowercase()} you just placed."
+                else -> "It sits on $floor, beside the ${nameOf(beside).lowercase()} from step ${beside.sequenceIndex + 1}."
+            },
+        )
+    }
     val under = all.firstOrNull {
         it.box.maxZMm == placement.zMm && it.box.coversFootprintOf(placement.box)
     }
-    return if (under != null) {
-        "It rests on the item you placed at step ${under.sequenceIndex + 1}."
-    } else {
-        "It rests on what is already packed beneath it."
-    }
+    return AnnotatedString(
+        if (under != null) "It rests on the ${nameOf(under).lowercase()} from step ${under.sequenceIndex + 1}."
+        else "It rests on what is already packed beneath it.",
+    )
+}
+
+/** Two boxes standing side by side: faces within a centimetre and a half, and overlapping along them. */
+private fun touchesSideways(a: Placement, b: Placement): Boolean {
+    val gap = 15
+    val overlapX = a.xMm < b.box.maxXMm && b.xMm < a.box.maxXMm
+    val overlapY = a.yMm < b.box.maxYMm && b.yMm < a.box.maxYMm
+    val xTouch = kotlin.math.abs(a.box.maxXMm - b.xMm) <= gap || kotlin.math.abs(b.box.maxXMm - a.xMm) <= gap
+    val yTouch = kotlin.math.abs(a.box.maxYMm - b.yMm) <= gap || kotlin.math.abs(b.box.maxYMm - a.yMm) <= gap
+    return (xTouch && overlapY) || (yTouch && overlapX)
 }
 
 private fun ordinal(n: Int): String = when (n) {
@@ -276,4 +351,3 @@ private fun ordinal(n: Int): String = when (n) {
     3 -> "3rd"
     else -> "${n}th"
 }
-

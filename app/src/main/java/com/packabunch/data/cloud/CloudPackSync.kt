@@ -89,6 +89,9 @@ class CloudPackSync(private val repository: ProjectRepository, private val accou
             _state.value=CloudSyncState(message="Couldn't sync. Your packs are safe on this phone; retry when connected.") }
     } }
 
+    /** Forgets every pack this phone has synced, so the next sync treats it as a new phone. */
+    fun forget() { preferences.edit().clear().commit() }
+
     private suspend fun request(path: String, body: JSONObject?=null): String {
         check(account.userId==owner)
         val token=account.accessToken()

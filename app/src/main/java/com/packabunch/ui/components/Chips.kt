@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -79,6 +80,88 @@ fun SelectableChip(
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             fontSize = 13.sp,
         )
+    }
+}
+
+/**
+ * A row of mutually exclusive options in one track — the plan's 3D / Top / Front / Side.
+ * Every option gets the same width, so the row never wraps and never shifts as the choice
+ * changes; the chosen one fills with the dark chip colour.
+ */
+@Composable
+fun SegmentedChips(
+    options: List<String>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(999.dp)
+    androidx.compose.foundation.layout.Row(
+        modifier = modifier
+            .background(Color.White, shape)
+            .border(BorderStroke(1.dp, Outline), shape)
+            .padding(3.dp),
+    ) {
+        options.forEachIndexed { index, label ->
+            val on = index == selected
+            val background by animateColorAsState(if (on) ChromeAlt else Color.Transparent, Motion.standardTween(Motion.SHORT_MS), label = "segment")
+            val content by animateColorAsState(if (on) Ground else Color(0xFF6B5849), Motion.standardTween(Motion.SHORT_MS), label = "segmentText")
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(34.dp)
+                    .pressScale(pressedScale = 0.95f)
+                    .background(background, shape)
+                    .clip(shape)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = ripple(color = content),
+                        role = androidx.compose.ui.semantics.Role.RadioButton,
+                        onClick = { onSelect(index) },
+                    ),
+                contentAlignment = androidx.compose.ui.Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    color = content,
+                    fontFamily = UiFamily,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/** A small on/off chip — "See-through" beside the plan. Tighter than [SelectableChip]. */
+@Composable
+fun ToggleChip(
+    text: String,
+    on: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(999.dp)
+    val background by animateColorAsState(if (on) ChromeAlt else Color.White, Motion.standardTween(Motion.SHORT_MS), label = "toggle")
+    val content by animateColorAsState(if (on) Ground else Color(0xFF6B5849), Motion.standardTween(Motion.SHORT_MS), label = "toggleText")
+    Box(
+        modifier = modifier
+            .height(32.dp)
+            .pressScale(pressedScale = 0.95f)
+            .background(background, shape)
+            .then(if (on) Modifier else Modifier.border(BorderStroke(1.dp, Outline), shape))
+            .clip(shape)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = content),
+                role = androidx.compose.ui.semantics.Role.Switch,
+                onClick = onToggle,
+            )
+            .padding(horizontal = 14.dp),
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        Text(text, color = content, fontFamily = UiFamily, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium, fontSize = 12.5f.sp, maxLines = 1)
     }
 }
 

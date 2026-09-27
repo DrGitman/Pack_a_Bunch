@@ -24,7 +24,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.rememberLottieDynamicProperties
+import com.airbnb.lottie.compose.rememberLottieDynamicProperty
 import com.airbnb.lottie.compose.LottieClipSpec
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
@@ -94,9 +97,15 @@ fun LottieTapIcon(
             .semantics { contentDescription?.let { this.contentDescription = it } },
         contentAlignment = Alignment.Center,
     ) {
+        // A few icons carry their own round background. Tinted, that background took the icon's
+        // colour too, and the close button showed a plain disc where the × should be. The
+        // button behind already draws the circle, so a tinted icon drops its own.
+        val hidden = BACKGROUND_LAYERS.map { rememberLottieDynamicProperty(LottieProperty.TRANSFORM_OPACITY, 0, "**", it) }
+        val withoutBackground = rememberLottieDynamicProperties(*hidden.toTypedArray())
         LottieAnimation(
             composition = composition,
             progress = { if (playing) progress else 0f },
+            dynamicProperties = if (tint != null) withoutBackground else null,
             modifier = Modifier
                 .size(size)
                 .then(
@@ -136,3 +145,6 @@ fun EmptyCrate(
         modifier = modifier.size(size),
     )
 }
+
+/** Layer names of the backgrounds some icon animations draw behind their glyph. */
+private val BACKGROUND_LAYERS = listOf("Close background", "Background", "Email · background")

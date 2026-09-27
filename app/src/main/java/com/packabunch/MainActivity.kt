@@ -21,6 +21,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Opened from a password-reset email.
+        if (savedInstanceState == null) com.packabunch.auth.RecoveryLink.offer(intent?.data)
         setContent {
             PackABunchTheme {
                 // Once per app launch, not per screen rotation.
@@ -48,5 +50,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** Already open when the reset link is tapped: the link arrives here instead. */
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        com.packabunch.auth.RecoveryLink.offer(intent.data)
     }
 }

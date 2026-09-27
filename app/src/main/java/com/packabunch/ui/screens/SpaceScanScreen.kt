@@ -248,6 +248,28 @@ fun SpaceScanOverlay(
                 GlassLottieButton(com.packabunch.R.raw.icon_edit, "Type the measurements instead", onTypeInstead, iconSize = 24.fd)
             }
         }
+
+        // Lost for more than a moment. Everything mapped so far is kept: the sweep carries on
+        // from where it was the moment the camera finds its place again.
+        val (lostShowing, dismissLost) = rememberLostTrack(ui.status == TrackingStatus.LOST)
+        if (lostShowing) {
+            LostTrackPopup(
+                what = spaceNoun(spaceName, standingInside = box?.cameraInside == true),
+                reason = ui.failureReason,
+                saved = box?.dimensions?.let { d ->
+                    savedLengths(listOf(
+                        "width" to formatLengthWithUnit(d.widthMm, unit),
+                        "depth" to formatLengthWithUnit(d.depthMm, unit),
+                        "height" to formatLengthWithUnit(d.heightMm, unit),
+                    ))
+                },
+                retry = "Carry on scanning",
+                onRetry = dismissLost,
+                typeInstead = "Type the size",
+                onTypeInstead = { dismissLost(); onTypeInstead() },
+                onDismiss = dismissLost,
+            )
+        }
     }
 }
 

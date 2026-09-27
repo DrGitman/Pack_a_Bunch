@@ -28,6 +28,10 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
     var habit by rememberSaveable { mutableStateOf(PackingHabit.entries.firstOrNull { it.name == onboarding.getString("habit", null) }) }
     var message by remember { mutableStateOf<String?>(null) }
     var recoverySent by remember { mutableStateOf(false) }
+    var recoverySentAt by remember { mutableStateOf(0L) }
+    // Opened from a reset email: the new password is asked for before anything else.
+    var recovering by rememberSaveable { mutableStateOf(false) }
+    val resetLink by RecoveryLink.pending.collectAsState()
     // Where a legal page returns to, since both sign in and sign up open them.
     var back by rememberSaveable { mutableStateOf("signIn") }
     val scope = rememberCoroutineScope()
@@ -59,6 +63,48 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
                 .fillMaxSize()
                 .background(com.packabunch.ui.theme.Ground),
         )
+        return
+    }
+    LaunchedEffect(resetLink) {
+        when (val link = resetLink) {
+            is RecoveryLink.Link.Opened -> {
+                RecoveryLink.pending.value = null
+                runAuth {
+                    account.startRecovery(link.refreshToken)
+                    authenticated = false
+                    recovering = true
+                }
+            }
+            is RecoveryLink.Link.Refused -> {
+                RecoveryLink.pending.value = null
+                if (!authenticated) { recoverySent = false; page = "forgot" }
+                message = link.message
+            }
+            null -> Unit
+        }
+    }
+    if (recovering) {
+        BackHandler { }
+        NewPasswordScreen(
+            email = account.email,
+            onSave = { password -> runAuth {
+                account.setPassword(password)
+                recovering = false
+                authenticated = account.hasSession
+                if (authenticated) JustSignedIn.mark()
+                message = "Your password is changed. You're signed in."
+            } },
+            onCancel = { runAuth {
+                account.signOut(context)
+                recovering = false
+                page = "login"
+            } },
+        )
+        if (busy) AlertDialog(onDismissRequest = {}, title = { Text("Connecting…") },
+            confirmButton = {}, text = { CircularProgressIndicator() })
+        message?.let { text -> AlertDialog(onDismissRequest = { message = null },
+            title = { Text("Your account") }, text = { Text(text) },
+            confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } }) }
         return
     }
     if (authenticated) {
@@ -119,7 +165,8 @@ fun RequiredAccount(content: @Composable (SupabaseAccount, () -> Unit) -> Unit) 
             "privacy" -> PrivacyPolicyScreen(onBack = { page = back })
             "forgot" -> ForgotPasswordScreen(
                 sent = recoverySent,
-                onSend = { email -> runAuth { account.sendRecovery(email); recoverySent = true } },
+                sentAtMillis = recoverySentAt,
+                onSend = { email -> runAuth { account.sendRecovery(email); recoverySent = true; recoverySentAt = System.currentTimeMillis() } },
                 onBack = { page = "login" })
             else -> SignInScreen(onContinueWithGoogle = ::google,
                 onContinueWithEmail = { page = "signup" }, onLogIn = { page = "login" },

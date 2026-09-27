@@ -65,12 +65,19 @@ class SupabaseAccount(context: Context) {
     }
 
     /**
-     * Deletes this account and everything owned by it, through the delete_account function in
-     * the database. Signing out afterwards is the caller's job.
+     * Starts the 30 days after which this account and everything in it is deleted
+     * (request_account_deletion). Signing in again within them stops it. Returns when it will
+     * happen, as the server's timestamp. Signing out afterwards is the caller's job.
      */
-    suspend fun deleteAccount() = mutex.withLock {
+    suspend fun requestDeletion(): String? = mutex.withLock {
         check(configured) { "Account service is not configured." }
-        request("/rest/v1/rpc/delete_account", JSONObject(), accessTokenNow())
+        request("/rest/v1/rpc/request_account_deletion", JSONObject(), accessTokenNow()).optString("deletes_at").ifBlank { null }
+    }
+
+    /** Stops a deletion this account asked for, if there is one. True when there was. */
+    suspend fun cancelPendingDeletion(): Boolean = mutex.withLock {
+        if (!configured || session == null) return@withLock false
+        request("/rest/v1/rpc/cancel_account_deletion", JSONObject(), accessTokenNow()).optBoolean("cancelled")
     }
 
     private suspend fun accessTokenNow(): String {
@@ -82,8 +89,27 @@ class SupabaseAccount(context: Context) {
         return session!!.getString("access_token")
     }
 
+    /**
+     * Emails a reset link. The link comes back to the app ([RecoveryLink.REDIRECT]), which then
+     * asks for the new password ([startRecovery], [setPassword]).
+     */
     suspend fun sendRecovery(email: String) {
-        request("/auth/v1/recover", JSONObject().put("email", email.trim()))
+        request(
+            "/auth/v1/recover?redirect_to=" + java.net.URLEncoder.encode(RecoveryLink.REDIRECT, "UTF-8"),
+            JSONObject().put("email", email.trim()),
+        )
+    }
+
+    /** Opens the session a reset link carried, so the new password can be set on it. */
+    suspend fun startRecovery(refreshToken: String) = mutex.withLock {
+        check(configured) { "Account service is not configured." }
+        save(request("/auth/v1/token?grant_type=refresh_token", JSONObject().put("refresh_token", refreshToken)))
+    }
+
+    /** Sets this account's password — the last step of a reset. */
+    suspend fun setPassword(password: String) = mutex.withLock {
+        check(configured) { "Account service is not configured." }
+        request("/auth/v1/user", JSONObject().put("password", password), accessTokenNow(), "PUT")
     }
 
     suspend fun restore(): Boolean {
@@ -167,6 +193,7 @@ class SupabaseAccount(context: Context) {
                         "email_address_not_authorized" -> "Sign-up emails can't be sent to this address yet. The app's email service needs setting up."
                         "user_already_exists", "email_exists" -> "An account with this email already exists. Log in instead."
                         "weak_password" -> "Choose a stronger password."
+                        "same_password" -> "That's the password you already have. Choose a different one."
                         "email_not_confirmed" -> "Confirm your email first, using the link we sent you."
                         "invalid_credentials" -> "Wrong email or password."
                         "over_email_send_rate_limit" -> "Too many emails sent. Please wait a few minutes and try again."

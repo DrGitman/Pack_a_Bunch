@@ -242,6 +242,11 @@ fun PackNavHost(
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var notice by remember { mutableStateOf<String?>(null) }
+    // A deletion stopped by signing in again is said once, as a notice.
+    val accountNotice by viewModel.accountNotice.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(accountNotice) {
+        accountNotice?.let { notice = it; viewModel.accountNoticeShown() }
+    }
     var changeEmailOpen by rememberSaveable { mutableStateOf(false) }
     if (changeEmailOpen) {
         var newEmail by remember { mutableStateOf("") }
@@ -477,21 +482,29 @@ fun PackNavHost(
 }
 
         composable(Routes.ACCOUNT_DELETE) {
+            var deleting by remember { mutableStateOf(false) }
             AccountDeleteScreen(
                 email = account.email.orEmpty(),
+                packCount = projects.size,
+                thingCount = projects.sumOf { it.items.size },
                 hasActiveSubscription = settings.tier == com.packabunch.packing.Tier.PLUS,
+                deleting = deleting,
                 onConfirmDelete = {
+                    deleting = true
                     scope.launch {
-                        // The profile photo sits in a public bucket and is not a database row, so
-                        // deleting the account would leave it online. It goes first; a person
-                        // with no photo simply has nothing to remove.
-                        com.packabunch.data.cloud.CloudAvatar(account, account.userId.orEmpty()).remove()
-                        val problem = runCatching { account.deleteAccount() }.exceptionOrNull()
+                        // The deletion itself happens in 30 days (request_account_deletion);
+                        // signing in before then stops it. The profile photo sits in a public
+                        // bucket, not in a database row, so it is taken down now rather than
+                        // left online for a month.
+                        val problem = runCatching { account.requestDeletion() }.exceptionOrNull()
                         if (problem != null) {
+                            deleting = false
                             notice = "Couldn't delete the account. " +
                                 (problem.message ?: "Try again when you have a connection.")
                         } else {
-                            viewModel.deleteAllLocalData()
+                            runCatching { com.packabunch.data.cloud.CloudAvatar(account, account.userId.orEmpty()).remove() }
+                            // Off this phone, without telling the account the packs are gone.
+                            viewModel.forgetThisPhone()
                             onSignOut()
                         }
                     }
@@ -684,6 +697,7 @@ fun PackNavHost(
                     popUpTo(Routes.MEASURE) { inclusive = true }
                 } },
                 onBack = { navController.popBackStack() },
+                spaceName = editor.space?.name?.takeIf { it.isNotBlank() },
             )
         }
 
@@ -1101,20 +1115,8 @@ fun PackNavHost(
             val selectedPlan by viewModel.selectedPlan.collectAsStateWithLifecycle()
             val outcome by viewModel.purchaseOutcome.collectAsStateWithLifecycle()
             val activity = androidx.compose.ui.platform.LocalContext.current as android.app.Activity
-            outcome?.let { result ->
-                com.packabunch.ui.screens.PurchaseOutcomeScreen(
-                    outcome = result,
-                    onContinue = {
-                        viewModel.clearPurchaseOutcome()
-                        if (result == com.packabunch.ui.screens.PurchaseOutcome.Succeeded) navController.popBackStack()
-                    },
-                    onTryAgain = { viewModel.clearPurchaseOutcome(); viewModel.subscribe(activity) },
-                    onContactSupport = { viewModel.clearPurchaseOutcome() },
-                )
-                return@WithNavBar
-            }
+            androidx.compose.foundation.layout.Box(pageModifier) {
             UpgradeScreen(
-                modifier = pageModifier,
                 // Google Play's localised plans, or none — never a price we invented.
                 plans = plans,
                 selected = selectedPlan,
@@ -1122,8 +1124,8 @@ fun PackNavHost(
                 onSubscribe = { viewModel.subscribe(activity) },
                 onRestore = {
                     viewModel.restorePurchases { restored ->
-                        notice = if (restored) "Pack a Bunch Pro restored." else
-                            "No active Pack a Bunch Pro on this Google account. Restoring does not bring back deleted packs."
+                        notice = if (restored) "Pack Plus restored." else
+                            "No active Pack Plus on this Google account. Restoring does not bring back deleted packs."
                     }
                 },
                 onTerms = { navController.navigate(Routes.TERMS) },
@@ -1131,6 +1133,31 @@ fun PackNavHost(
                 onCompare = { navController.navigate(Routes.PLAN_COMPARISON) },
                 onBack = { navController.popBackStack() },
             )
+            // What the purchase did, over the page it was made from.
+            outcome?.let { attempt ->
+                val context = androidx.compose.ui.platform.LocalContext.current
+                com.packabunch.ui.screens.PurchasePopup(
+                    attempt = attempt,
+                    renewsEvery = plans.getOrNull(selectedPlan)?.kind?.every ?: "month",
+                    onClose = viewModel::clearPurchaseOutcome,
+                    onTryAgain = { viewModel.clearPurchaseOutcome(); viewModel.subscribe(activity) },
+                    onCheckAgain = {
+                        viewModel.checkPurchaseAgain { notice = "Still waiting on Google Play. Pack Plus switches on by itself when it clears." }
+                    },
+                    onDone = { viewModel.clearPurchaseOutcome(); navController.popBackStack() },
+                    onSeeUnlocked = { viewModel.clearPurchaseOutcome(); navController.navigate(Routes.PLAN_COMPARISON) },
+                    onGetHelp = { reference ->
+                        val intent = android.content.Intent(android.content.Intent.ACTION_SENDTO, android.net.Uri.parse("mailto:")).apply {
+                            putExtra(android.content.Intent.EXTRA_EMAIL, arrayOf(com.packabunch.ui.screens.SUPPORT_EMAIL))
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, "Pack Plus purchase didn't go through" + (reference?.let { " ($it)" } ?: ""))
+                        }
+                        if (runCatching { context.startActivity(intent) }.isFailure) {
+                            notice = "No email app found. Write to ${com.packabunch.ui.screens.SUPPORT_EMAIL}" + (reference?.let { " with the code $it." } ?: ".")
+                        }
+                    },
+                )
+            }
+            }
                     }
 }
     }

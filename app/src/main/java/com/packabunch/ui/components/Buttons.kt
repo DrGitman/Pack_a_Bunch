@@ -131,6 +131,8 @@ fun SecondaryButton(
     backgroundColor: Color = Color.White,
     /** A Lottie to play in place of [icon], for the buttons the designer animated. */
     @androidx.annotation.RawRes motion: Int? = null,
+    /** The icon's size. Animated icons draw inside padding, so they want a little more. */
+    iconSize: Dp = 22.dp,
 ) {
     val interaction = remembered()
     val view = LocalView.current
@@ -159,10 +161,10 @@ fun SecondaryButton(
     ) {
         val played = motion ?: icon?.let { motionFor(it) }
         if (played != null) {
-            com.packabunch.ui.components.LottieTapIcon(played, null, onClick = null, size = 22.dp,
+            com.packabunch.ui.components.LottieTapIcon(played, null, onClick = null, size = iconSize,
                 interactionSource = interaction)
         } else if (icon != null) {
-            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = iconTint, modifier = Modifier.size(iconSize - 2.dp))
         }
         Text(
             text = text,

@@ -69,7 +69,8 @@ class AppViewModel(
 
     fun selectPlan(index: Int) { _selectedPlan.value = index }
 
-    private val _purchaseOutcome = MutableStateFlow<com.packabunch.ui.screens.PurchaseOutcome?>(null)
+    private val _purchaseOutcome = MutableStateFlow<com.packabunch.ui.screens.PurchaseAttempt?>(null)
+    /** The pop-up over the Pack Plus page, or null when there is none. */
     val purchaseOutcome = _purchaseOutcome.asStateFlow()
 
     fun subscribe(activity: android.app.Activity) {
@@ -77,11 +78,26 @@ class AppViewModel(
         viewModelScope.launch { _purchaseOutcome.value = com.packabunch.billing.Billing.purchase(activity, pkg) }
     }
 
+    /** "Check again" on a pending payment: asks Google Play afresh, and says so if it has cleared. */
+    fun checkPurchaseAgain(onStillPending: () -> Unit) {
+        viewModelScope.launch {
+            if (com.packabunch.billing.Billing.refresh()) setTier(Tier.PLUS) else onStillPending()
+        }
+    }
+
     fun restorePurchases(onDone: (Boolean) -> Unit) {
         viewModelScope.launch { onDone(com.packabunch.billing.Billing.restore()) }
     }
 
     fun clearPurchaseOutcome() { _purchaseOutcome.value = null }
+
+    /** Set once this phone is being cleared for an account deletion; no sync runs after it. */
+    private var syncStopped = false
+
+    private val _accountNotice = MutableStateFlow<String?>(null)
+    /** One thing to tell the person about their account, once — a stopped deletion. */
+    val accountNotice = _accountNotice.asStateFlow()
+    fun accountNoticeShown() { _accountNotice.value = null }
 
     /** False until the first sync has been attempted. Nothing to wait for with no account. */
     private val _firstSyncDone = MutableStateFlow(cloudSync == null)
@@ -127,6 +143,7 @@ class AppViewModel(
      * or of remote changes therefore costs one sync, not one each.
      */
     private fun requestSync(afterMillis: Long) {
+        if (syncStopped) return
         val sync = cloudSync ?: return
         pendingSync?.cancel()
         pendingSync = viewModelScope.launch {
@@ -192,6 +209,10 @@ class AppViewModel(
     // After _settings on purpose: RevenueCat may report cached entitlement synchronously.
     init {
         if (userId != null) viewModelScope.launch {
+            // Signing in again is what stops a deletion this account asked for.
+            if (runCatching { account?.cancelPendingDeletion() }.getOrNull() == true) {
+                _accountNotice.value = "Welcome back. Your account is no longer being deleted — everything is still here."
+            }
             com.packabunch.billing.Billing.identify(userId) { active -> setTier(if (active) Tier.PLUS else Tier.FREE) }
             _plans.value = com.packabunch.billing.Billing.plans()
         }
@@ -225,7 +246,13 @@ class AppViewModel(
         pushSettings()
     }
 
-    fun setTier(tier: Tier) = _settings.update { it.copy(tier = tier) }
+    fun setTier(tier: Tier) {
+        _settings.update { it.copy(tier = tier) }
+        // A pending payment that clears while its pop-up is showing turns into the success one.
+        if (tier == Tier.PLUS && _purchaseOutcome.value?.outcome == com.packabunch.ui.screens.PurchaseOutcome.Pending) {
+            _purchaseOutcome.value = com.packabunch.ui.screens.PurchaseAttempt(com.packabunch.ui.screens.PurchaseOutcome.Succeeded)
+        }
+    }
 
     fun setCameraMeasuring(enabled: Boolean) {
         preferences.edit().putBoolean("cameraMeasuring", enabled).apply()
@@ -614,6 +641,26 @@ class AppViewModel(
             _editor.value = PackEditorState()
         }
     }
+
+    /**
+     * Clears this account off this phone after it has asked to be deleted, without touching
+     * the copy in the account.
+     *
+     * Sync treats a pack that vanished from the phone as deleted, so clearing the phone the
+     * ordinary way would push every pack's deletion straight away — and signing in again within
+     * the 30 days would bring back an empty account. So sync is stopped first, and its record of
+     * what it has seen is cleared with the packs: to the next sign-in this is a new phone, and
+     * it downloads everything.
+     */
+    suspend fun forgetThisPhone() {
+        syncStopped = true
+        pendingSync?.cancel()
+        realtime?.stop()
+        repository.deleteAll()
+        cloudSync?.forget()
+        _editor.value = PackEditorState()
+    }
+
 
     class Factory(private val context: Context, private val userId: String,
         private val account: com.packabunch.auth.SupabaseAccount? = null) : ViewModelProvider.Factory {

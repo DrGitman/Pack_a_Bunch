@@ -275,6 +275,8 @@ fun CreateSpaceScreen(
                 onClick = onMeasureWithCamera,
                 icon = PackIcons.Camera,
                 motion = com.packabunch.R.raw.icon_camera,
+                // The camera animation draws small inside its frame; at 22 dp it read as a speck.
+                iconSize = 30.dp,
             )
             Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {

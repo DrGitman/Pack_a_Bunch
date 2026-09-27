@@ -3,6 +3,7 @@ package com.packabunch.billing
 import android.app.Activity
 import android.content.Context
 import com.packabunch.BuildConfig
+import com.packabunch.ui.screens.PurchaseAttempt
 import com.packabunch.ui.screens.PurchaseOutcome
 import com.revenuecat.purchases.CustomerInfo
 import com.revenuecat.purchases.Package
@@ -121,23 +122,32 @@ object Billing {
         }.format(micros / 1_000_000.0)
     }.getOrNull()
 
-    suspend fun purchase(activity: Activity, pkg: Package): PurchaseOutcome = try {
+    suspend fun purchase(activity: Activity, pkg: Package): PurchaseAttempt = try {
         val result = Purchases.sharedInstance.awaitPurchase(PurchaseParams.Builder(activity, pkg).build())
-        if (result.customerInfo.hasPlus()) PurchaseOutcome.Succeeded else PurchaseOutcome.Pending
+        PurchaseAttempt(if (result.customerInfo.hasPlus()) PurchaseOutcome.Succeeded else PurchaseOutcome.Pending)
     } catch (e: PurchasesTransactionException) {
-        if (e.userCancelled) PurchaseOutcome.Cancelled else outcomeFor(e.code)
+        if (e.userCancelled) PurchaseAttempt(PurchaseOutcome.Cancelled) else attemptFor(e.code)
     } catch (e: PurchasesException) {
-        outcomeFor(e.code)
+        attemptFor(e.code)
     }
+
+    /**
+     * Asks Google Play, through RevenueCat, whether Plus is active now — "Check again" on a
+     * pending payment. Fetched fresh, never the cached answer, which is what said pending.
+     */
+    suspend fun refresh(): Boolean = configured && runCatching {
+        Purchases.sharedInstance.awaitCustomerInfo(com.revenuecat.purchases.CacheFetchPolicy.FETCH_CURRENT).hasPlus()
+    }.getOrDefault(false)
 
     /** Restores what Google Play holds. It does not bring back deleted packs, and says so on screen. */
     suspend fun restore(): Boolean = runCatching { Purchases.sharedInstance.awaitRestore().hasPlus() }.getOrDefault(false)
 
-    private fun outcomeFor(code: PurchasesErrorCode) = when (code) {
-        PurchasesErrorCode.PaymentPendingError -> PurchaseOutcome.Pending
-        PurchasesErrorCode.NetworkError -> PurchaseOutcome.Offline
-        PurchasesErrorCode.PurchaseCancelledError -> PurchaseOutcome.Cancelled
-        else -> PurchaseOutcome.Failed
+    private fun attemptFor(code: PurchasesErrorCode) = when (code) {
+        PurchasesErrorCode.PaymentPendingError -> PurchaseAttempt(PurchaseOutcome.Pending)
+        PurchasesErrorCode.NetworkError -> PurchaseAttempt(PurchaseOutcome.Offline)
+        PurchasesErrorCode.PurchaseCancelledError -> PurchaseAttempt(PurchaseOutcome.Cancelled)
+        // The code is what support searches for; it names the failure, never the person.
+        else -> PurchaseAttempt(PurchaseOutcome.Failed, "BILLING_ERROR_${code.code}")
     }
 
     private fun CustomerInfo.hasPlus() = entitlements[ENTITLEMENT]?.isActive == true

@@ -2,6 +2,18 @@ package com.packabunch.ui.screens
 
 import com.packabunch.ui.motion.pressScale
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
+import com.packabunch.ui.theme.Caution
+import com.packabunch.ui.theme.Divider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,7 +44,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.packabunch.packing.Tier
 import com.packabunch.ui.components.IconTile
-import com.packabunch.ui.components.LabelledTextField
 import com.packabunch.ui.components.Note
 import com.packabunch.ui.components.NoteTone
 import com.packabunch.ui.components.PackAppBar
@@ -40,7 +51,6 @@ import com.packabunch.ui.components.PackCard
 import com.packabunch.ui.components.PackIcons
 import com.packabunch.ui.components.PackTextButton
 import com.packabunch.ui.components.PrimaryButton
-import com.packabunch.ui.components.ScreenHeading
 import com.packabunch.ui.components.ScreenScaffold
 import com.packabunch.ui.components.SecondaryButton
 import com.packabunch.ui.components.SectionHeading
@@ -50,7 +60,6 @@ import com.packabunch.ui.theme.ErrorRed
 import com.packabunch.ui.theme.ErrorTint
 import com.packabunch.ui.theme.Primary
 import com.packabunch.ui.theme.Spacing
-import com.packabunch.ui.theme.SurfaceField
 import com.packabunch.ui.theme.TextPrimary
 import com.packabunch.ui.theme.TextSecondary
 import com.packabunch.ui.theme.TextTertiary
@@ -281,157 +290,163 @@ private fun AccountRow(
     }
 }
 
+/**
+ * Deleting the account — the `AccountDelete` frame. It says, before anything is typed, exactly
+ * what goes and what does not: the counts are this account's own, and the subscription line is
+ * there because Google keeps billing a deleted account until the subscription is cancelled in
+ * Play. The deletion happens 30 days later, and signing in again before then stops it.
+ */
 @Composable
 fun AccountDeleteScreen(
     email: String,
+    packCount: Int,
+    thingCount: Int,
     hasActiveSubscription: Boolean,
     onConfirmDelete: () -> Unit,
     onManageSubscription: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    /** True while the request is on its way, so it cannot be sent twice. */
+    deleting: Boolean = false,
 ) {
     var typed by remember { mutableStateOf("") }
-    val matches = typed.trim().equals(email.trim(), ignoreCase = true)
+    val matches = email.isNotBlank() && typed.trim().equals(email.trim(), ignoreCase = true)
 
-    ScreenScaffold(modifier) {
+    ScreenScaffold(modifier.imePadding()) {
         PackAppBar(title = "Delete account", onBack = onBack)
 
         Column(
             Modifier
+                .weight(1f)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.gutter),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.height(Spacing.sm))
-
-            IconTile(
-                icon = PackIcons.Trash,
-                tint = ErrorRed,
-                background = ErrorTint,
-                size = 56.dp,
-                iconSize = 26.dp,
-            )
-
-            Spacer(Modifier.height(Spacing.base))
-            ScreenHeading("This can't be undone")
-            Spacer(Modifier.height(10.dp))
-
-            Text(
-                text = "Deleting your account removes it and everything in it.",
-                color = TextSecondary,
-                fontFamily = UiFamily,
-                fontSize = 15.sp,
-                lineHeight = 23.sp,
-            )
-
-            Spacer(Modifier.height(Spacing.base))
-
-            WhatGoes(
-                title = "What goes",
-                items = listOf(
-                    "Your account and sign-in",
-                    "Every saved pack, on this phone and in your account",
-                    "Every item photo",
-                    "Everything you've measured",
-                ),
-                tone = ErrorTint,
-                textColor = Color(0xFF8E3322),
-            )
-
-            Spacer(Modifier.height(10.dp))
-
-            WhatGoes(
-                title = "What doesn't",
-                items = buildList {
-                    if (hasActiveSubscription) {
-                        add("Your Pack a Bunch Pro subscription, cancel that in Google Play, or it keeps billing")
-                    }
-                    add("Anything you've already packed. Obviously.")
-                },
-                tone = SurfaceField,
-                textColor = TextSecondary,
-            )
-
-            if (hasActiveSubscription) {
-                Spacer(Modifier.height(10.dp))
-                SecondaryButton(
-                    text = "Cancel my subscription first",
-                    onClick = onManageSubscription,
+            Spacer(Modifier.height(4.dp))
+            Box(Modifier.size(60.dp).background(ErrorTint, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) {
+                Icon(PackIcons.Person, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(28.dp))
+                Icon(
+                    PackIcons.Close, contentDescription = null, tint = ErrorRed,
+                    modifier = Modifier.size(14.dp).align(Alignment.BottomEnd).offset(x = (-11).dp, y = (-12).dp)
+                        .background(ErrorTint, CircleShape),
                 )
             }
-
-            Spacer(Modifier.height(Spacing.lg))
-
+            Spacer(Modifier.height(16.dp))
             Text(
-                text = "Type $email to confirm",
-                color = TextPrimary,
-                fontFamily = UiFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 14.sp,
+                "This deletes everything, everywhere",
+                color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold,
+                fontSize = 24.sp, lineHeight = 29.sp, letterSpacing = (-0.6).sp, textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(8.dp))
-            LabelledTextField(
-                label = "Email",
-                value = typed,
-                onValueChange = { typed = it },
-                placeholder = email,
-                focused = true,
+            Text(
+                "Not just this phone. Read what goes before you type your email.",
+                color = TextSecondary, fontFamily = UiFamily, fontSize = 14.5f.sp, lineHeight = 21.sp, textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(18.dp))
 
-            Spacer(Modifier.height(Spacing.xl))
+            Column(
+                Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(20.dp)).padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                SectionLabel("Deleted within 30 days", ErrorRed)
+                DeleteLine(PackIcons.Close, ErrorRed, buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("$packCount ${if (packCount == 1) "pack" else "packs"}") }
+                    append(" and every arrangement in them")
+                })
+                DeleteLine(PackIcons.Close, ErrorRed, buildAnnotatedString {
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("$thingCount measured ${if (thingCount == 1) "thing" else "things"}") }
+                    append(" and their photos")
+                })
+                DeleteLine(PackIcons.Close, ErrorRed, AnnotatedString("Your email address and login"))
+                if (hasActiveSubscription) {
+                    Box(Modifier.fillMaxWidth().height(1.dp).background(Divider))
+                    SectionLabel("Not handled here", Caution)
+                    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable(onClick = onManageSubscription)) {
+                        DeleteLine(PackIcons.Warning, Caution, buildAnnotatedString {
+                            append("Your ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append("Pack Plus subscription") }
+                            append(" is billed by Google. Cancel it in Google Play first, or it keeps renewing.")
+                        })
+                    }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+
+            // The email field: red, because what it confirms cannot be undone after 30 days.
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .background(Color.White, RoundedCornerShape(16.dp))
+                    .border(1.5.dp, ErrorRed, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+            ) {
+                Text("TYPE YOUR EMAIL TO CONFIRM", color = ErrorRed, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 10.5f.sp, letterSpacing = 0.6.sp)
+                Spacer(Modifier.height(4.dp))
+                androidx.compose.foundation.text.BasicTextField(
+                    value = typed,
+                    onValueChange = { typed = it },
+                    singleLine = true,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontFamily = UiFamily, fontSize = 16.sp),
+                    cursorBrush = androidx.compose.ui.graphics.SolidColor(ErrorRed),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Email,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                        autoCorrectEnabled = false,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    decorationBox = { field ->
+                        if (typed.isEmpty()) Text(email, color = TextTertiary, fontFamily = UiFamily, fontSize = 16.sp)
+                        field()
+                    },
+                )
+            }
+            Spacer(Modifier.height(Spacing.lg))
         }
 
         Column(
             Modifier.padding(horizontal = Spacing.gutter),
             verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            PrimaryButton(
-                text = "Delete everything",
-                enabled = matches,
-                onClick = onConfirmDelete,
+            DangerButton(text = if (deleting) "Deleting…" else "Delete my account", enabled = matches && !deleting, onClick = onConfirmDelete)
+            SecondaryButton(text = "Keep my account", onClick = onBack, contentColor = TextPrimary)
+            Text(
+                "Signing in again within 30 days stops the deletion.",
+                color = TextTertiary, fontFamily = UiFamily, fontSize = 12.5f.sp, textAlign = TextAlign.Center,
             )
-            SecondaryButton(text = "Keep my account", onClick = onBack)
         }
-
         Spacer(Modifier.height(Spacing.sm))
     }
 }
 
 @Composable
-private fun WhatGoes(
-    title: String,
-    items: List<String>,
-    tone: Color,
-    textColor: Color,
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .background(tone, RoundedCornerShape(20.dp))
-            .padding(14.dp),
-    ) {
-        Text(
-            text = title.uppercase(),
-            color = textColor,
-            fontFamily = UiFamily,
-            fontWeight = FontWeight.ExtraBold,
-            fontSize = 11.sp,
-            letterSpacing = 0.7.sp,
-        )
-        Spacer(Modifier.height(8.dp))
-        items.forEach { item ->
-            Row(
-                Modifier.padding(vertical = 3.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("·", color = textColor, fontFamily = UiFamily, fontSize = 14.sp)
-                Text(
-                    text = item,
-                    color = textColor,
-                    fontFamily = UiFamily,
-                    fontSize = 13.5f.sp,
-                    lineHeight = 20.sp,
-                )
-            }
-        }
+private fun SectionLabel(text: String, color: Color) {
+    Text(text.uppercase(), color = color, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, letterSpacing = 0.7.sp)
+}
+
+@Composable
+private fun DeleteLine(icon: ImageVector, tint: Color, text: AnnotatedString) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.padding(top = 2.dp).size(16.dp))
+        Text(text, color = TextPrimary, fontFamily = UiFamily, fontSize = 14.sp, lineHeight = 20.sp)
     }
 }
+
+/** The one red button in the app: filled, and only once the email matches. */
+@Composable
+private fun DangerButton(text: String, enabled: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(28.dp)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(54.dp)
+            .pressScale(pressedScale = 0.95f, enabled = enabled)
+            .background(if (enabled) ErrorRed else ErrorRed.copy(alpha = 0.35f), shape)
+            .clip(shape)
+            .clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(text, color = Color.White, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+    }
+}
+
