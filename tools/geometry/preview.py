@@ -50,20 +50,23 @@ wrong = []
 for ax, f in zip(axes.flat, files):
     d = json.load(open(f)); name = d["family"]; W, D, H = dims.get(name, (1000,1000,1000))
     faces = [[(p[0]/1000*W, p[1]/1000*D, p[2]/1000*H) for p in fc["points"]] for fc in d["faces"]]
+    smooth = [fc.get("smooth", False) for fc in d["faces"]]
     view = (1, 1, 1)  # towards the viewer, gradient of depth()
     shown = []
-    for fc in faces:
+    for fc, sm in zip(faces, smooth):
         # normal in canonical space, then scaled by inverse dims (normals transform with inverse-transpose)
         n0 = newell([(p[0]/W, p[1]/D, p[2]/H) for p in fc])
         n = [n0[0]/W, n0[1]/D, n0[2]/H]; l = math.sqrt(sum(v*v for v in n)) or 1; n = [v/l for v in n]
         if sum(n[i]*view[i] for i in range(3)) <= 0: continue
         lit = 0.12 + 0.5*max(n[2],0) + 0.22*n[0]*n[0]
-        shown.append((sum(depth(*p) for p in fc)/4, fc, lit))
+        shown.append((sum(depth(*p) for p in fc)/4, fc, lit, sm))
     shown.sort(key=lambda t: t[0])
     pts=[proj(*p, W, D) for fc in faces for p in fc]
-    for _, fc, lit in shown:
+    for _, fc, lit, sm in shown:
         poly=[proj(*p, W, D) for p in fc]
-        ax.add_patch(Polygon(poly, closed=True, facecolor=lighten(BASE, lit), edgecolor=darken(BASE,0.28)+(0.45,), linewidth=0.6))
+        # Smooth facets are edged in their own colour, as IsometricCrate draws them.
+        edge = lighten(BASE, lit) if sm else darken(BASE,0.28)+(0.45,)
+        ax.add_patch(Polygon(poly, closed=True, facecolor=lighten(BASE, lit), edgecolor=edge, linewidth=0.6))
     xs=[p[0] for p in pts]; ys=[p[1] for p in pts]
     ax.set_xlim(min(xs), max(xs)); ax.set_ylim(min(ys), max(ys)); ax.set_aspect("equal"); ax.axis("off")
     ax.set_title(name.replace("_"," "), fontsize=9, color="#2B1D14")

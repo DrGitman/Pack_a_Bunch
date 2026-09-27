@@ -11,7 +11,16 @@ data class SurfacePoint(val x: Float, val y: Float, val z: Float)
  * are shaded from it and turned away when they face away from the viewer. Leaving it null keeps
  * every scanned item and every plain box drawn exactly as before the families existed.
  */
-data class SurfaceFace(val points: List<SurfacePoint>, val side: Int, val normal: SurfacePoint? = null)
+data class SurfaceFace(
+    val points: List<SurfacePoint>,
+    val side: Int,
+    val normal: SurfacePoint? = null,
+    /**
+     * One facet of a curved surface. Drawn without an edge line, so a pot or a ball shades as
+     * one surface instead of reading as the staves of a barrel.
+     */
+    val smooth: Boolean = false,
+)
 
 /** Greedy meshing joins coplanar voxel faces into clean panels, preserving every boundary. */
 fun voxelSurface(nx: Int, ny: Int, nz: Int, resolution: Int,

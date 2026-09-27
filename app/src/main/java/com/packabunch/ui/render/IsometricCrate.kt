@@ -432,7 +432,10 @@ private fun DrawScope.drawSurface(view: CrateView, faces: List<SurfaceFace>, bas
         val n = face.normal ?: sideNormal(face.side)
         val fill = base.lighten(0.12f + 0.5f * n.z.coerceAtLeast(0f) + 0.22f * n.x * n.x).copy(alpha=alpha)
         quad(p[0],p[1],p[2],p[3],fill)
-        quadOutline(p[0],p[1],p[2],p[3],base.darken(0.28f).copy(alpha=alpha*0.4f),0.7f)
+        // A curved surface's facets are edged in their own colour: no dark line between them,
+        // and no hairline of background where two anti-aliased neighbours meet.
+        if (face.smooth) quadOutline(p[0],p[1],p[2],p[3],fill,0.9f)
+        else quadOutline(p[0],p[1],p[2],p[3],base.darken(0.28f).copy(alpha=alpha*0.4f),0.7f)
     }
 }
 

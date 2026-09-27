@@ -31,6 +31,23 @@ import sys
 S = 1000.0  # canonical size
 
 
+class SmoothFace(list):
+    """
+    One facet of a curved surface, or one piece of a flat cap cut into a fan. Written out with
+    `"smooth": true`, so the app draws it without an edge line: a round thing should shade as
+    one surface, not read as staves, and a lid should not look like a sliced pizza.
+    """
+
+
+def smooth_sides(sides):
+    """
+    Facets round the curve. The shapes were first authored at 6–12 sides and looked like
+    barrels made of planks; these counts shade smoothly at the sizes a plan draws them.
+    Always a multiple of four so the ring reaches its box on both axes.
+    """
+    return 16 if sides <= 6 else 24 if sides <= 8 else 32
+
+
 # ---------------------------------------------------------------------------------------------
 # vector helpers
 
@@ -150,8 +167,9 @@ def prism(poly, axis, t0, t1):
     for i in range(n):
         j = (i + 1) % n
         faces.append([bottom[i], bottom[j], top[j], top[i]])
-    faces += fan(bottom) + fan(top)
-    return [orient(f, sub(centroid(f), c)) for f in faces]
+    # An end cap is one flat face cut into a fan; its pieces are drawn without lines between them.
+    caps = [SmoothFace(orient(f, sub(centroid(f), c))) for f in fan(bottom) + fan(top)]
+    return [orient(f, sub(centroid(f), c)) for f in faces] + caps
 
 
 def chamfered_rect(a0, a1, b0, b1, ca, cb=None):
@@ -168,6 +186,7 @@ def lathe(profile, sides, axis, centre, radii):
     """
     ca, cb = centre
     ra, rb = radii
+    sides = smooth_sides(sides)
     # A faceted ring only touches its circle at its corners; stretch it so its flats reach
     # the radius on both axes and the mesh fills its box exactly.
     cmax = max(abs(math.cos(2 * math.pi * k / sides)) for k in range(sides))
@@ -192,17 +211,18 @@ def lathe(profile, sides, axis, centre, radii):
                       "z": (math.cos(mid_ang), math.sin(mid_ang), 0)}[axis]
             # Outward in the (r, t) plane when walking the profile from start to end: (dt, −dr).
             out = tuple(radial[i] * dt + axis_dir(1)[i] * (-dr) for i in range(3))
-            faces.append(orient(quad, out))
+            faces.append(SmoothFace(orient(quad, out)))
     if profile[0][0] > 0:
         ring = [point(profile[0][0], profile[0][1], k) for k in range(sides)]
-        faces += [orient(f, axis_dir(-1 if profile[1][1] >= profile[0][1] else 1)) for f in fan(ring)]
+        faces += [SmoothFace(orient(f, axis_dir(-1 if profile[1][1] >= profile[0][1] else 1))) for f in fan(ring)]
     if profile[-1][0] > 0:
         ring = [point(profile[-1][0], profile[-1][1], k) for k in range(sides)]
-        faces += [orient(f, axis_dir(1 if profile[-1][1] >= profile[-2][1] else -1)) for f in fan(ring)]
+        faces += [SmoothFace(orient(f, axis_dir(1 if profile[-1][1] >= profile[-2][1] else -1))) for f in fan(ring)]
     return faces
 
 
 def sphere(centre, radii, slices, stacks):
+    slices, stacks = smooth_sides(slices), smooth_sides(slices) // 2
     faces = []
     cx, cy, cz = centre
     rx, ry, rz = radii
@@ -213,13 +233,14 @@ def sphere(centre, radii, slices, stacks):
     for i in range(stacks):
         for k in range(slices):
             q = [p(i, k), p(i, k + 1), p(i + 1, k + 1), p(i + 1, k)]
-            faces.append(orient(q, sub(centroid(q), centre)))
+            faces.append(SmoothFace(orient(q, sub(centroid(q), centre))))
     return faces
 
 
 def torus(centre, big, small_ab, small_z, ring_sides, tube_sides):
     """Lying flat (axis Z). `big` is (ra, rb) of the centreline; the tube is small_ab across, small_z tall."""
     cx, cy, cz = centre
+    ring_sides, tube_sides = smooth_sides(ring_sides), 12
     faces = []
     zmax = max(abs(math.sin(2 * math.pi * k / tube_sides)) for k in range(tube_sides))
     def p(i, k):
@@ -232,7 +253,7 @@ def torus(centre, big, small_ab, small_z, ring_sides, tube_sides):
             q = [p(i, k), p(i + 1, k), p(i + 1, k + 1), p(i, k + 1)]
             um = 2 * math.pi * (i + 0.5) / ring_sides
             core = (cx + big[0] * math.cos(um), cy + big[1] * math.sin(um), cz)
-            faces.append(orient(q, sub(centroid(q), core)))
+            faces.append(SmoothFace(orient(q, sub(centroid(q), core))))
     return faces
 
 
@@ -729,7 +750,7 @@ def facing_viewer(fn):
     """
     def wrapped():
         m = fn()
-        m.faces = [list(reversed([(p[0], 1 - p[1], p[2]) for p in f])) for f in m.faces]
+        m.faces = [type(f)(reversed([(p[0], 1 - p[1], p[2]) for p in f])) for f in m.faces]
         return m
     wrapped.__doc__ = fn.__doc__
     wrapped.__name__ = fn.__name__
@@ -779,6 +800,11 @@ FAMILIES = [
 # checks — the contract is enforced here, not trusted
 
 
+# Enough for 32-sided curves on the most detailed shapes. A plan draws a few dozen items, and
+# the renderer skips every face turned away from the viewer, so about half of these are drawn.
+MAX_QUADS = 600
+
+
 def check(name, faces):
     problems = []
     pts = [p for f in faces for p in f]
@@ -803,8 +829,8 @@ def check(name, faces):
         off = max(abs(dot(sub(p, c), n)) for p in f)
         if off > 1e-4:
             problems.append("face %d not planar (%.5f)" % (k, off))
-    if len(faces) > 80:
-        problems.append("%d quads — over the 80 budget" % len(faces))
+    if len(faces) > MAX_QUADS:
+        problems.append("%d quads — over the %d budget" % (len(faces), MAX_QUADS))
     return problems
 
 
@@ -830,7 +856,8 @@ def emit(out_dir, readme_dir=None):
             "version": 1,
             "params": {},
             "bounds_mm": [1000, 1000, 1000],
-            "faces": [{"points": [[round(c * S, 1) for c in p] for p in f]} for f in faces],
+            "faces": [dict({"points": [[round(c * S, 1) for c in p] for p in f]}, **({"smooth": True} if isinstance(f, SmoothFace) else {}))
+                      for f in faces],
         }
         with open(os.path.join(out_dir, "family_%s.json" % name), "w") as fh:
             json.dump(data, fh, separators=(",", ":"))
@@ -845,8 +872,8 @@ def emit(out_dir, readme_dir=None):
         for name, q, parts, doc in rows:
             fh.write("| `%s` | %d | %d | %s |\n" % (name, q, parts, doc))
         fh.write("\n## Compromises\n\n"
-                 "- `cable_coil`, `ball`, `lamp` and the other round families are faceted (10–12 sides); the sphere "
-                 "poles are degenerate quads (one repeated vertex), the only triangles in the set.\n"
+                 "- Round parts are faceted at 16–32 sides and marked `smooth`, which the app draws without edge lines "
+                 "so a curve shades as one surface. Sphere and dome poles are degenerate quads (one repeated vertex).\n"
                  "- `bicycle` wheels are solid discs rather than rings — a tyre ring costs 60+ quads per wheel.\n"
                  "- `folded_chair`, `ladder` and `plank_stack` are drawn lying as they are usually packed.\n"
                  "- One variant per family. Proportions are ratios of the measured box, so an unusually squat "
@@ -855,7 +882,7 @@ def emit(out_dir, readme_dir=None):
                  "From the project root, in plain Python 3 or Blender 4.x headless:\n\n"
                  "```\npython3 tools/geometry/families.py app/src/main/res/raw\n"
                  "blender -b -P tools/geometry/families.py -- app/src/main/res/raw\n```\n\n"
-                 "It checks every family (fills the box, 4 points per face, planar, at most 80 quads) and exits 1 "
+                 "It checks every family (fills the box, 4 points per face, planar, at most 600 quads) and exits 1 "
                  "if any fails. `preview.py` redraws `families_preview.png` from the JSON.\n\n"
                  "## In the app\n\n"
                  "`ui/render/FamilyMeshes.kt` loads these with `org.json`, stretches each to the item's measured box, "
