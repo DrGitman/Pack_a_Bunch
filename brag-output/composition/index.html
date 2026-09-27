@@ -102,7 +102,8 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
 /* scene 8 */
 #s8 .centre { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
 #s8-logo { display:flex; align-items:center; gap:34px; }
-#s8-logo .mark { width:190px; height:192px; filter:drop-shadow(0 20px 40px rgba(90,36,30,0.35)); }
+#s8-logo .mark { width:180px; height:180px; border-radius:42px; background:#955532; display:flex; align-items:center; justify-content:center; box-shadow:0 20px 44px rgba(149,85,50,0.35); }
+#s8-logo .mark img { width:106px; height:101px; }
 #s8-logo .name { height:120px; width:929px; }
 #s8-line { font-weight:700; font-size:52px; color:var(--muted); margin-top:30px; letter-spacing:-1px; }
 #s8-cta { margin-top:56px; padding:26px 56px; border-radius:60px; background:#A65C34; color:#FFFFFF; font-weight:800; font-size:44px; }
@@ -130,8 +131,7 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
 
   <section id="s2" class="clip" data-start="8" data-duration="17" data-track-index="0">
     <div id="s2-title" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:40px;">
-      <img src="assets/img/logo_tile.png" alt="" style="width:170px;height:172px;" />
-      <img src="assets/img/wordmark.svg" alt="Pack-a-Bunch" style="height:110px;width:852px;" />
+      <img src="assets/img/wordmark_brown.svg" alt="Pack-a-Bunch" style="height:140px;width:890px;" />
     </div>
     <div id="s2-inner" class="inner">
       <div class="copy" id="s2-copy">
@@ -251,7 +251,7 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
 
   <section id="s8" class="clip" data-start="108" data-duration="7" data-track-index="0">
     <div class="centre">
-      <div id="s8-logo"><img class="mark" src="assets/img/logo_tile.png" alt="" /><img class="name" src="assets/img/wordmark.svg" alt="Pack-a-Bunch" /></div>
+      <div id="s8-logo"><div class="mark"><img src="assets/img/box_white.svg" alt="" /></div><img class="name" src="assets/img/wordtext_brown.svg" alt="Pack-a-Bunch" /></div>
       <div id="s8-line">Pack it once. It fits.</div>
       <div id="s8-cta">Try Pack Plus — code on the Pack Plus page</div>
       <div id="s8-foot">ON ANDROID</div>
