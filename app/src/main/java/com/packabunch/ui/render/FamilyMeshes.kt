@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.sqrt
 
 /**
- * The ~38 generic item shapes — a bottle, a chair, a sofa — drawn in the plan and the packing
+ * The 68 generic item shapes — a bottle, a chair, a sofa, a kettle — drawn in the plan and the packing
  * guide instead of a plain box, so a person can see which thing goes where.
  *
  * ### What these are, and are not
@@ -66,6 +66,36 @@ enum class GeometryFamily(@RawRes val raw: Int) {
     TV_STAND(R.raw.family_tv_stand),
     PLANT_POT(R.raw.family_plant_pot),
     PIANO(R.raw.family_piano),
+    KETTLE(R.raw.family_kettle),
+    COFFEE_MAKER(R.raw.family_coffee_maker),
+    MICROWAVE(R.raw.family_microwave),
+    TOASTER(R.raw.family_toaster),
+    COOKER(R.raw.family_cooker),
+    COOKING_POT(R.raw.family_cooking_pot),
+    FRYING_PAN(R.raw.family_frying_pan),
+    PLATE_STACK(R.raw.family_plate_stack),
+    BOWL(R.raw.family_bowl),
+    PILLOW(R.raw.family_pillow),
+    FOLDED_STACK(R.raw.family_folded_stack),
+    BOOKCASE(R.raw.family_bookcase),
+    CHEST_OF_DRAWERS(R.raw.family_chest_of_drawers),
+    DESK(R.raw.family_desk),
+    STOOL(R.raw.family_stool),
+    OTTOMAN(R.raw.family_ottoman),
+    CLOTHES_RAIL(R.raw.family_clothes_rail),
+    FRAMED_PANEL(R.raw.family_framed_panel),
+    DISC(R.raw.family_disc),
+    MONITOR(R.raw.family_monitor),
+    PRINTER(R.raw.family_printer),
+    HELMET(R.raw.family_helmet),
+    SHOE(R.raw.family_shoe),
+    TOTE_BAG(R.raw.family_tote_bag),
+    GUITAR(R.raw.family_guitar),
+    UPRIGHT_VACUUM(R.raw.family_upright_vacuum),
+    LONG_HANDLE(R.raw.family_long_handle),
+    WATERING_CAN(R.raw.family_watering_can),
+    POWER_DRILL(R.raw.family_power_drill),
+    HAND_TOOL(R.raw.family_hand_tool),
 }
 
 /**
@@ -265,18 +295,25 @@ private val ROUND = setOf(
     GeometryFamily.UPRIGHT_CYLINDER, GeometryFamily.LYING_CYLINDER, GeometryFamily.BOTTLE,
     GeometryFamily.TIGHT_ROLL, GeometryFamily.CABLE_COIL, GeometryFamily.YOGA_MAT, GeometryFamily.BALL,
     GeometryFamily.BARREL, GeometryFamily.LAMP, GeometryFamily.PLANT_POT, GeometryFamily.DUFFEL_BAG,
+    GeometryFamily.KETTLE, GeometryFamily.COOKING_POT, GeometryFamily.FRYING_PAN, GeometryFamily.PLATE_STACK,
+    GeometryFamily.BOWL, GeometryFamily.DISC, GeometryFamily.HELMET, GeometryFamily.STOOL,
 )
 
 private val FITTED_ROUND = setOf(
     GeometryFamily.UPRIGHT_CYLINDER, GeometryFamily.LYING_CYLINDER, GeometryFamily.BALL, GeometryFamily.PLANT_POT,
 )
 
-private val THIN_IN_HEIGHT = setOf(GeometryFamily.FLAT_RECTANGLE, GeometryFamily.SLIM_SLAB, GeometryFamily.MATTRESS)
+private val THIN_IN_HEIGHT = setOf(
+    GeometryFamily.FLAT_RECTANGLE, GeometryFamily.SLIM_SLAB, GeometryFamily.MATTRESS,
+    GeometryFamily.FRAMED_PANEL, GeometryFamily.DISC, GeometryFamily.GUITAR,
+)
 
 private val LONG_IN_WIDTH = setOf(
     GeometryFamily.LYING_CYLINDER, GeometryFamily.TIGHT_ROLL, GeometryFamily.DUFFEL_BAG, GeometryFamily.YOGA_MAT,
     GeometryFamily.SOFT_POUCH, GeometryFamily.THIN_BUNDLE, GeometryFamily.LADDER, GeometryFamily.MATTRESS,
     GeometryFamily.BICYCLE, GeometryFamily.SOFA, GeometryFamily.PIANO, GeometryFamily.PLANK_STACK,
+    GeometryFamily.LONG_HANDLE, GeometryFamily.HAND_TOOL, GeometryFamily.SHOE, GeometryFamily.GUITAR,
+    GeometryFamily.POWER_DRILL, GeometryFamily.CLOTHES_RAIL, GeometryFamily.PILLOW, GeometryFamily.FRYING_PAN,
 )
 
 private val LONG_IN_DEPTH = setOf(GeometryFamily.BED_FRAME)
@@ -328,9 +365,62 @@ private val PHRASES: List<Pair<String, GeometryFamily>> = listOf(
     "pencil case" to GeometryFamily.SOFT_POUCH,
     "gym bag" to GeometryFamily.DUFFEL_BAG, "duffel bag" to GeometryFamily.DUFFEL_BAG, "duffle bag" to GeometryFamily.DUFFEL_BAG,
     "sports bag" to GeometryFamily.DUFFEL_BAG, "kit bag" to GeometryFamily.DUFFEL_BAG,
-    "board game" to GeometryFamily.FLAT_RECTANGLE, "picture frame" to GeometryFamily.FLAT_RECTANGLE,
-    "photo frame" to GeometryFamily.FLAT_RECTANGLE,
+    "board game" to GeometryFamily.FLAT_RECTANGLE, "picture frame" to GeometryFamily.FRAMED_PANEL,
+    "photo frame" to GeometryFamily.FRAMED_PANEL, "wall art" to GeometryFamily.FRAMED_PANEL,
     "tent poles" to GeometryFamily.THIN_BUNDLE, "garden hose" to GeometryFamily.CABLE_COIL,
+    // Kitchen. Several of these end in a word that means something else on its own — a
+    // watering "can", a coffee "maker", a baking "pan" — so they have to be matched whole.
+    "coffee maker" to GeometryFamily.COFFEE_MAKER, "coffee machine" to GeometryFamily.COFFEE_MAKER,
+    "espresso machine" to GeometryFamily.COFFEE_MAKER, "toaster oven" to GeometryFamily.MICROWAVE,
+    "air fryer" to GeometryFamily.MICROWAVE, "mini oven" to GeometryFamily.MICROWAVE,
+    "frying pan" to GeometryFamily.FRYING_PAN, "baking pan" to GeometryFamily.SHALLOW_TRAY,
+    "baking sheet" to GeometryFamily.SHALLOW_TRAY, "baking tray" to GeometryFamily.SHALLOW_TRAY,
+    "roasting pan" to GeometryFamily.SHALLOW_TRAY, "roasting tin" to GeometryFamily.SHALLOW_TRAY,
+    "cake tin" to GeometryFamily.SHALLOW_TRAY, "ice cube tray" to GeometryFamily.SHALLOW_TRAY,
+    "dish rack" to GeometryFamily.SHALLOW_TRAY, "drying rack" to GeometryFamily.SHALLOW_TRAY,
+    "stock pot" to GeometryFamily.COOKING_POT, "cooking pot" to GeometryFamily.COOKING_POT,
+    "sauce pan" to GeometryFamily.COOKING_POT, "dutch oven" to GeometryFamily.COOKING_POT,
+    "slow cooker" to GeometryFamily.COOKING_POT, "rice cooker" to GeometryFamily.COOKING_POT,
+    "pressure cooker" to GeometryFamily.COOKING_POT, "mixing bowl" to GeometryFamily.BOWL,
+    "cutting board" to GeometryFamily.SLIM_SLAB, "chopping board" to GeometryFamily.SLIM_SLAB,
+    "rolling pin" to GeometryFamily.LYING_CYLINDER, "paper towel" to GeometryFamily.LYING_CYLINDER,
+    "paper towels" to GeometryFamily.LYING_CYLINDER, "toilet roll" to GeometryFamily.LYING_CYLINDER,
+    "hand mixer" to GeometryFamily.POWER_DRILL, "lazy susan" to GeometryFamily.DISC,
+    "mini fridge" to GeometryFamily.UPRIGHT_FRIDGE, "wine cooler" to GeometryFamily.UPRIGHT_FRIDGE,
+    // Rooms.
+    "chest of drawers" to GeometryFamily.CHEST_OF_DRAWERS, "bedside table" to GeometryFamily.CHEST_OF_DRAWERS,
+    "bedside cabinet" to GeometryFamily.CHEST_OF_DRAWERS, "filing cabinet" to GeometryFamily.CHEST_OF_DRAWERS,
+    "shoe rack" to GeometryFamily.BOOKCASE, "shelving unit" to GeometryFamily.BOOKCASE,
+    "coat rack" to GeometryFamily.CLOTHES_RAIL, "coat stand" to GeometryFamily.CLOTHES_RAIL,
+    "hat stand" to GeometryFamily.CLOTHES_RAIL, "clothes rail" to GeometryFamily.CLOTHES_RAIL,
+    "clothes rack" to GeometryFamily.CLOTHES_RAIL, "garment rack" to GeometryFamily.CLOTHES_RAIL,
+    "ironing board" to GeometryFamily.DINING_TABLE, "bean bag" to GeometryFamily.PILLOW,
+    "bed sheets" to GeometryFamily.FOLDED_STACK, "bath mat" to GeometryFamily.FOLDED_STACK,
+    "wall clock" to GeometryFamily.DISC, "room divider" to GeometryFamily.FRAMED_PANEL,
+    "flat screen" to GeometryFamily.MONITOR, "laundry basket" to GeometryFamily.CRATE,
+    "air conditioner" to GeometryFamily.APPLIANCE_SLAB,
+    // Cleaning, tools, garden.
+    "vacuum cleaner" to GeometryFamily.UPRIGHT_VACUUM, "watering can" to GeometryFamily.WATERING_CAN,
+    "hair dryer" to GeometryFamily.POWER_DRILL, "glue gun" to GeometryFamily.POWER_DRILL,
+    "heat gun" to GeometryFamily.POWER_DRILL, "leaf blower" to GeometryFamily.POWER_DRILL,
+    "power drill" to GeometryFamily.POWER_DRILL, "electric screwdriver" to GeometryFamily.POWER_DRILL,
+    "tape measure" to GeometryFamily.SMALL_CARTON, "first aid kit" to GeometryFamily.TOOLBOX,
+    "cleaning caddy" to GeometryFamily.TOOLBOX, "sewing box" to GeometryFamily.TOOLBOX,
+    "extension cord" to GeometryFamily.CABLE_COIL, "extension lead" to GeometryFamily.CABLE_COIL,
+    "fire extinguisher" to GeometryFamily.BOTTLE, "dish soap" to GeometryFamily.BOTTLE,
+    "trash can" to GeometryFamily.UPRIGHT_CYLINDER, "waste bin" to GeometryFamily.UPRIGHT_CYLINDER,
+    "hockey stick" to GeometryFamily.LONG_HANDLE, "walking stick" to GeometryFamily.LONG_HANDLE,
+    "fishing rod" to GeometryFamily.LONG_HANDLE, "curtain rod" to GeometryFamily.LONG_HANDLE,
+    "golf club" to GeometryFamily.LONG_HANDLE, "step stool" to GeometryFamily.STOOL,
+    "bar stool" to GeometryFamily.STOOL,
+    // Personal.
+    "shopping bag" to GeometryFamily.TOTE_BAG, "tote bag" to GeometryFamily.TOTE_BAG,
+    "laptop bag" to GeometryFamily.TOTE_BAG, "bass guitar" to GeometryFamily.GUITAR,
+    "hard hat" to GeometryFamily.HELMET, "games console" to GeometryFamily.SMALL_CARTON,
+    "can opener" to GeometryFamily.HAND_TOOL, "box cutter" to GeometryFamily.HAND_TOOL,
+    "toilet brush" to GeometryFamily.LONG_HANDLE, "bottled water" to GeometryFamily.BOTTLE,
+    "smoke alarm" to GeometryFamily.DISC, "oven mitt" to GeometryFamily.SOFT_POUCH,
+    "oven mitts" to GeometryFamily.SOFT_POUCH,
 )
 
 private val WORDS: Map<String, GeometryFamily> = buildMap {
@@ -362,11 +452,77 @@ private val WORDS: Map<String, GeometryFamily> = buildMap {
     put(GeometryFamily.LAWNMOWER, "lawnmower", "mower")
     put(GeometryFamily.SOFA, "sofa", "couch", "settee", "loveseat")
     put(GeometryFamily.ARMCHAIR, "armchair", "recliner")
-    put(GeometryFamily.DINING_TABLE, "table", "desk")
-    put(GeometryFamily.CHAIR, "chair", "stool")
+    put(GeometryFamily.DINING_TABLE, "table")
+    put(GeometryFamily.CHAIR, "chair", "highchair")
     put(GeometryFamily.WARDROBE, "wardrobe", "armoire")
     put(GeometryFamily.BED_FRAME, "bed", "bedframe", "divan")
     put(GeometryFamily.LAMP, "lamp")
     put(GeometryFamily.PLANT_POT, "plant", "planter", "flowerpot", "pot", "cup", "mug", "tumbler", "bucket")
     put(GeometryFamily.PIANO, "piano")
+
+    // Kitchen.
+    put(GeometryFamily.KETTLE, "kettle", "teapot")
+    put(GeometryFamily.COFFEE_MAKER, "coffeemaker", "percolator")
+    put(GeometryFamily.MICROWAVE, "microwave")
+    put(GeometryFamily.TOASTER, "toaster")
+    put(GeometryFamily.COOKER, "cooker", "stove", "oven", "range", "hob")
+    put(GeometryFamily.COOKING_POT, "saucepan", "stockpot", "casserole", "crockpot")
+    put(GeometryFamily.FRYING_PAN, "pan", "skillet", "wok", "frypan", "griddle")
+    put(GeometryFamily.PLATE_STACK, "plate", "dish", "dishes", "crockery", "dinnerware", "saucer", "platter")
+    put(GeometryFamily.BOWL, "bowl", "colander", "sieve")
+    put(GeometryFamily.HAND_TOOL, "spoon", "fork", "knife", "knives", "ladle", "spatula", "whisk", "tongs")
+    put(GeometryFamily.BOTTLE, "vase", "blender", "extinguisher", "spray", "cleaner", "detergent", "bleach",
+        "shampoo", "soap", "sunscreen", "lotion", "repellent", "disinfectant")
+    put(GeometryFamily.UPRIGHT_CYLINDER, "glass", "bin", "paint", "battery", "batteries")
+    put(GeometryFamily.LYING_CYLINDER, "flashlight", "torch")
+    // Bedroom and living room.
+    put(GeometryFamily.PILLOW, "pillow", "cushion", "beanbag")
+    put(GeometryFamily.FOLDED_STACK, "blanket", "duvet", "comforter", "quilt", "throw", "towel", "towels",
+        "sheets", "bedding", "linen", "linens", "clothes", "clothing", "laundry", "shirt", "tshirt", "blouse",
+        "sweater", "jumper", "hoodie", "cardigan", "trousers", "pants", "jeans", "shorts", "skirt", "dress",
+        "jacket", "coat", "socks", "underwear", "pyjamas", "pajamas", "uniform", "curtains", "curtain")
+    put(GeometryFamily.BOOKCASE, "bookcase", "bookshelf", "bookshelves", "shelf", "shelves", "shelving")
+    put(GeometryFamily.CHEST_OF_DRAWERS, "drawers", "dresser", "cupboard", "cabinet", "sideboard",
+        "nightstand", "credenza", "bureau", "tallboy", "commode")
+    put(GeometryFamily.DESK, "desk", "workstation")
+    put(GeometryFamily.STOOL, "stool", "barstool")
+    put(GeometryFamily.OTTOMAN, "ottoman", "pouf", "pouffe", "footstool", "bench")
+    put(GeometryFamily.FRAMED_PANEL, "mirror", "picture", "painting", "artwork", "frame", "whiteboard",
+        "blackboard", "chalkboard", "corkboard", "noticeboard", "canvas", "poster", "door", "window", "headboard")
+    put(GeometryFamily.DISC, "clock", "frisbee", "record", "vinyl", "cymbal")
+    put(GeometryFamily.CRATE, "basket", "hamper")
+    put(GeometryFamily.LAMP, "fan")
+    put(GeometryFamily.BED_FRAME, "crib", "cot", "cradle")
+    put(GeometryFamily.MATTRESS, "futon")
+    put(GeometryFamily.WARDROBE, "closet")
+    // Office and electronics.
+    put(GeometryFamily.MONITOR, "monitor", "screen", "tv", "television", "telly", "computer", "imac")
+    put(GeometryFamily.PRINTER, "printer", "scanner", "copier")
+    put(GeometryFamily.SLIM_SLAB, "keyboard", "chromebook", "macbook")
+    put(GeometryFamily.SMALL_CARTON, "speaker", "router", "modem", "console", "playstation", "xbox", "shoebox")
+    // Personal.
+    put(GeometryFamily.HELMET, "helmet", "hardhat")
+    put(GeometryFamily.SHOE, "shoe", "boot", "trainer", "sneaker", "sandal", "slipper", "heels", "loafer")
+    put(GeometryFamily.TOTE_BAG, "bag", "handbag", "purse", "tote", "satchel")
+    put(GeometryFamily.SOFT_POUCH, "wallet")
+    put(GeometryFamily.SUITCASE, "briefcase", "trolley")
+    put(GeometryFamily.GUITAR, "guitar", "violin", "ukulele", "viola", "cello", "banjo", "mandolin")
+    // Cleaning, tools and garden.
+    put(GeometryFamily.UPRIGHT_VACUUM, "vacuum", "hoover")
+    put(GeometryFamily.LONG_HANDLE, "broom", "mop", "rake", "shovel", "spade", "hoe", "umbrella", "duster",
+        "squeegee", "pole", "rod", "stick", "bat", "racket", "racquet", "oar", "paddle")
+    put(GeometryFamily.POWER_DRILL, "drill", "sander", "jigsaw", "grinder", "hairdryer", "blower")
+    put(GeometryFamily.HAND_TOOL, "hammer", "spanner", "wrench", "screwdriver", "pliers", "mallet", "axe",
+        "hatchet", "chisel", "trowel", "saw", "secateurs", "scissors")
+    put(GeometryFamily.CABLE_COIL, "cord", "rope", "lead", "wire")
+    put(GeometryFamily.TOOLBOX, "caddy", "kit")
+    put(GeometryFamily.BARREL, "butt")
+    // Desk and stationery.
+    put(GeometryFamily.LYING_CYLINDER, "pen", "pencil", "marker", "highlighter")
+    put(GeometryFamily.HAND_TOOL, "toothbrush", "hairbrush", "brush")
+    put(GeometryFamily.SLIM_SLAB, "ruler")
+    put(GeometryFamily.FLAT_RECTANGLE, "paper", "ream", "envelope", "envelopes")
+    put(GeometryFamily.DISC, "tape")
+    put(GeometryFamily.BOTTLE, "glue")
+    put(GeometryFamily.COOLER_BOX, "container", "tupperware")
 }

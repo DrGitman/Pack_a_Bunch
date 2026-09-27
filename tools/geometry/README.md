@@ -44,6 +44,36 @@ Canonical box 1000 × 1000 × 1000 mm, origin at the minimum corner, X width, Y 
 | `tv_stand` | 18 | 3 | A TV on its stand: cabinet, neck, screen. |
 | `plant_pot` | 46 | 1 | Tapered pot with a rim — also how a cup or tumbler is drawn. |
 | `piano` | 24 | 4 | Upright piano: case, keyboard shelf, legs under it. |
+| `kettle` | 52 | 5 | Jug kettle: round body, spout, a handle on the back reaching over the lid. |
+| `coffee_maker` | 46 | 4 | Drip coffee maker: base plate, water tower at the back, hood over a round carafe. |
+| `microwave` | 18 | 3 | Microwave or countertop oven: body, a door window and the control strip beside it. |
+| `toaster` | 24 | 4 | Pop-up toaster: body with two slot rims on top and the lever on its side. |
+| `cooker` | 64 | 8 | Free-standing cooker: body, four rings on the hob, splashback, oven door and handle. |
+| `cooking_pot` | 46 | 3 | Saucepan or stock pot: round body, a lid knob and a long handle. |
+| `frying_pan` | 28 | 2 | Frying pan or skillet: a shallow flared disc and a long handle. |
+| `plate_stack` | 72 | 4 | A stack of plates or dishes: four shallow flared discs. |
+| `bowl` | 46 | 1 | A bowl: a foot ring and a wide flared body. |
+| `pillow` | 42 | 3 | Pillow or cushion: a puffed middle that thins towards the ends. |
+| `folded_stack` | 24 | 4 | Folded clothes, towels or a blanket: four soft layers, none quite squared up. |
+| `bookcase` | 60 | 10 | Bookcase or open shelving: sides, back, three shelves and books on two of them. |
+| `chest_of_drawers` | 54 | 9 | Chest of drawers, cupboard or bedside table: carcass, four drawer fronts, handles. |
+| `desk` | 36 | 6 | Desk: top, a drawer pedestal on one side, two legs on the other. |
+| `stool` | 42 | 5 | Stool or bar stool: a round seat on four legs, no back. |
+| `ottoman` | 34 | 5 | Ottoman, pouf or bench: a padded block with softened top edges on short feet. |
+| `clothes_rail` | 36 | 6 | Clothes rail or coat stand: feet, two uprights, the top bar and the clothes hanging on it. |
+| `framed_panel` | 30 | 5 | Mirror, picture, whiteboard or a door: a frame round a recessed panel, drawn lying flat. |
+| `disc` | 46 | 1 | Clock, platter, frisbee, anything round and flat: a disc with a raised rim. |
+| `monitor` | 18 | 3 | Monitor or flat-screen TV: foot, neck and a thin screen. |
+| `printer` | 24 | 4 | Printer: body, scanner lid, output tray at the front and paper feed behind. |
+| `helmet` | 70 | 2 | Helmet: a dome with a short peak at the front. |
+| `shoe` | 18 | 3 | Shoe or boot: sole, a heel and ankle block, and the toe sloping down to the front. |
+| `tote_bag` | 24 | 4 | Handbag, tote or shopping bag: a body wider at the top and two handles. |
+| `guitar` | 48 | 4 | Guitar or violin lying on its back: lower and upper bouts, neck and headstock. |
+| `upright_vacuum` | 24 | 4 | Upright vacuum cleaner: floor head, body, stick and handle. |
+| `long_handle` | 12 | 2 | Broom, mop, rake or umbrella: a long pole and its head, lying along the width. |
+| `watering_can` | 48 | 6 | Watering can: body, a long spout with its rose, and the handle at the back. |
+| `power_drill` | 24 | 4 | Cordless drill: barrel, chuck, grip and the battery it stands on. |
+| `hand_tool` | 12 | 2 | Hammer, spanner, screwdriver or pliers: a handle and a heavier head, lying along the width. |
 
 ## Compromises
 

@@ -1,7 +1,7 @@
 """
 Pack a Bunch — item geometry families.
 
-Thirty-eight generic, low-poly shapes that make a packing plan readable: a bottle is drawn as
+Sixty-eight generic, low-poly shapes that make a packing plan readable: a bottle is drawn as
 a bottle, a chair as a chair, scaled to the size the person measured. They are for *looking*
 only. The solver never sees them — it packs the measured bounding box, and every mesh here
 fills exactly that box, so the picture can never show an item where the solver did not put it.
@@ -506,6 +506,215 @@ def piano():
     return m.add(box(0.03, 0.09, 0, 0.06, 0, 0.66)).add(box(0.91, 0.97, 0, 0.06, 0, 0.66))
 
 
+# -- everyday household things -----------------------------------------------------------------
+
+
+def kettle():
+    """Jug kettle: round body, spout, a handle on the back reaching over the lid."""
+    m = Mesh().add(lathe([(1, 0), (1, 0.7), (0.8, 0.82)], 10, "z", (0.46, 0.5), (0.34, 0.5)))
+    m.add(box(0, 0.14, 0.44, 0.56, 0.5, 0.7))
+    m.add(box(0.9, 1, 0.44, 0.56, 0.25, 1)).add(box(0.62, 0.9, 0.44, 0.56, 0.9, 1))
+    return m.add(box(0.78, 0.9, 0.44, 0.56, 0.25, 0.33))
+
+
+def coffee_maker():
+    """Drip coffee maker: base plate, water tower at the back, hood over a round carafe."""
+    m = Mesh().add(box(0, 1, 0, 1, 0, 0.1)).add(box(0, 1, 0.58, 1, 0.1, 1)).add(box(0, 1, 0.1, 0.58, 0.82, 1))
+    return m.add(lathe([(1, 0.1), (1, 0.5), (0.72, 0.62)], 10, "z", (0.5, 0.33), (0.3, 0.22)))
+
+
+def microwave():
+    """Microwave or countertop oven: body, a door window and the control strip beside it."""
+    m = Mesh().add(box(0, 1, 0.04, 1, 0, 1))
+    return m.add(box(0.05, 0.7, 0, 0.04, 0.12, 0.88)).add(box(0.76, 0.95, 0.015, 0.04, 0.12, 0.88))
+
+
+def toaster():
+    """Pop-up toaster: body with two slot rims on top and the lever on its side."""
+    m = Mesh().add(box(0, 0.9, 0, 1, 0, 0.9))
+    m.add(box(0.12, 0.78, 0.18, 0.4, 0.9, 0.96)).add(box(0.12, 0.78, 0.6, 0.82, 0.9, 0.96))
+    return m.add(box(0.9, 1, 0.42, 0.58, 0.45, 1))
+
+
+def cooker():
+    """Free-standing cooker: body, four rings on the hob, splashback, oven door and handle."""
+    m = Mesh().add(box(0, 1, 0.03, 1, 0, 0.92)).add(box(0, 1, 0.9, 1, 0.92, 1))
+    for cx, cy in ((0.27, 0.28), (0.73, 0.28), (0.27, 0.64), (0.73, 0.64)):
+        m.add(lathe([(1, 0.92), (1, 0.95)], 6, "z", (cx, cy), (0.14, 0.12)))
+    return m.add(box(0.08, 0.92, 0.012, 0.03, 0.1, 0.7)).add(box(0.2, 0.8, 0, 0.012, 0.62, 0.66))
+
+
+def cooking_pot():
+    """Saucepan or stock pot: round body, a lid knob and a long handle."""
+    m = Mesh().add(lathe([(1, 0), (1, 0.8), (0.92, 0.86)], 12, "z", (0.4, 0.5), (0.4, 0.5)))
+    return m.add(box(0.36, 0.44, 0.46, 0.54, 0.86, 1)).add(box(0.8, 1, 0.45, 0.55, 0.66, 0.76))
+
+
+def frying_pan():
+    """Frying pan or skillet: a shallow flared disc and a long handle."""
+    m = Mesh().add(lathe([(0.8, 0), (1, 1)], 12, "z", (0.3, 0.5), (0.3, 0.5)))
+    return m.add(box(0.6, 1, 0.44, 0.56, 0.62, 0.86))
+
+
+def plate_stack():
+    """A stack of plates or dishes: four shallow flared discs."""
+    m = Mesh()
+    for i in range(4):
+        z0 = i * 0.25
+        m.add(lathe([(0.62, z0), (1, z0 + 0.25)], 10, "z", (0.5, 0.5), (0.5, 0.5)))
+    return m
+
+
+def bowl():
+    """A bowl: a foot ring and a wide flared body."""
+    return Mesh().add(lathe([(0.55, 0), (0.55, 0.08), (0.88, 0.55), (1, 1)], 12, "z", (0.5, 0.5), (0.5, 0.5)))
+
+
+def pillow():
+    """Pillow or cushion: a puffed middle that thins towards the ends."""
+    m = Mesh().add(prism(chamfered_rect(0, 1, 0, 1, 0.16, 0.42), "x", 0.07, 0.93))
+    m.add(prism(chamfered_rect(0.1, 0.9, 0.22, 0.78, 0.14, 0.2), "x", 0, 0.07))
+    return m.add(prism(chamfered_rect(0.1, 0.9, 0.22, 0.78, 0.14, 0.2), "x", 0.93, 1))
+
+
+def folded_stack():
+    """Folded clothes, towels or a blanket: four soft layers, none quite squared up."""
+    return Mesh().add(box(0, 0.97, 0.02, 1, 0, 0.25)).add(box(0.02, 1, 0, 0.98, 0.25, 0.5)) \
+        .add(box(0.01, 0.98, 0.01, 0.99, 0.5, 0.75)).add(box(0.03, 0.99, 0.02, 0.97, 0.75, 1))
+
+
+def bookcase():
+    """Bookcase or open shelving: sides, back, three shelves and books on two of them."""
+    m = Mesh().add(box(0, 0.05, 0, 1, 0, 1)).add(box(0.95, 1, 0, 1, 0, 1)).add(box(0.05, 0.95, 0.94, 1, 0, 1))
+    m.add(box(0.05, 0.95, 0, 0.94, 0, 0.05)).add(box(0.05, 0.95, 0, 0.94, 0.95, 1))
+    for z in (0.3, 0.55, 0.78):
+        m.add(box(0.05, 0.95, 0, 0.94, z, z + 0.03))
+    return m.add(box(0.08, 0.62, 0.2, 0.94, 0.05, 0.25)).add(box(0.3, 0.9, 0.2, 0.94, 0.58, 0.76))
+
+
+def chest_of_drawers():
+    """Chest of drawers, cupboard or bedside table: carcass, four drawer fronts, handles."""
+    m = Mesh().add(box(0, 1, 0.03, 1, 0, 1))
+    for i in range(4):
+        z0 = 0.04 + i * 0.24
+        m.add(box(0.04, 0.96, 0.012, 0.03, z0, z0 + 0.21)).add(box(0.42, 0.58, 0, 0.012, z0 + 0.09, z0 + 0.12))
+    return m
+
+
+def desk():
+    """Desk: top, a drawer pedestal on one side, two legs on the other."""
+    m = Mesh().add(box(0, 1, 0, 1, 0.92, 1)).add(box(0.62, 1, 0.05, 1, 0, 0.92))
+    m.add(box(0.64, 0.98, 0.03, 0.05, 0.5, 0.88)).add(box(0.64, 0.98, 0.03, 0.05, 0.06, 0.46))
+    return m.add(box(0.02, 0.08, 0.05, 0.11, 0, 0.92)).add(box(0.02, 0.08, 0.89, 0.95, 0, 0.92))
+
+
+def monitor():
+    """Monitor or flat-screen TV: foot, neck and a thin screen."""
+    m = Mesh().add(box(0.3, 0.7, 0, 1, 0, 0.05)).add(box(0.45, 0.55, 0.56, 0.7, 0.05, 0.3))
+    return m.add(box(0, 1, 0.4, 0.56, 0.3, 1))
+
+
+def printer():
+    """Printer: body, scanner lid, output tray at the front and paper feed behind."""
+    m = Mesh().add(box(0, 1, 0.1, 1, 0, 0.7)).add(box(0.02, 0.98, 0.12, 0.98, 0.7, 0.78))
+    return m.add(box(0.15, 0.85, 0, 0.1, 0.25, 0.29)).add(box(0.15, 0.85, 0.9, 0.97, 0.78, 1))
+
+
+def disc():
+    """Clock, platter, frisbee, anything round and flat: a disc with a raised rim."""
+    return Mesh().add(lathe([(1, 0), (1, 1), (0.9, 1), (0.9, 0.7)], 12, "z", (0.5, 0.5), (0.5, 0.5)))
+
+
+def framed_panel():
+    """Mirror, picture, whiteboard or a door: a frame round a recessed panel, drawn lying flat."""
+    m = Mesh().add(box(0, 0.06, 0, 1, 0, 1)).add(box(0.94, 1, 0, 1, 0, 1))
+    m.add(box(0.06, 0.94, 0, 0.06, 0, 1)).add(box(0.06, 0.94, 0.94, 1, 0, 1))
+    return m.add(box(0.06, 0.94, 0.06, 0.94, 0.25, 0.75))
+
+
+def helmet():
+    """Helmet: a dome with a short peak at the front."""
+    m = Mesh().add(lathe(
+        [(1, 0), (1, 0.15), (0.95, 0.4), (0.8, 0.65), (0.55, 0.85), (0.25, 0.97), (0, 1)],
+        10, "z", (0.5, 0.56), (0.5, 0.44)))
+    return m.add(box(0.2, 0.8, 0, 0.14, 0.08, 0.18))
+
+
+def shoe():
+    """Shoe or boot: sole, a heel and ankle block, and the toe sloping down to the front."""
+    m = Mesh().add(box(0, 1, 0, 1, 0, 0.12)).add(box(0, 0.4, 0.05, 0.95, 0.12, 1))
+    return m.add(hexahedron([
+        (0.4, 0.05, 0.12), (1, 0.1, 0.12), (1, 0.9, 0.12), (0.4, 0.95, 0.12),
+        (0.4, 0.05, 0.7), (1, 0.1, 0.35), (1, 0.9, 0.35), (0.4, 0.95, 0.7)]))
+
+
+def upright_vacuum():
+    """Upright vacuum cleaner: floor head, body, stick and handle."""
+    m = Mesh().add(box(0, 1, 0, 0.5, 0, 0.1)).add(box(0.25, 0.75, 0.4, 1, 0.1, 0.6))
+    return m.add(box(0.44, 0.56, 0.75, 0.87, 0.6, 0.94)).add(box(0.3, 0.7, 0.75, 0.87, 0.94, 1))
+
+
+def long_handle():
+    """Broom, mop, rake or umbrella: a long pole and its head, lying along the width."""
+    return Mesh().add(box(0, 0.85, 0.44, 0.56, 0.44, 0.56)).add(box(0.85, 1, 0, 1, 0, 1))
+
+
+def watering_can():
+    """Watering can: body, a long spout with its rose, and the handle at the back."""
+    m = Mesh().add(lathe([(1, 0), (1, 0.7)], 10, "z", (0.5, 0.5), (0.25, 0.5)))
+    m.add(bar((0.28, 0.5, 0.2), (0.07, 0.5, 0.78), 0.03, 0.03)).add(box(0, 0.08, 0.42, 0.58, 0.76, 0.86))
+    m.add(box(0.92, 1, 0.45, 0.55, 0.25, 1)).add(box(0.6, 0.92, 0.45, 0.55, 0.92, 1))
+    return m.add(box(0.75, 0.92, 0.45, 0.55, 0.25, 0.33))
+
+
+def power_drill():
+    """Cordless drill: barrel, chuck, grip and the battery it stands on."""
+    m = Mesh().add(box(0, 0.8, 0.2, 0.8, 0.55, 1)).add(box(0.8, 1, 0.38, 0.62, 0.66, 0.88))
+    return m.add(box(0.38, 0.62, 0.3, 0.7, 0.18, 0.55)).add(box(0.25, 0.75, 0, 1, 0, 0.18))
+
+
+def hand_tool():
+    """Hammer, spanner, screwdriver or pliers: a handle and a heavier head, lying along the width."""
+    return Mesh().add(box(0, 0.82, 0.42, 0.58, 0.35, 0.65)).add(box(0.82, 1, 0, 1, 0, 1))
+
+
+def guitar():
+    """Guitar or violin lying on its back: lower and upper bouts, neck and headstock."""
+    m = Mesh().add(lathe([(1, 0), (1, 1)], 10, "z", (0.2, 0.5), (0.2, 0.5)))
+    m.add(lathe([(1, 0), (1, 1)], 10, "z", (0.47, 0.5), (0.15, 0.38)))
+    return m.add(box(0.6, 0.93, 0.44, 0.56, 0.55, 0.85)).add(box(0.93, 1, 0.4, 0.6, 0.55, 0.85))
+
+
+def tote_bag():
+    """Handbag, tote or shopping bag: a body wider at the top and two handles."""
+    m = Mesh().add(prism([(0.08, 0), (0.92, 0), (1, 0.72), (0, 0.72)], "y", 0, 1))
+    m.add(box(0.28, 0.34, 0.45, 0.55, 0.72, 0.94)).add(box(0.66, 0.72, 0.45, 0.55, 0.72, 0.94))
+    return m.add(box(0.28, 0.72, 0.45, 0.55, 0.94, 1))
+
+
+def stool():
+    """Stool or bar stool: a round seat on four legs, no back."""
+    m = Mesh().add(lathe([(1, 0.88), (1, 1)], 10, "z", (0.5, 0.5), (0.5, 0.5)))
+    for x0, y0 in ((0.14, 0.14), (0.78, 0.14), (0.14, 0.78), (0.78, 0.78)):
+        m.add(box(x0, x0 + 0.08, y0, y0 + 0.08, 0, 0.88))
+    return m
+
+
+def ottoman():
+    """Ottoman, pouf or bench: a padded block with softened top edges on short feet."""
+    m = Mesh().add(prism([(0, 0.12), (1, 0.12), (1, 0.88), (0.94, 1), (0.06, 1), (0, 0.88)], "x", 0, 1))
+    for x0, y0 in ((0.04, 0.04), (0.9, 0.04), (0.04, 0.9), (0.9, 0.9)):
+        m.add(box(x0, x0 + 0.06, y0, y0 + 0.06, 0, 0.12))
+    return m
+
+
+def clothes_rail():
+    """Clothes rail or coat stand: feet, two uprights, the top bar and the clothes hanging on it."""
+    m = Mesh().add(box(0, 0.08, 0, 1, 0, 0.05)).add(box(0.92, 1, 0, 1, 0, 0.05))
+    m.add(box(0.02, 0.06, 0.46, 0.54, 0.05, 0.94)).add(box(0.94, 0.98, 0.46, 0.54, 0.05, 0.94))
+    return m.add(box(0, 1, 0.46, 0.54, 0.94, 1)).add(box(0.1, 0.9, 0.2, 0.8, 0.3, 0.92))
+
+
 def facing_viewer(fn):
     """
     Turns a family round so its front — the door, the keyboard, the seat — faces +Y.
@@ -523,7 +732,8 @@ def facing_viewer(fn):
     return wrapped
 
 
-for _f in ("appliance_slab", "upright_fridge", "wardrobe", "piano", "backpack", "sofa", "armchair", "chair", "bed_frame"):
+for _f in ("appliance_slab", "upright_fridge", "wardrobe", "piano", "backpack", "sofa", "armchair", "chair", "bed_frame",
+           "coffee_maker", "microwave", "cooker", "bookcase", "chest_of_drawers", "desk", "monitor", "printer"):
     globals()[_f] = facing_viewer(globals()[_f])
 
 
@@ -542,6 +752,21 @@ FAMILIES = [
     # room
     ("sofa", sofa), ("armchair", armchair), ("dining_table", dining_table), ("chair", chair), ("wardrobe", wardrobe),
     ("bed_frame", bed_frame), ("lamp", lamp), ("tv_stand", tv_stand), ("plant_pot", plant_pot), ("piano", piano),
+    # kitchen
+    ("kettle", kettle), ("coffee_maker", coffee_maker), ("microwave", microwave), ("toaster", toaster),
+    ("cooker", cooker), ("cooking_pot", cooking_pot), ("frying_pan", frying_pan), ("plate_stack", plate_stack),
+    ("bowl", bowl),
+    # bedroom and living room
+    ("pillow", pillow), ("folded_stack", folded_stack), ("bookcase", bookcase), ("chest_of_drawers", chest_of_drawers),
+    ("desk", desk), ("stool", stool), ("ottoman", ottoman), ("clothes_rail", clothes_rail),
+    ("framed_panel", framed_panel), ("disc", disc),
+    # office and electronics
+    ("monitor", monitor), ("printer", printer),
+    # personal
+    ("helmet", helmet), ("shoe", shoe), ("tote_bag", tote_bag), ("guitar", guitar),
+    # cleaning, tools and garden
+    ("upright_vacuum", upright_vacuum), ("long_handle", long_handle), ("watering_can", watering_can),
+    ("power_drill", power_drill), ("hand_tool", hand_tool),
 ]
 
 

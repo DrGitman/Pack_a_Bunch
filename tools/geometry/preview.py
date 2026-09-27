@@ -35,7 +35,15 @@ dims = {  # realistic sizes (mm) so proportions read as they will in the app
  "ladder":(2400,400,120),"barrel":(600,600,880),"bicycle":(1750,600,1050),"lawnmower":(1400,550,1000),
  "sofa":(2000,900,850),"armchair":(850,850,900),"dining_table":(1600,900,750),"chair":(450,500,900),
  "wardrobe":(1200,600,2000),"bed_frame":(1500,2100,1000),"lamp":(400,400,1500),"tv_stand":(1200,400,1100),
- "plant_pot":(300,300,280),"piano":(1500,600,1250)}
+ "plant_pot":(300,300,280),"piano":(1500,600,1250),
+ "kettle":(250,170,250),"coffee_maker":(250,260,360),"microwave":(480,360,280),"toaster":(300,180,200),
+ "cooker":(600,600,900),"cooking_pot":(380,220,180),"frying_pan":(480,280,60),"plate_stack":(270,270,80),
+ "bowl":(200,200,90),"pillow":(700,450,150),"folded_stack":(350,300,200),"bookcase":(800,300,1800),
+ "chest_of_drawers":(800,450,900),"desk":(1200,600,750),"stool":(400,400,650),"ottoman":(800,450,420),
+ "clothes_rail":(1200,450,1600),"framed_panel":(600,900,40),"disc":(300,300,50),"monitor":(600,200,450),
+ "printer":(450,380,250),"helmet":(250,300,200),"shoe":(300,110,120),"tote_bag":(400,150,450),
+ "guitar":(1000,380,110),"upright_vacuum":(320,300,1100),"long_handle":(1300,300,120),
+ "watering_can":(550,200,400),"power_drill":(250,90,240),"hand_tool":(320,120,35)}
 cols = 8; rows = math.ceil(len(files)/cols)
 fig, axes = plt.subplots(rows, cols, figsize=(cols*2.4, rows*2.6), facecolor="#F7EFE6")
 wrong = []
