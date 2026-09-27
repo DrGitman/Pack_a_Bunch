@@ -29,17 +29,43 @@ object ItemPhotos {
     fun pathFor(context: Context, itemId: String): String? =
         File(dir(context), "$itemId.jpg").takeIf { it.exists() }?.absolutePath
 
-    /** Copies a picked image in and returns its path, or null if it could not be read. */
+    /**
+     * Stores a picked image and returns its path, or null if it is not a picture that decodes.
+     *
+     * The picture is decoded and written out again rather than copied byte for byte. Whatever
+     * the picker hands over — a 40 MB camera original, or a file that is not an image at all —
+     * what lands here is a JPEG no longer than [MAX_PX] on its longest side, and it no longer
+     * carries where the photo was taken.
+     */
     suspend fun store(context: Context, itemId: String, picked: Uri): String? =
         withContext(Dispatchers.IO) {
-            runCatching {
-                val target = File(dir(context), "$itemId.jpg")
-                context.contentResolver.openInputStream(picked)?.use { input ->
-                    target.outputStream().use(input::copyTo)
-                } ?: return@runCatching null
-                target.absolutePath
-            }.getOrNull()
+            val bitmap = runCatching { decode(context, picked) }.getOrNull() ?: return@withContext null
+            try {
+                store(context, itemId, bitmap)
+            } finally {
+                bitmap.recycle()
+            }
         }
+
+    private fun decode(context: Context, picked: Uri): android.graphics.Bitmap? {
+        val resolver = context.contentResolver
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        resolver.openInputStream(picked)?.use { android.graphics.BitmapFactory.decodeStream(it, null, bounds) }
+        val longest = maxOf(bounds.outWidth, bounds.outHeight)
+        if (longest <= 0) return null
+        var sample = 1
+        while (longest / (sample * 2) >= MAX_PX) sample *= 2
+        val decoded = resolver.openInputStream(picked)?.use {
+            android.graphics.BitmapFactory.decodeStream(it, null, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+        } ?: return null
+        val scale = MAX_PX.toFloat() / maxOf(decoded.width, decoded.height)
+        if (scale >= 1f) return decoded
+        return android.graphics.Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt().coerceAtLeast(1),
+            (decoded.height * scale).toInt().coerceAtLeast(1), true).also { decoded.recycle() }
+    }
+
+    /** Longest side of a stored item photo. Plenty for a thumbnail and for the plan's colour. */
+    private const val MAX_PX = 1600
 
     /**
      * Stores a picture the app took itself — the crop of an object from the item scan — as
