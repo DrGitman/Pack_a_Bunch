@@ -1,0 +1,492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>Pack a Bunch — brag</title>
+<script src="assets/gsap.min.js"></script>
+<script src="assets/audio-rms.js"></script>
+<style>
+@font-face { font-family: "Jakarta"; src: url("assets/fonts/plus_jakarta_sans.ttf") format("truetype"); font-weight: 200 900; }
+@font-face { font-family: "DM Mono"; src: url("assets/fonts/dm_mono_regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "DM Mono"; src: url("assets/fonts/dm_mono_medium.ttf") format("truetype"); font-weight: 500; }
+:root { --ground:#F7EFE6; --ink:#3F2718; --terra:#A65C34; --amber:#F2A03D; --muted:#6E5646; --card:#FFFDFa; }
+body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakarta", sans-serif; }
+#root { position:relative; width:100%; height:100%; overflow:hidden; background:var(--ground); }
+.clip { position:absolute; inset:0; }
+.inner { position:absolute; inset:0; }
+#glow { position:absolute; width:1300px; height:1300px; left:760px; top:-160px; border-radius:50%;
+  background:radial-gradient(circle, rgba(166,92,52,0.22) 0%, rgba(242,160,61,0.10) 38%, rgba(247,239,230,0) 68%); }
+#ghost { position:absolute; left:-40px; bottom:150px; font-weight:800; font-size:300px; letter-spacing:-12px; color:#3F2718; opacity:0.035; white-space:nowrap; }
+.grain { position:absolute; inset:0; background-image:radial-gradient(rgba(63,39,24,0.05) 1px, transparent 1px); background-size:6px 6px; }
+
+/* scene 1 */
+#s1-photo { position:absolute; inset:0; background:url("assets/img/desk.jpg") center/cover; }
+#s1-dim { position:absolute; inset:0; background:linear-gradient(180deg, rgba(43,29,20,0.55), rgba(43,29,20,0.82)); }
+.s1-line { position:absolute; left:140px; right:140px; color:#FFF8F0; font-weight:800; letter-spacing:-2px; }
+#s1-l1 { top:380px; font-size:88px; }
+#s1-l2 { top:520px; font-size:120px; color:#F7C27A; }
+
+/* shared copy column */
+.copy { position:absolute; left:120px; top:190px; width:520px; }
+.step { font-family:"DM Mono"; font-weight:500; font-size:26px; letter-spacing:1px; color:#8E4A26; text-transform:uppercase; }
+.h { font-weight:800; font-size:66px; line-height:1.04; letter-spacing:-2px; margin-top:18px; color:var(--ink); }
+.b { font-size:30px; line-height:1.4; color:var(--muted); margin-top:22px; }
+
+/* phone (held sideways, as in the scan screens) */
+.phone { position:absolute; left:700px; top:120px; width:1120px; height:640px; border-radius:56px; background:#1F140D; box-shadow:0 40px 90px rgba(63,39,24,0.35), 0 0 0 3px #4A3222 inset; }
+.screen { position:absolute; left:18px; top:18px; right:18px; bottom:18px; border-radius:40px; overflow:hidden; background:#2B1D14; }
+.feed { position:absolute; inset:0; background:url("assets/img/desk.jpg") center/cover; filter:saturate(1.05); }
+.overlay { position:absolute; inset:0; width:100%; height:100%; }
+.outline .dr { fill:none; stroke:#F2A03D; stroke-width:3; stroke-dasharray:1400; stroke-linejoin:round; stroke-linecap:round; filter:drop-shadow(0 0 4px rgba(242,160,61,0.8)); }
+#s2-o0 .dr, #s2-o1 .dr, #s2-o2 .dr { stroke:#FFFFFF; filter:drop-shadow(0 0 5px rgba(255,255,255,0.8)); }
+#s4-phone .outline .dr { stroke-dasharray:none; }
+.pill { position:absolute; padding:10px 22px; border-radius:999px; font-family:"DM Mono"; font-size:30px; font-weight:500; background:#FFFFFF; color:#241710; box-shadow:0 6px 16px rgba(0,0,0,0.25); white-space:nowrap; }
+.pill i { font-style:normal; color:#6E5646; margin-right:10px; }
+.pill.amber { background:#F2A03D; color:#241710; }
+.pill.amber i { color:#5A3413; }
+.dark { position:absolute; padding:12px 26px; border-radius:999px; background:rgba(28,19,13,0.82); color:#FFF8F0; font-size:26px; font-weight:600; white-space:nowrap; }
+.dot { display:inline-block; width:14px; height:14px; border-radius:50%; background:#F2A03D; margin-right:14px; vertical-align:middle; }
+.dot.ok { background:#3E9B62; }
+.round { position:absolute; width:82px; height:82px; border-radius:50%; background:rgba(28,19,13,0.82); }
+.round svg { position:absolute; left:23px; top:23px; }
+.btn { position:absolute; left:50%; margin-left:-190px; width:380px; bottom:34px; height:78px; border-radius:40px; background:#A65C34; color:#FFFFFF; font-weight:800; font-size:32px; display:flex; align-items:center; justify-content:center; gap:14px; box-shadow:0 10px 24px rgba(0,0,0,0.3); }
+.tap { position:absolute; width:90px; height:90px; border-radius:50%; background:rgba(255,255,255,0.55); left:50%; margin-left:-45px; bottom:28px; opacity:0; }
+.chip { position:absolute; display:flex; align-items:center; gap:12px; padding:10px 22px 10px 12px; border-radius:999px; background:rgba(28,19,13,0.84); color:#FFF8F0; font-size:26px; font-weight:700; white-space:nowrap; }
+.chip .mk { position:relative; width:34px; height:34px; }
+.chip .ring { position:absolute; inset:0; border-radius:50%; border:4px solid #F2A03D; box-sizing:border-box; }
+.chip .tick { position:absolute; inset:0; border-radius:50%; background:#3E9B62; opacity:0; }
+.chip .tick svg { position:absolute; left:7px; top:8px; }
+
+/* scene 3 boot */
+#s3-boot { position:absolute; inset:0; background:radial-gradient(ellipse at 50% 55%, #6B5646 0%, #3A2B20 55%, #1F150E 100%); }
+#s3-scan { position:absolute; top:0; bottom:0; width:140px; background:linear-gradient(90deg, rgba(242,160,61,0), rgba(242,160,61,0.28), rgba(242,160,61,0)); }
+#s3-wire .dr { fill:none; stroke:#FFFFFF; stroke-width:4; stroke-dasharray:2400; stroke-linejoin:round; filter:drop-shadow(0 0 5px rgba(255,255,255,0.7)); }
+
+/* scene 5 */
+#s5-svg { position:absolute; left:640px; top:40px; width:1200px; height:760px; }
+.stat { position:absolute; top:560px; width:250px; height:150px; border-radius:28px; background:#FFFFFF; box-shadow:0 14px 34px rgba(63,39,24,0.12); padding:24px 28px; box-sizing:border-box; }
+.stat .n { font-family:"DM Mono"; font-weight:500; font-size:52px; color:var(--ink); }
+.stat .l { font-size:22px; color:var(--muted); margin-top:6px; }
+
+/* scene 6 */
+.gcard { position:absolute; left:760px; top:230px; width:980px; height:430px; border-radius:40px; background:#FFFFFF; box-shadow:0 24px 60px rgba(63,39,24,0.16); padding:52px 60px; box-sizing:border-box; }
+.gcard .k { font-family:"DM Mono"; font-weight:500; font-size:26px; color:#8E4A26; letter-spacing:1px; }
+.gcard .t { font-weight:800; font-size:58px; line-height:1.08; letter-spacing:-1.5px; margin-top:22px; color:var(--ink); }
+.gcard .track { position:absolute; left:60px; right:60px; bottom:56px; height:12px; border-radius:6px; background:#EFE2D3; }
+.gcard .fill { position:absolute; left:0; top:0; bottom:0; width:100%; border-radius:6px; background:#A65C34; transform-origin:left center; }
+#s6-fits { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:34px; }
+#s6-fits .big { font-weight:800; font-size:150px; letter-spacing:-5px; color:var(--ink); }
+#s6-fits .ok { width:150px; height:150px; border-radius:50%; background:#2F7A4C; position:relative; }
+#s6-fits .ok svg { position:absolute; left:34px; top:38px; }
+
+/* scene 7 */
+#s7-card { position:absolute; left:820px; top:70px; width:880px; height:800px; border-radius:44px; background:#FFFFFF; box-shadow:0 30px 70px rgba(63,39,24,0.16); padding:30px; box-sizing:border-box; }
+#s7-hero { height:280px; border-radius:32px; background:linear-gradient(135deg, #4A2C19 0%, #7A4125 60%, #A65C34 100%); padding:36px 44px; box-sizing:border-box; color:#FFF8F0; position:relative; overflow:hidden; }
+#s7-hero .badge { display:inline-block; padding:8px 18px; border-radius:999px; background:rgba(255,255,255,0.16); font-family:"DM Mono"; font-weight:500; font-size:22px; letter-spacing:1px; }
+#s7-hero .t { font-weight:800; font-size:62px; letter-spacing:-2px; line-height:1.02; margin-top:20px; width:520px; }
+#s7-hero .s { font-size:24px; margin-top:12px; color:#F4DCC6; }
+#s7-hero .crate { position:absolute; right:40px; bottom:30px; }
+.row { display:flex; align-items:center; gap:22px; margin:22px 10px 0; }
+.row .ic { width:60px; height:60px; border-radius:18px; background:#F6E6D6; flex:none; position:relative; }
+.row .ic svg { position:absolute; left:15px; top:15px; }
+.row .tt { font-weight:700; font-size:28px; color:var(--ink); }
+.row .ss { font-size:21px; color:var(--muted); margin-top:2px; }
+#s7-toggle { position:relative; margin:30px auto 0; width:440px; height:70px; border-radius:36px; background:#F3E7DA; }
+#s7-knob { position:absolute; left:4px; top:4px; width:218px; height:62px; border-radius:32px; background:#A65C34; }
+.tg { position:absolute; top:0; width:220px; height:70px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:26px; }
+#s7-weekly { left:0; color:#FFFFFF; }
+#s7-monthly { right:0; color:#6E5646; }
+#s7-sub { margin:22px 10px 0; height:78px; border-radius:40px; background:#A65C34; color:#FFFFFF; font-weight:800; font-size:30px; display:flex; align-items:center; justify-content:center; }
+
+/* scene 8 */
+#s8 .centre { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+#s8-logo { display:flex; align-items:center; gap:34px; }
+#s8-logo .mark { width:150px; height:150px; border-radius:40px; background:#A65C34; position:relative; box-shadow:0 20px 50px rgba(166,92,52,0.35); }
+#s8-logo .mark svg { position:absolute; left:25px; top:22px; }
+#s8-logo .name { font-weight:800; font-size:128px; letter-spacing:-5px; color:var(--ink); }
+#s8-line { font-weight:700; font-size:52px; color:var(--muted); margin-top:30px; letter-spacing:-1px; }
+#s8-cta { margin-top:56px; padding:26px 56px; border-radius:60px; background:#A65C34; color:#FFFFFF; font-weight:800; font-size:44px; }
+#s8-foot { margin-top:30px; font-family:"DM Mono"; font-weight:500; font-size:28px; color:#8E4A26; letter-spacing:1px; }
+
+/* captions */
+#caps { position:absolute; left:0; right:0; bottom:56px; height:80px; }
+.cap { position:absolute; left:0; right:0; top:0; text-align:center; opacity:0; }
+.cap span { display:inline-block; padding:16px 36px; border-radius:18px; background:rgba(43,29,20,0.9); color:#FFF8F0; font-weight:600; font-size:36px; letter-spacing:-0.3px; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-width="1920" data-height="1080" data-duration="115">
+  <div class="grain"></div>
+  <div id="glow"></div>
+  <div id="ghost">pack it once</div>
+
+  <section id="s1" class="clip" data-start="0" data-duration="8" data-track-index="0">
+    <div id="s1-inner" class="inner">
+      <div id="s1-photo"></div><div id="s1-dim"></div>
+      <div class="s1-line" id="s1-l1">One car boot. A table full of stuff.</div>
+      <div class="s1-line" id="s1-l2">Will it all fit?</div>
+    </div>
+  </section>
+
+  <section id="s2" class="clip" data-start="8" data-duration="17" data-track-index="0">
+    <div id="s2-title" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:30px;">
+      <div style="width:120px;height:120px;border-radius:32px;background:#A65C34;position:relative;">
+        <svg width="80" height="80" viewBox="0 0 24 24" style="position:absolute;left:20px;top:18px" fill="none" stroke="#FFF8F0" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z M4 7.5 12 12l8-4.5 M12 12v9"/></svg>
+      </div>
+      <div style="font-weight:800;font-size:120px;letter-spacing:-5px;">Pack a Bunch</div>
+    </div>
+    <div id="s2-inner" class="inner">
+      <div class="copy" id="s2-copy">
+        <div class="step">The aha</div>
+        <div class="h">Point the phone. It’s measured.</div>
+        <div class="b">Every thing on the table, outlined in its own shape — box, cylinder or sphere.</div>
+        <div class="h" id="s2-aha" style="color:#A65C34;margin-top:34px;">No tape measure.</div>
+      </div>
+      <div class="phone" id="s2-phone"><div class="screen">
+        <div class="feed"></div>
+        <svg class="overlay" viewBox="0 0 739 415" preserveAspectRatio="xMidYMid slice"><g id="s2-o0" class="outline"><path class="dr" d="M233 124 H440 V322 H233 Z M249 116 H456 V314 M440 124 L456 116 M440 322 L456 314 M233 124 L249 116" /></g><g id="s2-o1" class="outline"><circle class="dr" cx="553" cy="172" r="91"/><ellipse class="dr" cx="553" cy="176" rx="91" ry="22"/></g><g id="s2-o2" class="outline"><path class="dr" d="M452 275 A85 23 0 1 0 622 275 A85 23 0 1 0 452 275 M452 275 V368 M622 275 V368 M452 368 A85 30 0 0 0 622 368"/></g></svg>
+        <div class="dark" id="s2-hint" style="left:50%;top:26px;transform:translateX(-50%)"><span class="dot"></span>Hold steady — measuring</div>
+        <div class="pill" id="s2-p0" style="left:470px;top:330px"><i>W</i>16.4 cm</div>
+        <div class="pill amber" id="s2-p1" style="left:250px;top:400px"><i>H</i>14.8 cm</div>
+        <div class="pill" id="s2-p2" style="left:330px;top:150px"><i>D</i>8.8 cm</div>
+        <div class="chip" id="s2-tag" style="left:390px;top:250px"><div class="mk"><div class="tick" style="opacity:1"><svg width="20" height="18" viewBox="0 0 20 18"><path d="M2 9l5 5L18 3" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Display</div>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="s3" class="clip" data-start="25" data-duration="20" data-track-index="0">
+    <div id="s3-inner" class="inner">
+      <div class="copy" id="s3-copy">
+        <div class="step">1 · Scan the space</div>
+        <div class="h">Walk the phone round the boot.</div>
+        <div class="b">Width, depth and height in seconds. It knows the floor, the walls and the lip.</div>
+      </div>
+      <div class="phone" id="s3-phone"><div class="screen">
+        <div id="s3-boot"></div>
+        <svg class="overlay" viewBox="0 0 1084 604" preserveAspectRatio="none">
+          <polygon points="330,170 754,170 770,392 314,392" fill="#4E3D30"/>
+          <polygon points="314,392 770,392 930,560 150,560" fill="#5C4A3B"/>
+          <polygon points="150,560 314,392 330,170 110,110" fill="#3F3027"/>
+          <polygon points="930,560 770,392 754,170 974,110" fill="#3F3027"/>
+          <g id="s3-wire"><path class="dr" d="M150 560 L930 560 L770 392 L314 392 Z M314 392 L330 170 L754 170 L770 392 M330 170 L110 110 M754 170 L974 110 M110 110 L150 560 M974 110 L930 560"/></g>
+        </svg>
+        <div id="s3-scan"></div>
+        <div class="dark" style="right:30px;top:26px"><b>Car boot</b>&nbsp;&nbsp;<span id="s3-pct" style="font-family:'DM Mono'">0% mapped</span></div>
+        <div class="dark" id="s3-hint1" style="left:50%;top:100px;transform:translateX(-50%)"><span class="dot"></span>Move slowly round the edges</div>
+        <div class="dark" id="s3-hint2" style="left:50%;top:100px;transform:translateX(-50%);opacity:0"><span class="dot ok"></span>All mapped — use this space</div>
+        <div class="pill" id="s3-p0" style="left:470px;top:430px"><i>W</i>104 cm</div>
+        <div class="pill" id="s3-p1" style="left:150px;top:390px"><i>D</i>80 cm</div>
+        <div class="pill amber" id="s3-p2" style="left:470px;top:250px"><i>H</i>59 cm</div>
+        <div class="btn" id="s3-btn">✓&nbsp;Use this space</div>
+        <div class="tap" id="s3-tap"></div>
+        <div class="round" style="left:28px;top:26px"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></div>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="s4" class="clip" data-start="45" data-duration="20" data-track-index="0">
+    <div id="s4-inner" class="inner">
+      <div class="copy" id="s4-copy">
+        <div class="step">2 · Scan the things</div>
+        <div class="h">Sweep over the table.</div>
+        <div class="b">Several at once, each one outlined and measured. Anything flat or odd, type in.</div>
+        <div class="b" id="s4-step" style="margin-top:30px;color:#8E4A26;font-weight:700;">“Vase · step back” — it tells you when it needs a better look.</div>
+      </div>
+      <div class="phone" id="s4-phone"><div class="screen">
+        <div class="feed"></div>
+        <svg class="overlay" viewBox="0 0 739 415" preserveAspectRatio="xMidYMid slice"><g id="s4-o0" class="outline"><path class="dr" d="M233 124 H440 V322 H233 Z M249 116 H456 V314 M440 124 L456 116 M440 322 L456 314 M233 124 L249 116" /></g><g id="s4-o1" class="outline"><circle class="dr" cx="553" cy="172" r="91"/><ellipse class="dr" cx="553" cy="176" rx="91" ry="22"/></g><g id="s4-o2" class="outline"><path class="dr" d="M452 275 A85 23 0 1 0 622 275 A85 23 0 1 0 452 275 M452 275 V368 M622 275 V368 M452 368 A85 30 0 0 0 622 368"/></g><g id="s4-o3" class="outline"><path class="dr" d="M14 40 C 90 18, 170 30, 196 80 C 214 130, 200 220, 150 252 C 100 272, 30 262, 12 220 Z"/></g><g id="s4-o4" class="outline"><path class="dr" d="M88 342 L352 334 L360 410 L80 414 Z"/></g></svg>
+        <div class="dark" style="right:30px;top:26px;font-family:'DM Mono'" id="s4-count">0 of 5 measured</div>
+        <div class="dark" id="s4-hint1" style="left:50%;top:100px;transform:translateX(-50%)"><span class="dot"></span>Move slowly over the table</div>
+        <div class="dark" id="s4-hint2" style="left:50%;top:100px;transform:translateX(-50%);opacity:0"><span class="dot ok"></span>All 5 measured</div>
+        <div class="chip" id="s4-c0" style="left:420px;top:250px"><div class="mk"><div class="ring"></div><div class="tick"><svg width="20" height="18" viewBox="0 0 20 18"><path d="M2 9l5 5L18 3" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Display</div><div class="chip" id="s4-c1" style="left:750px;top:150px"><div class="mk"><div class="ring"></div><div class="tick"><svg width="20" height="18" viewBox="0 0 20 18"><path d="M2 9l5 5L18 3" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Speaker</div><div class="chip" id="s4-c2" style="left:720px;top:400px"><div class="mk"><div class="ring"></div><div class="tick"><svg width="20" height="18" viewBox="0 0 20 18"><path d="M2 9l5 5L18 3" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Puck</div><div class="chip" id="s4-c3" style="left:60px;top:190px"><div class="mk"><div class="ring"></div><div class="tick"><svg width="20" height="18" viewBox="0 0 20 18"><path d="M2 9l5 5L18 3" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Vase</div><div class="chip" id="s4-c4" style="left:180px;top:470px"><div class="mk"><div class="ring"></div><div class="tick"><svg width="20" height="18" viewBox="0 0 20 18"><path d="M2 9l5 5L18 3" stroke="#fff" stroke-width="3.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div></div>Book</div>
+        <div class="btn" id="s4-btn">✓&nbsp;Use 5 items</div>
+        <div class="tap" id="s4-tap"></div>
+        <div class="round" style="left:28px;top:26px"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></div>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="s5" class="clip" data-start="65" data-duration="17" data-track-index="0">
+    <div id="s5-inner" class="inner">
+      <div class="copy" id="s5-copy">
+        <div class="step">3 · See the plan</div>
+        <div class="h">Every piece placed in 3D.</div>
+        <div class="b">Before you lift a thing — biggest first, nothing left over.</div>
+      </div>
+      <svg id="s5-svg" viewBox="640 40 1200 760"><g id="s5-boot"><polygon points="1060.0,330.0 1474.3,569.2 1474.3,297.8 1060.0,58.6" fill="#EADBC8" stroke="#A65C34" stroke-width="2"/><polygon points="1060.0,330.0 741.3,514.0 741.3,242.6 1060.0,58.6" fill="#E3D0B9" stroke="#A65C34" stroke-width="2"/><polygon points="1060.0,330.0 1474.3,569.2 1155.6,753.2 741.3,514.0" fill="#DCC6AC" stroke="#A65C34" stroke-width="2"/><g class="pc" id="pc0"><polygon points="1060.0,192.0 1219.3,284.0 1099.8,353.0 940.5,261.0" fill="#E19B69" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1219.3,422.0 1099.8,491.0 1099.8,353.0 1219.3,284.0" fill="#A4714D" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="940.5,399.0 1099.8,491.0 1099.8,353.0 940.5,261.0" fill="#C98B5E" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc3"><polygon points="1060.0,100.0 1179.5,169.0 1060.0,238.0 940.5,169.0" fill="#FFB344" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1179.5,261.0 1060.0,330.0 1060.0,238.0 1179.5,169.0" fill="#C68332" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="940.5,261.0 1060.0,330.0 1060.0,238.0 940.5,169.0" fill="#F2A03D" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc4"><polygon points="940.5,307.0 1099.8,399.0 1000.2,456.5 840.9,364.5" fill="#F3BC85" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1099.8,491.0 1000.2,548.5 1000.2,456.5 1099.8,399.0" fill="#B18961" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="840.9,456.5 1000.2,548.5 1000.2,456.5 840.9,364.5" fill="#D9A877" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc1"><polygon points="1219.3,307.0 1354.8,385.2 1235.3,454.2 1099.8,376.0" fill="#FDCFA0" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1354.8,500.2 1235.3,569.2 1235.3,454.2 1354.8,385.2" fill="#B99775" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1099.8,491.0 1235.3,569.2 1235.3,454.2 1099.8,376.0" fill="#E2B98F" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc9"><polygon points="840.9,387.5 960.4,456.5 860.8,514.0 741.3,445.0" fill="#FFB344" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="960.4,525.5 860.8,583.0 860.8,514.0 960.4,456.5" fill="#C68332" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="741.3,514.0 860.8,583.0 860.8,514.0 741.3,445.0" fill="#F2A03D" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc5"><polygon points="1099.8,399.0 1235.3,477.2 1135.7,534.7 1000.2,456.5" fill="#CE8452" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1235.3,569.2 1135.7,626.7 1135.7,534.7 1235.3,477.2" fill="#96603C" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1000.2,548.5 1135.7,626.7 1135.7,534.7 1000.2,456.5" fill="#B8764A" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc2"><polygon points="1354.8,339.2 1474.3,408.2 1315.0,500.2 1195.4,431.2" fill="#B9673A" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1474.3,569.2 1315.0,661.2 1315.0,500.2 1474.3,408.2" fill="#884B2A" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1195.4,592.2 1315.0,661.2 1315.0,500.2 1195.4,431.2" fill="#A65C34" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc6"><polygon points="1099.8,316.2 1219.3,385.2 1119.8,442.7 1000.2,373.7" fill="#FFDEB2" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1219.3,468.0 1119.8,525.5 1119.8,442.7 1219.3,385.2" fill="#BEA382" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1000.2,456.5 1119.8,525.5 1119.8,442.7 1000.2,373.7" fill="#E8C79F" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc10"><polygon points="960.4,470.3 1135.7,571.5 1036.1,629.0 860.8,527.8" fill="#F3BC85" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1135.7,626.7 1036.1,684.2 1036.1,629.0 1135.7,571.5" fill="#B18961" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="860.8,583.0 1036.1,684.2 1036.1,629.0 860.8,527.8" fill="#D9A877" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc7"><polygon points="1195.4,509.4 1315.0,578.4 1155.6,670.4 1036.1,601.4" fill="#E19B69" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1315.0,661.2 1155.6,753.2 1155.6,670.4 1315.0,578.4" fill="#A4714D" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1036.1,684.2 1155.6,753.2 1155.6,670.4 1036.1,601.4" fill="#C98B5E" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><g class="pc" id="pc8"><polygon points="1195.4,417.4 1295.0,474.9 1175.5,543.9 1075.9,486.4" fill="#9A6442" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1295.0,566.9 1175.5,635.9 1175.5,543.9 1295.0,474.9" fill="#714930" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/><polygon points="1075.9,578.4 1175.5,635.9 1175.5,543.9 1075.9,486.4" fill="#8A5A3B" stroke="#3F2718" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round"/></g><polyline points="1474.3,297.8 1155.6,481.8 741.3,242.6" fill="none" stroke="#A65C34" stroke-width="3" stroke-dasharray="10 8"/><polyline points="1474.3,569.2 1474.3,297.8" fill="none" stroke="#A65C34" stroke-width="2"/><polyline points="1155.6,753.2 1155.6,481.8" fill="none" stroke="#A65C34" stroke-width="3" stroke-dasharray="10 8"/><polyline points="741.3,514.0 741.3,242.6" fill="none" stroke="#A65C34" stroke-width="3" stroke-dasharray="10 8"/><polyline points="741.3,514.0 1155.6,753.2 1474.3,569.2" fill="none" stroke="#A65C34" stroke-width="3"/></g></svg>
+      <div class="stat" id="s5-st0" style="left:120px"><div class="n" id="s5-placed">0/11</div><div class="l">pieces placed</div></div>
+      <div class="stat" id="s5-st1" style="left:390px"><div class="n">36%</div><div class="l">of the boot filled</div></div>
+      <div class="stat" id="s5-st2" style="left:120px;top:730px"><div class="n">0</div><div class="l">left over</div></div>
+    </div>
+  </section>
+
+  <section id="s6" class="clip" data-start="82" data-duration="13" data-track-index="0">
+    <div id="s6-inner" class="inner">
+      <div class="copy" id="s6-copy">
+        <div class="step">4 · Pack it</div>
+        <div class="h">One piece at a time.</div>
+        <div class="b">Plain words for where each one goes, in the order that works.</div>
+      </div>
+      <div class="gcard" id="s6-card1"><div class="k">STEP 1 OF 11 · SPEAKER BOX</div><div class="t">Stand it upright against the left wall.</div><div class="track"><div class="fill" id="s6-bar"></div></div></div>
+      <div class="gcard" id="s6-card2"><div class="k">STEP 3 OF 11 · CAKE BOX</div><div class="t">Lay it flat. Push it into the back right corner.</div><div class="track"><div class="fill" id="s6-bar2"></div></div></div>
+      <div id="s6-fits"><div class="ok"><svg width="84" height="74" viewBox="0 0 20 18"><path d="M2 9l5 5L18 3" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="big">It all fits.</div></div>
+    </div>
+  </section>
+
+  <section id="s7" class="clip" data-start="95" data-duration="13" data-track-index="0">
+    <div id="s7-inner" class="inner">
+      <div class="copy" id="s7-copy">
+        <div class="step">Pack Plus</div>
+        <div class="h">For people who pack more than once.</div>
+        <div class="b">Free plans one pack of up to 20 pieces. Plus unlocks the rest — weekly or monthly, priced for your country.</div>
+      </div>
+      <div id="s7-card">
+        <div id="s7-hero"><div class="badge">PACK PLUS</div><div class="t">Keep every pack you plan</div><div class="s">For people who pack more than once.</div>
+          <svg class="crate" width="150" height="150" viewBox="0 0 24 24" fill="#E2A36B" stroke="#4A2C19" stroke-width="0.8" stroke-linejoin="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z"/><path d="M4 7.5 12 12l8-4.5 M12 12v9" fill="none"/></svg>
+        </div>
+        <div class="row" id="s7-row0"><div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#A65C34" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 5h16v14H4z M4 9h16"/></svg></div><div><div class="tt">As many saved packs as you like</div><div class="ss">Free keeps one.</div></div></div><div class="row" id="s7-row1"><div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#A65C34" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z M4 7.5 12 12l8-4.5 M12 12v9"/></svg></div><div><div class="tt">Any number of pieces, any size of space</div><div class="ss">Free fits up to 20 pieces.</div></div></div><div class="row" id="s7-row2"><div class="ic"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#A65C34" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 14-5 M20 12a8 8 0 0 1-14 5 M18 3v4h-4 M6 21v-4h4"/></svg></div><div><div class="tt">Reuse items across packs</div><div class="ss">Measure a thing once, use it anywhere.</div></div></div>
+        <div id="s7-toggle"><div id="s7-knob"></div><div class="tg" id="s7-weekly">Weekly</div><div class="tg" id="s7-monthly">Monthly</div></div>
+        <div id="s7-sub">Subscribe</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="s8" class="clip" data-start="108" data-duration="7" data-track-index="0">
+    <div class="centre">
+      <div id="s8-logo"><div class="mark"><svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#FFF8F0" stroke-width="1.7" stroke-linejoin="round"><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z M4 7.5 12 12l8-4.5 M12 12v9"/></svg></div><div class="name">Pack a Bunch</div></div>
+      <div id="s8-line">Pack it once. It fits.</div>
+      <div id="s8-cta">Try Pack Plus — code on the Pack Plus page</div>
+      <div id="s8-foot">ON ANDROID</div>
+    </div>
+  </section>
+
+  <div id="caps">
+<div class="cap" id="cap0"><span>Pack a Bunch measures with your phone’s camera.</span></div>
+<div class="cap" id="cap1"><span>Point it at the table — each thing gets outlined and measured.</span></div>
+<div class="cap" id="cap2"><span>Start with the space: walk the phone round the car boot.</span></div>
+<div class="cap" id="cap3"><span>Width, depth and height are measured as it maps.</span></div>
+<div class="cap" id="cap4"><span>Happy with it? Tap “Use this space”.</span></div>
+<div class="cap" id="cap5"><span>Now the things. Sweep over the table — several at once.</span></div>
+<div class="cap" id="cap6"><span>Each one turns green as soon as it’s measured.</span></div>
+<div class="cap" id="cap7"><span>Not sure about one? It asks you to step back — or type it in.</span></div>
+<div class="cap" id="cap8"><span>Pack a Bunch plans where every piece goes, in 3D.</span></div>
+<div class="cap" id="cap9"><span>Biggest and heaviest first. Nothing left over.</span></div>
+<div class="cap" id="cap10"><span>You see it all before you lift a thing.</span></div>
+<div class="cap" id="cap11"><span>Then it guides you, one piece at a time.</span></div>
+<div class="cap" id="cap12"><span>“Lay it flat. Push it into the back right corner.”</span></div>
+<div class="cap" id="cap13"><span>It all fits — first time.</span></div>
+<div class="cap" id="cap14"><span>Free plans one pack of up to 20 pieces.</span></div>
+<div class="cap" id="cap15"><span>Pack Plus: unlimited packs, pieces, scans and any size of space.</span></div>
+  </div>
+
+  <audio id="music" src="assets/music/happy-beats-business-moves-vol-12-by-ende-dot-app.mp3" data-start="0" data-duration="115" data-track-index="1" data-volume="0.55" data-automation='{"version": 1, "lanes": [{"target": "volume", "points": [{"t": 0, "v": 0}, {"t": 1.2, "v": 1}, {"t": 111, "v": 1}, {"t": 115, "v": 0}]}]}'></audio>
+<audio id="sfx0" src="assets/sfx/impactSoft_medium_004.ogg" data-start="3.9" data-duration="0.15" data-track-index="2" data-volume="0.55"></audio>
+<audio id="sfx1" src="assets/sfx/impactSoft_medium_001.ogg" data-start="8.74" data-duration="0.18" data-track-index="3" data-volume="0.7"></audio>
+<audio id="sfx2" src="assets/sfx/drop_001.ogg" data-start="16.38" data-duration="0.11" data-track-index="4" data-volume="0.6"></audio>
+<audio id="sfx3" src="assets/sfx/drop_002.ogg" data-start="17.47" data-duration="0.19" data-track-index="2" data-volume="0.6"></audio>
+<audio id="sfx4" src="assets/sfx/drop_001.ogg" data-start="18.56" data-duration="0.11" data-track-index="3" data-volume="0.6"></audio>
+<audio id="sfx5" src="assets/sfx/impactSoft_medium_004.ogg" data-start="22.93" data-duration="0.15" data-track-index="4" data-volume="0.6"></audio>
+<audio id="sfx6" src="assets/sfx/impactSoft_medium_001.ogg" data-start="25.1" data-duration="0.18" data-track-index="2" data-volume="0.5"></audio>
+<audio id="sfx7" src="assets/sfx/drop_001.ogg" data-start="33.11" data-duration="0.11" data-track-index="3" data-volume="0.6"></audio>
+<audio id="sfx8" src="assets/sfx/drop_002.ogg" data-start="34.2" data-duration="0.19" data-track-index="4" data-volume="0.6"></audio>
+<audio id="sfx9" src="assets/sfx/drop_001.ogg" data-start="35.29" data-duration="0.11" data-track-index="2" data-volume="0.6"></audio>
+<audio id="sfx10" src="assets/sfx/click_003.ogg" data-start="40.95" data-duration="0.01" data-track-index="3" data-volume="0.7"></audio>
+<audio id="sfx11" src="assets/sfx/impactSoft_medium_001.ogg" data-start="45.1" data-duration="0.18" data-track-index="4" data-volume="0.5"></audio>
+<audio id="sfx12" src="assets/sfx/drop_001.ogg" data-start="48.02" data-duration="0.11" data-track-index="2" data-volume="0.55"></audio>
+<audio id="sfx13" src="assets/sfx/drop_002.ogg" data-start="49.11" data-duration="0.19" data-track-index="3" data-volume="0.55"></audio>
+<audio id="sfx14" src="assets/sfx/drop_001.ogg" data-start="50.2" data-duration="0.11" data-track-index="4" data-volume="0.55"></audio>
+<audio id="sfx15" src="assets/sfx/drop_002.ogg" data-start="51.29" data-duration="0.19" data-track-index="2" data-volume="0.55"></audio>
+<audio id="sfx16" src="assets/sfx/drop_001.ogg" data-start="52.37" data-duration="0.11" data-track-index="3" data-volume="0.55"></audio>
+<audio id="sfx17" src="assets/sfx/click_003.ogg" data-start="63.15" data-duration="0.01" data-track-index="4" data-volume="0.7"></audio>
+<audio id="sfx18" src="assets/sfx/impactSoft_medium_001.ogg" data-start="65.3" data-duration="0.18" data-track-index="2" data-volume="0.5"></audio>
+<audio id="sfx19" src="assets/sfx/impactWood_light_001.ogg" data-start="66.86" data-duration="0.27" data-track-index="3" data-volume="0.45"></audio>
+<audio id="sfx20" src="assets/sfx/impactWood_light_001.ogg" data-start="67.95" data-duration="0.27" data-track-index="4" data-volume="0.45"></audio>
+<audio id="sfx21" src="assets/sfx/impactWood_light_001.ogg" data-start="69.04" data-duration="0.27" data-track-index="2" data-volume="0.45"></audio>
+<audio id="sfx22" src="assets/sfx/impactWood_light_001.ogg" data-start="70.13" data-duration="0.27" data-track-index="3" data-volume="0.45"></audio>
+<audio id="sfx23" src="assets/sfx/impactWood_light_001.ogg" data-start="71.22" data-duration="0.27" data-track-index="4" data-volume="0.45"></audio>
+<audio id="sfx24" src="assets/sfx/impactWood_light_001.ogg" data-start="72.31" data-duration="0.27" data-track-index="2" data-volume="0.45"></audio>
+<audio id="sfx25" src="assets/sfx/impactSoft_medium_001.ogg" data-start="82.4" data-duration="0.18" data-track-index="3" data-volume="0.5"></audio>
+<audio id="sfx26" src="assets/sfx/click_003.ogg" data-start="88.3" data-duration="0.01" data-track-index="4" data-volume="0.5"></audio>
+<audio id="sfx27" src="assets/sfx/impactBell_heavy_000.ogg" data-start="93.0" data-duration="1.48" data-track-index="2" data-volume="0.6"></audio>
+<audio id="sfx28" src="assets/sfx/impactSoft_medium_004.ogg" data-start="96.55" data-duration="0.15" data-track-index="3" data-volume="0.6"></audio>
+<audio id="sfx29" src="assets/sfx/switch_007.ogg" data-start="103.0" data-duration="0.61" data-track-index="4" data-volume="0.5"></audio>
+<audio id="sfx30" src="assets/sfx/impactBell_heavy_000.ogg" data-start="108.2" data-duration="1.48" data-track-index="2" data-volume="0.5"></audio>
+</div>
+<script>
+  var tl = gsap.timeline({ paused: true });
+    tl.fromTo("#s1-photo",{scale:1.08},{scale:1,duration:8,ease:"none"},0);
+  tl.fromTo("#s1-l1",{y:40,opacity:0},{y:0,opacity:1,duration:0.7,ease:"power3.out"},0.5);
+  tl.fromTo("#s1-l2",{y:40,opacity:0},{y:0,opacity:1,duration:0.7,ease:"back.out(1.6)"},3.9);
+  tl.to("#s1-inner",{opacity:0,duration:0.5},7.5);
+  tl.fromTo("#s2-title",{scale:0.86,opacity:0},{scale:1,opacity:1,duration:0.6,ease:"back.out(1.7)"},8.74);
+  tl.to("#s2-title",{y:-60,opacity:0,duration:0.5,ease:"power2.in"},10.9);
+  tl.fromTo("#s2-phone",{x:260,opacity:0},{x:0,opacity:1,duration:0.8,ease:"power3.out"},11.2);
+  tl.fromTo("#s2-copy",{x:-40,opacity:0},{x:0,opacity:1,duration:0.6,ease:"power3.out"},11.6);
+  tl.fromTo("#s2-hint",{y:-16,opacity:0},{y:0,opacity:1,duration:0.4},12.4);
+  tl.fromTo("#s2-o0 .dr",{strokeDashoffset:1400},{strokeDashoffset:0,duration:1.1,ease:"power2.inOut"},13.11);
+  tl.fromTo("#s2-o0",{opacity:0},{opacity:1,duration:0.2},13.11);
+  tl.fromTo("#s2-o1 .dr",{strokeDashoffset:1400},{strokeDashoffset:0,duration:1.1,ease:"power2.inOut"},14.2);
+  tl.fromTo("#s2-o1",{opacity:0},{opacity:1,duration:0.2},14.2);
+  tl.fromTo("#s2-o2 .dr",{strokeDashoffset:1400},{strokeDashoffset:0,duration:1.1,ease:"power2.inOut"},15.29);
+  tl.fromTo("#s2-o2",{opacity:0},{opacity:1,duration:0.2},15.29);
+  tl.fromTo("#s2-p0",{scale:0.4,opacity:0},{scale:1,opacity:1,duration:0.4,ease:"back.out(2)"},16.38);
+  tl.fromTo("#s2-p1",{scale:0.4,opacity:0},{scale:1,opacity:1,duration:0.4,ease:"back.out(2)"},17.47);
+  tl.fromTo("#s2-p2",{scale:0.4,opacity:0},{scale:1,opacity:1,duration:0.4,ease:"back.out(2)"},18.56);
+  tl.fromTo("#s2-tag",{scale:0.6,opacity:0},{scale:1,opacity:1,duration:0.4,ease:"back.out(2)"},19.66);
+  tl.fromTo("#s2-aha",{y:30,opacity:0},{y:0,opacity:1,duration:0.6,ease:"back.out(1.6)"},22.93);
+  tl.to("#s2-inner",{x:-120,opacity:0,duration:0.5,ease:"power2.in"},24.5);
+  tl.fromTo("#s3-copy",{x:-40,opacity:0},{x:0,opacity:1,duration:0.6,ease:"power3.out"},25.2);
+  tl.fromTo("#s3-phone",{x:260,opacity:0},{x:0,opacity:1,duration:0.8,ease:"power3.out"},25.1);
+  tl.fromTo("#s3-wire .dr",{strokeDashoffset:2400},{strokeDashoffset:0,duration:6,ease:"power1.inOut"},27);
+  tl.fromTo("#s3-scan",{x:-60,opacity:0},{x:1160,opacity:1,duration:6,ease:"none"},27);
+  tl.to("#s3-scan",{opacity:0,duration:0.4},32.8);
+  var pct={v:0};tl.to(pct,{v:82,duration:6,ease:"power1.inOut",onUpdate:function(){document.getElementById("s3-pct").textContent=Math.round(pct.v)+"% mapped";}},27);
+  tl.fromTo("#s3-p0",{scale:0.4,opacity:0},{scale:1,opacity:1,duration:0.4,ease:"back.out(2)"},33.11);
+  tl.fromTo("#s3-p1",{scale:0.4,opacity:0},{scale:1,opacity:1,duration:0.4,ease:"back.out(2)"},34.2);
+  tl.fromTo("#s3-p2",{scale:0.4,opacity:0},{scale:1,opacity:1,duration:0.4,ease:"back.out(2)"},35.29);
+  tl.to("#s3-hint1",{opacity:0,duration:0.3},35.8);
+  tl.fromTo("#s3-hint2",{opacity:0},{opacity:1,duration:0.3},36.0);
+  tl.fromTo("#s3-btn",{y:40,opacity:0},{y:0,opacity:1,duration:0.5,ease:"back.out(1.6)"},36.55);
+  tl.fromTo("#s3-tap",{scale:0.3,opacity:0},{scale:1.4,opacity:0.9,duration:0.35,ease:"power2.out"},40.9);
+  tl.to("#s3-tap",{scale:2,opacity:0,duration:0.4},41.25);
+  tl.to("#s3-btn",{scale:0.94,duration:0.12,yoyo:true,repeat:1},40.95);
+  tl.to("#s3-inner",{x:-120,opacity:0,duration:0.5,ease:"power2.in"},44.5);
+  tl.fromTo("#s4-copy",{x:-40,opacity:0},{x:0,opacity:1,duration:0.6,ease:"power3.out"},45.2);
+  tl.fromTo("#s4-phone",{x:260,opacity:0},{x:0,opacity:1,duration:0.8,ease:"power3.out"},45.1);
+  tl.fromTo("#s4-o0",{opacity:0},{opacity:1,duration:0.4},46.40);
+  tl.fromTo("#s4-c0",{scale:0.6,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2)"},46.40);
+  tl.fromTo("#s4-o1",{opacity:0},{opacity:1,duration:0.4},46.70);
+  tl.fromTo("#s4-c1",{scale:0.6,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2)"},46.70);
+  tl.fromTo("#s4-o2",{opacity:0},{opacity:1,duration:0.4},47.00);
+  tl.fromTo("#s4-c2",{scale:0.6,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2)"},47.00);
+  tl.fromTo("#s4-o3",{opacity:0},{opacity:1,duration:0.4},47.30);
+  tl.fromTo("#s4-c3",{scale:0.6,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2)"},47.30);
+  tl.fromTo("#s4-o4",{opacity:0},{opacity:1,duration:0.4},47.60);
+  tl.fromTo("#s4-c4",{scale:0.6,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2)"},47.60);
+  tl.to("#s4-c0 .ring",{opacity:0,duration:0.15},48.02);
+  tl.fromTo("#s4-c0 .tick",{scale:0,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2.4)"},48.02);
+  tl.to("#s4-o0 .dr",{stroke:"#FFFFFF",duration:0.3},48.02);
+  tl.fromTo({v:0},{v:0},{v:1,duration:0.05,onUpdate:function(){document.getElementById("s4-count").textContent=Math.round(this.targets()[0].v)+" of 5 measured";}},48.02);
+  tl.to("#s4-c1 .ring",{opacity:0,duration:0.15},49.11);
+  tl.fromTo("#s4-c1 .tick",{scale:0,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2.4)"},49.11);
+  tl.to("#s4-o1 .dr",{stroke:"#FFFFFF",duration:0.3},49.11);
+  tl.fromTo({v:1},{v:1},{v:2,duration:0.05,onUpdate:function(){document.getElementById("s4-count").textContent=Math.round(this.targets()[0].v)+" of 5 measured";}},49.11);
+  tl.to("#s4-c2 .ring",{opacity:0,duration:0.15},50.2);
+  tl.fromTo("#s4-c2 .tick",{scale:0,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2.4)"},50.2);
+  tl.to("#s4-o2 .dr",{stroke:"#FFFFFF",duration:0.3},50.2);
+  tl.fromTo({v:2},{v:2},{v:3,duration:0.05,onUpdate:function(){document.getElementById("s4-count").textContent=Math.round(this.targets()[0].v)+" of 5 measured";}},50.2);
+  tl.to("#s4-c3 .ring",{opacity:0,duration:0.15},51.29);
+  tl.fromTo("#s4-c3 .tick",{scale:0,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2.4)"},51.29);
+  tl.to("#s4-o3 .dr",{stroke:"#FFFFFF",duration:0.3},51.29);
+  tl.fromTo({v:3},{v:3},{v:4,duration:0.05,onUpdate:function(){document.getElementById("s4-count").textContent=Math.round(this.targets()[0].v)+" of 5 measured";}},51.29);
+  tl.to("#s4-c4 .ring",{opacity:0,duration:0.15},52.37);
+  tl.fromTo("#s4-c4 .tick",{scale:0,opacity:0},{scale:1,opacity:1,duration:0.35,ease:"back.out(2.4)"},52.37);
+  tl.to("#s4-o4 .dr",{stroke:"#FFFFFF",duration:0.3},52.37);
+  tl.fromTo({v:4},{v:4},{v:5,duration:0.05,onUpdate:function(){document.getElementById("s4-count").textContent=Math.round(this.targets()[0].v)+" of 5 measured";}},52.37);
+  tl.to("#s4-hint1",{opacity:0,duration:0.3},52.8);
+  tl.fromTo("#s4-hint2",{opacity:0},{opacity:1,duration:0.3},53.0);
+  tl.fromTo("#s4-btn",{y:40,opacity:0},{y:0,opacity:1,duration:0.5,ease:"back.out(1.6)"},53.2);
+  tl.fromTo("#s4-step",{y:20,opacity:0},{y:0,opacity:1,duration:0.5,ease:"power3.out"},58.6);
+  tl.to("#s4-step",{y:20,opacity:0,duration:0.4},62.4);
+  tl.fromTo("#s4-tap",{scale:0.3,opacity:0},{scale:1.4,opacity:0.9,duration:0.35,ease:"power2.out"},63.1);
+  tl.to("#s4-tap",{scale:2,opacity:0,duration:0.4},63.45);
+  tl.to("#s4-btn",{scale:0.94,duration:0.12,yoyo:true,repeat:1},63.15);
+  tl.to("#s4-inner",{x:-120,opacity:0,duration:0.5,ease:"power2.in"},64.5);
+  tl.fromTo("#s5-copy",{x:-40,opacity:0},{x:0,opacity:1,duration:0.6,ease:"power3.out"},65.2);
+  tl.fromTo("#s5-boot",{y:40,opacity:0},{y:0,opacity:1,duration:0.8,ease:"power3.out"},65.3);
+  tl.fromTo("#pc0",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},66.56);
+  tl.fromTo({v:0},{v:0},{v:1,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},66.86);
+  tl.fromTo("#pc3",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},67.11);
+  tl.fromTo({v:1},{v:1},{v:2,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},67.41);
+  tl.fromTo("#pc4",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},67.65);
+  tl.fromTo({v:2},{v:2},{v:3,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},67.95);
+  tl.fromTo("#pc1",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},68.2);
+  tl.fromTo({v:3},{v:3},{v:4,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},68.50);
+  tl.fromTo("#pc9",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},68.74);
+  tl.fromTo({v:4},{v:4},{v:5,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},69.04);
+  tl.fromTo("#pc5",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},69.28);
+  tl.fromTo({v:5},{v:5},{v:6,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},69.58);
+  tl.fromTo("#pc2",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},69.83);
+  tl.fromTo({v:6},{v:6},{v:7,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},70.13);
+  tl.fromTo("#pc6",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},70.38);
+  tl.fromTo({v:7},{v:7},{v:8,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},70.68);
+  tl.fromTo("#pc10",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},70.92);
+  tl.fromTo({v:8},{v:8},{v:9,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},71.22);
+  tl.fromTo("#pc7",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},71.47);
+  tl.fromTo({v:9},{v:9},{v:10,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},71.77);
+  tl.fromTo("#pc8",{y:-220,opacity:0},{y:0,opacity:1,duration:0.45,ease:"bounce.out"},72.01);
+  tl.fromTo({v:10},{v:10},{v:11,duration:0.05,onUpdate:function(){document.getElementById("s5-placed").textContent=Math.round(this.targets()[0].v)+"/11";}},72.31);
+  tl.fromTo("#s5-st0",{y:30,opacity:0},{y:0,opacity:1,duration:0.45,ease:"back.out(1.6)"},73.11);
+  tl.fromTo("#s5-st1",{y:30,opacity:0},{y:0,opacity:1,duration:0.45,ease:"back.out(1.6)"},74.2);
+  tl.fromTo("#s5-st2",{y:30,opacity:0},{y:0,opacity:1,duration:0.45,ease:"back.out(1.6)"},75.29);
+  tl.to("#s5-inner",{x:-120,opacity:0,duration:0.5,ease:"power2.in"},81.6);
+  tl.fromTo("#s6-copy",{x:-40,opacity:0},{x:0,opacity:1,duration:0.6,ease:"power3.out"},82.3);
+  tl.fromTo("#s6-card1",{x:200,opacity:0},{x:0,opacity:1,duration:0.6,ease:"power3.out"},82.4);
+  tl.set("#s6-bar",{scaleX:0.09},0);
+  tl.to("#s6-card1",{x:-200,opacity:0,duration:0.45,ease:"power2.in"},87.9);
+  tl.fromTo("#s6-card2",{x:200,opacity:0},{x:0,opacity:1,duration:0.6,ease:"power3.out"},88.3);
+  tl.fromTo("#s6-bar2",{scaleX:0.09},{scaleX:0.27,duration:0.8,ease:"power2.out"},88.5);
+  tl.to(["#s6-card2","#s6-copy"],{opacity:0,duration:0.4},92.6);
+  tl.fromTo("#s6-fits",{scale:0.7,opacity:0},{scale:1,opacity:1,duration:0.6,ease:"back.out(1.8)"},93.0);
+  tl.to("#s6-inner",{opacity:0,duration:0.4},94.8);
+  tl.fromTo("#s7-copy",{x:-40,opacity:0},{x:0,opacity:1,duration:0.6,ease:"power3.out"},95.3);
+  tl.fromTo("#s7-card",{y:60,opacity:0},{y:0,opacity:1,duration:0.7,ease:"power3.out"},95.4);
+  tl.fromTo("#s7-hero",{scale:0.94},{scale:1,duration:0.6,ease:"back.out(1.6)"},96.55);
+  tl.fromTo("#s7-row0",{x:40,opacity:0},{x:0,opacity:1,duration:0.4,ease:"power3.out"},97.65);
+  tl.fromTo("#s7-row1",{x:40,opacity:0},{x:0,opacity:1,duration:0.4,ease:"power3.out"},98.73);
+  tl.fromTo("#s7-row2",{x:40,opacity:0},{x:0,opacity:1,duration:0.4,ease:"power3.out"},99.82);
+  tl.fromTo("#s7-toggle",{opacity:0},{opacity:1,duration:0.4},100.9);
+  tl.to("#s7-knob",{x:218,duration:0.35,ease:"power3.inOut"},103.0);
+  tl.to("#s7-weekly",{color:"#6E5646",duration:0.35},103.0);
+  tl.to("#s7-monthly",{color:"#FFFFFF",duration:0.35},103.0);
+  tl.fromTo("#s7-sub",{y:30,opacity:0},{y:0,opacity:1,duration:0.45,ease:"back.out(1.6)"},104.2);
+  tl.to("#s7-inner",{opacity:0,duration:0.5},107.5);
+  tl.fromTo("#s8-logo",{scale:0.7,opacity:0},{scale:1,opacity:1,duration:0.7,ease:"back.out(1.7)"},108.2);
+  tl.fromTo("#s8-line",{y:30,opacity:0},{y:0,opacity:1,duration:0.6,ease:"power3.out"},109.0);
+  tl.fromTo("#s8-cta",{y:30,opacity:0},{y:0,opacity:1,duration:0.6,ease:"back.out(1.5)"},110.0);
+  tl.fromTo("#s8-foot",{opacity:0},{opacity:1,duration:0.5},110.8);
+  tl.fromTo("#cap0",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},10.4);
+  tl.to("#cap0",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},14.70);
+  tl.fromTo("#cap1",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},15.4);
+  tl.to("#cap1",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},21.90);
+  tl.fromTo("#cap2",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},25.8);
+  tl.to("#cap2",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},31.30);
+  tl.fromTo("#cap3",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},32.0);
+  tl.to("#cap3",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},37.70);
+  tl.fromTo("#cap4",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},38.4);
+  tl.to("#cap4",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},44.30);
+  tl.fromTo("#cap5",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},45.8);
+  tl.to("#cap5",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},51.30);
+  tl.fromTo("#cap6",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},52.0);
+  tl.to("#cap6",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},57.70);
+  tl.fromTo("#cap7",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},58.4);
+  tl.to("#cap7",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},64.30);
+  tl.fromTo("#cap8",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},65.8);
+  tl.to("#cap8",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},71.30);
+  tl.fromTo("#cap9",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},72.0);
+  tl.to("#cap9",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},76.90);
+  tl.fromTo("#cap10",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},77.6);
+  tl.to("#cap10",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},81.50);
+  tl.fromTo("#cap11",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},82.8);
+  tl.to("#cap11",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},87.90);
+  tl.fromTo("#cap12",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},88.6);
+  tl.to("#cap12",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},92.50);
+  tl.fromTo("#cap13",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},93.2);
+  tl.to("#cap13",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},94.70);
+  tl.fromTo("#cap14",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},95.8);
+  tl.to("#cap14",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},100.90);
+  tl.fromTo("#cap15",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},101.6);
+  tl.to("#cap15",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},107.30);
+  // Audio-reactive: the terracotta glow breathes with the music's loudness (pre-extracted, 15 fps).
+  (function () {
+    var d = window.AUDIO_RMS, glow = document.getElementById("glow");
+    for (var f = 0; f < d.v.length; f++) {
+      tl.call((function (v) { return function () { gsap.set(glow, { opacity: 0.55 + v * 0.9, scale: 0.97 + v * 0.08 }); }; })(d.v[f]), [], f / d.fps);
+    }
+  })();
+  tl.to({}, { duration: 0.01 }, 114.99);
+  window.__timelines["main"] = tl;
+</script>
+</body>
+</html>
