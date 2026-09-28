@@ -135,6 +135,7 @@ dependencies {
     implementation(libs.mlkit.objects)
 
     testImplementation(libs.junit)
+    testImplementation("org.robolectric:robolectric:4.14.1")
     testImplementation(libs.kotlin.test.junit)
 }
 

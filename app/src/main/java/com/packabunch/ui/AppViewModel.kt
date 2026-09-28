@@ -521,13 +521,17 @@ class AppViewModel(
     }
 
     /** Remembers the photo on this phone and against the account. Null clears it. */
-    fun setAvatar(url: String?) {
+    suspend fun setAvatar(url: String?): Result<Unit> {
+        val cloud = cloudSettings
+            ?: return Result.failure(IllegalStateException("Sign in to save your profile photo."))
+        val saved = cloud.saveAvatar(_settings.value.unit.name, url)
+        saved.exceptionOrNull()?.let {
+            if (it is kotlinx.coroutines.CancellationException) throw it
+            return Result.failure(it)
+        }
         preferences.edit().putString("avatar", url).apply()
         _settings.update { it.copy(avatarUrl = url) }
-        val settings = cloudSettings ?: return
-        viewModelScope.launch {
-            settings.saveAvatar(_settings.value.unit.name, url)
-        }
+        return Result.success(Unit)
     }
 
     fun setPackingHabit(habit: PackingHabit) {

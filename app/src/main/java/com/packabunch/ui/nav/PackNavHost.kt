@@ -521,8 +521,8 @@ fun PackNavHost(
             ) { picked ->
                 if (picked != null) scope.launch {
                     val url = avatars.upload(context, picked)
-                    if (url != null) viewModel.setAvatar(url)
-                    else notice = "Couldn't upload that picture. Check your connection and try again."
+                    if (url != null) viewModel.setAvatar(url).onFailure { notice = "The picture uploaded, but could not be saved to your account. Please try again." }
+                    else notice = "Couldn't read or upload that picture. Try another photo; if it still fails, try again later."
                 }
             }
             androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshAccountSettings() }
@@ -538,8 +538,8 @@ fun PackNavHost(
                 },
                 onRemovePhoto = {
                     scope.launch {
-                        avatars.remove()
-                        viewModel.setAvatar(null)
+                        viewModel.setAvatar(null).onSuccess { avatars.remove() }
+                            .onFailure { notice = "Couldn't remove the photo from your account. Please try again." }
                     }
                 },
                 email = account.email,

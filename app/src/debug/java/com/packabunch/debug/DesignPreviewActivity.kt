@@ -37,7 +37,7 @@ class DesignPreviewActivity : ComponentActivity() {
                     onCameraMeasuringChange = { previewSettings = previewSettings.copy(cameraMeasuring = it) },
                     onDefaultEdgeGapChange = { previewSettings = previewSettings.copy(defaultEdgeGapMm = it) })
                 "Profile" -> ProfileScreen("preview@example.com", com.packabunch.packing.Tier.FREE, 0, 0, false,
-                    {}, {}, {}, {}, {}, {})
+                    {}, {}, {}, {}, {}, {}, onBack = {})
                 else -> SignInScreen({}, {}, {})
             }
         } }

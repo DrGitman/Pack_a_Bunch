@@ -41,7 +41,7 @@ class CloudSettings(private val account: SupabaseAccount, private val owner: Str
             RemoteSettings(
                 unit = row.getString("unit"),
                 habit = row.optString("habit").takeIf { it.isNotBlank() },
-                avatarUrl = row.optString("avatar_url").takeIf { it.isNotBlank() },
+                avatarUrl = row.optString("avatar_url").takeIf { !row.isNull("avatar_url") && it.isNotBlank() },
             )
         }
     }
