@@ -107,7 +107,6 @@ fun ProjectsScreen(
 ) {
     // A pack deleted on its own page lands back here with a window to take it back.
     var justDeleted by remember(deleted?.id) { mutableStateOf(deleted) }
-    var searchOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     var filter by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("All") }
     var alphabetical by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
@@ -153,12 +152,6 @@ fun ProjectsScreen(
                             .background(com.packabunch.ui.theme.Primary, androidx.compose.foundation.shape.CircleShape),
                     )
                 }
-                com.packabunch.ui.components.LottieTapIcon(
-                    animation = com.packabunch.R.raw.icon_search,
-                    contentDescription = "Search packs",
-                    onClick = { searchOpen = !searchOpen; if (!searchOpen) query = "" },
-                    size = 52.dp,
-                )
                 Box {
                     com.packabunch.ui.components.LottieTapIcon(
                         animation = com.packabunch.R.raw.icon_filter,
@@ -185,29 +178,9 @@ fun ProjectsScreen(
                 modifier = Modifier.padding(horizontal = Spacing.gutter, vertical = 4.dp),
             )
 
-            // A plain white pill with the words inside it: no floating label, and light enough
-            // against the cream ground to be obvious.
-            if (searchOpen) androidx.compose.foundation.text.BasicTextField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    color = TextPrimary, fontFamily = UiFamily, fontSize = 15.sp,
-                ),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(com.packabunch.ui.theme.Primary),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 6.dp)
-                    .background(Color.White, RoundedCornerShape(14.dp))
-                    .border(1.dp, com.packabunch.ui.theme.Outline, RoundedCornerShape(14.dp))
-                    .padding(horizontal = 14.dp, vertical = 13.dp),
-                decorationBox = { inner ->
-                    if (query.isEmpty()) {
-                        Text("Search packs", color = TextTertiary, fontFamily = UiFamily, fontSize = 15.sp)
-                    }
-                    inner()
-                },
-            )
+            // Always there, under the title: one bar instead of a search icon in a header that
+            // already had three. White, with the design's blue-to-pink edge.
+            ProjectSearchBar(query = query, onQueryChange = { query = it })
             if (projects.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 18.dp, bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // The same sliding pill as the item library's filters, not a second style of chip.
@@ -637,4 +610,46 @@ private fun SwipeAwayCard(
                 },
             ),
     ) { content() }
+}
+
+/** The search bar from the design: search glyph, a hairline divider, then the words. */
+@Composable
+private fun ProjectSearchBar(query: String, onQueryChange: (String) -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    val edge = androidx.compose.ui.graphics.Brush.horizontalGradient(
+        listOf(Color(0xFF4DA3E6), Color(0xFF7A5CE8), Color(0xFFB45CE0), Color(0xFFE85CB4)),
+    )
+    androidx.compose.foundation.text.BasicTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        singleLine = true,
+        textStyle = androidx.compose.ui.text.TextStyle(color = TextPrimary, fontFamily = UiFamily, fontSize = 15.sp),
+        cursorBrush = androidx.compose.ui.graphics.SolidColor(com.packabunch.ui.theme.Primary),
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 20.dp, top = 10.dp)
+            .background(Color.White, shape)
+            .border(1.5.dp, edge, shape)
+            .height(52.dp),
+        decorationBox = { inner ->
+            Row(Modifier.fillMaxSize().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.Icon(
+                    com.packabunch.ui.components.PackIcons.Search, contentDescription = null,
+                    tint = TextPrimary, modifier = Modifier.size(20.dp),
+                )
+                Box(Modifier.padding(horizontal = 12.dp).size(width = 1.dp, height = 22.dp).background(Color(0xFFD9D4CF)))
+                Box(Modifier.weight(1f)) {
+                    if (query.isEmpty()) Text("Search your packs", color = TextTertiary, fontFamily = UiFamily, fontSize = 15.sp)
+                    inner()
+                }
+                if (query.isNotEmpty()) androidx.compose.material3.IconButton(onClick = { onQueryChange("") }) {
+                    androidx.compose.material3.Icon(
+                        com.packabunch.ui.components.PackIcons.Close, contentDescription = "Clear search",
+                        tint = TextTertiary, modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+        },
+    )
 }
