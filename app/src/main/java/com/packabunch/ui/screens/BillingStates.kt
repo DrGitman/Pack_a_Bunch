@@ -86,7 +86,7 @@ fun PurchasePopup(
             body = "You backed out of Google Play's payment screen, so nothing was charged and nothing changed.",
             primary = "Try again", onPrimary = onTryAgain,
             secondary = "Carry on without it", onSecondary = onClose,
-            footnote = "Free keeps ${free.maxSavedPacks} pack, ${free.maxPiecesPerPack} pieces and the full packing guide.",
+            footnote = "Free keeps ${free.maxSavedPacks} packs of up to ${free.maxPiecesPerPack} pieces, and the full packing guide.",
             onDismiss = onClose,
             modifier = modifier,
         )

@@ -521,6 +521,10 @@ def serve():
                 out = select_json(json.dumps(req))
             elif req["op"] == "fit":
                 out = fit_json(json.dumps(req))
+            elif req["op"] == "fitSpace":
+                out = fit_space_json(json.dumps(req))
+            elif req["op"] == "selectSpace":
+                out = select_space_json(json.dumps(req))
             elif req["op"] == "ping":
                 out = json.dumps({"ok": True, "opencv": cv2.__version__ if cv2 is not None else None})
             else:
@@ -531,8 +535,6 @@ def serve():
         sys.stdout.flush()
 
 
-if __name__ == "__main__" and "--serve" in sys.argv:
-    serve()
 
 
 # ============================================================================================
@@ -678,3 +680,242 @@ def segment_frame(rgb, width, height, boxes_json, grow_px=2):
             m = cv2.dilate(m, kernel)
         out[(m > 0) & (out == 0)] = i + 1
     return out.tobytes()
+
+
+# ============================================================================================
+# spaces — a car boot, a carton, a cupboard, a room
+
+
+FLOOR_BAND_MM = 25.0
+MIN_WALL_POINTS = 60
+MIN_FACE_POINTS = 12
+SPACE_CELL_MM = 50.0
+FACES = ("FLOOR", "LEFT", "RIGHT", "BACK", "FRONT", "TOP")
+
+
+def _range(idx, v, w, trim=0.01):
+    vals = v[idx]
+    if vals.size == 0:
+        return 0.0, 0.0
+    order = np.argsort(vals, kind="stable")
+    cum = np.cumsum(w[idx][order])
+    t = cum[-1] * trim
+    lo = vals[order[min(np.searchsorted(cum, t, side="right"), vals.size - 1)]]
+    rcum = np.cumsum(w[idx][order][::-1])
+    hi = vals[order[::-1][min(np.searchsorted(rcum, t, side="right"), vals.size - 1)]]
+    return float(lo), float(hi)
+
+
+def _densest(idx, v):
+    """The middle of the most crowded 20 mm of values."""
+    vals = np.sort(v[idx])
+    if vals.size == 0:
+        return 0.0
+    j = np.searchsorted(vals, vals + 20.0, side="right") - np.arange(vals.size)
+    k = int(np.argmax(j))
+    return float(vals[k:k + j[k]].mean())
+
+
+def _wmedian(idx, v, w):
+    return weighted_median(v[idx], w[idx])
+
+
+def fit_space(x, y, h, weights=None, cameras=()):
+    """The inside of a space as a box, in its floor's frame: the fields of Kotlin's SpaceBox."""
+    xs = np.asarray(x, np.float64); ys = np.asarray(y, np.float64); hs = np.asarray(h, np.float64)
+    n = xs.size
+    cams = np.asarray(cameras, np.float64).reshape(-1, 3)
+    walls = np.nonzero(hs > FLOOR_BAND_MM)[0]
+    if walls.size < MIN_WALL_POINTS or cams.shape[0] == 0:
+        return None
+    w = np.ones(n) if weights is None or len(weights) != n else np.asarray(weights, np.float64)
+
+    # The turn of the space: OpenCV's tightest rotated rectangle round the walls, polished.
+    deg = refine_angle(xs[walls], ys[walls], min_area_rect(xs[walls], ys[walls]))
+    # Width runs across the person's line of sight; depth away from them.
+    look = np.array([xs[walls].mean() - cams[:, 0].mean(), ys[walls].mean() - cams[:, 1].mean()])
+    base = math.radians(deg)
+    yaw = base
+    if np.hypot(*look) > 50:
+        best = -1e18
+        for q in range(4):
+            a = base + q * math.pi / 2
+            dot = (-math.sin(a) * look[0] + math.cos(a) * look[1]) / np.hypot(*look)
+            if dot > best:
+                best, yaw = dot, a
+    c, s = math.cos(yaw), math.sin(yaw)
+    us = xs * c + ys * s
+    vs = -xs * s + ys * c
+
+    u_lo, u_hi = _range(walls, us, w)
+    v_lo, v_hi = _range(walls, vs, w)
+    band = max(40.0, 0.06 * max(u_hi - u_lo, v_hi - v_lo))
+    wall_top = _range(walls, hs, w)[1]
+    lower_half = wall_top * 0.5
+    low = walls[hs[walls] <= lower_half]
+
+    def side(vals, along, along_len, outer, inward, span):
+        """Where one side stands, how many points it has (0 when open) and their spread."""
+        found = []
+        offset = 0.0
+        while offset <= span * 0.35:
+            a = outer + inward * offset
+            d = (vals[low] - a) * inward
+            lower = low[(d >= 0) & (d <= band)]
+            if lower.size >= MIN_FACE_POINTS:
+                peak = _densest(lower, vals)
+                on = low[np.abs(vals[low] - peak) <= max(20.0, band / 4)]
+                if on.size >= MIN_FACE_POINTS:
+                    lo = along[on].min()
+                    bins = np.clip(((along[on] - lo) / max(along_len, 1e-6) * 10).astype(int), 0, 9)
+                    if np.unique(bins).size >= 6:
+                        at = _wmedian(on, vals, w)
+                        spread = float(np.median(np.abs(vals[on] - at)) * 1.4826)
+                        if all(abs(f[0] - at) >= 5 for f in found):
+                            found.append((at, int(on.size), spread))
+            offset += band / 2
+        if found:
+            most = max(f[1] for f in found)
+            ok = [f for f in found if f[1] >= most / 2]
+            return min(ok, key=lambda f: (f[0] - outer) * inward)
+        if low.size < MIN_FACE_POINTS:
+            return (outer, 0, 0.0)
+        lo, hi = _range(low, vals, w, trim=0.002)
+        return (lo if inward > 0 else hi, 0, 0.0)
+
+    left_s = side(us, vs, v_hi - v_lo, u_lo, 1.0, u_hi - u_lo)
+    right_s = side(us, vs, v_hi - v_lo, u_hi, -1.0, u_hi - u_lo)
+    back_s = side(vs, us, u_hi - u_lo, v_hi, -1.0, v_hi - v_lo)
+    front_s = side(vs, us, u_hi - u_lo, v_lo, 1.0, v_hi - v_lo)
+    left, right, back, front = left_s[0], right_s[0], back_s[0], front_s[0]
+    width = max(right - left, 1.0)
+    depth = max(back - front, 1.0)
+
+    def top_of(sd, vals, along, lo, hi):
+        if sd[1] == 0:
+            return None
+        ln = hi - lo
+        tight = max(8.0, 2 * sd[2])
+        sel = walls[(np.abs(vals[walls] - sd[0]) <= tight) & (along[walls] > lo + 0.1 * ln) & (along[walls] < hi - 0.1 * ln)]
+        hh = np.sort(hs[sel])
+        if hh.size < MIN_FACE_POINTS:
+            return None
+        gap = max(50.0, 0.08 * wall_top)
+        top = hh[0]
+        for v in hh:
+            if v - top > gap:
+                break
+            top = v
+        return float(top)
+
+    tops = sorted(t for t in (top_of(left_s, us, vs, front, back), top_of(right_s, us, vs, front, back),
+                              top_of(back_s, vs, us, left, right)) if t is not None)
+    walls_top = wall_top if not tops else tops[len(tops) // 2]
+    top_band = max(60.0, 0.1 * walls_top)
+    hw = walls
+    high = hw[(np.abs(hs[hw] - walls_top) <= top_band) & (us[hw] > left + band) & (us[hw] < right - band)
+              & (vs[hw] > front + band) & (vs[hw] < back - band)]
+    height = _wmedian(high, hs, w) if high.size >= MIN_FACE_POINTS * 3 else walls_top
+
+    um, vm = (left + right) / 2, (front + back) / 2
+    cx, cy = um * c - vm * s, um * s + vm * c
+    yaw_deg = (math.degrees(yaw) % 360 + 360) % 360
+
+    cu = (cams[:, 0] - cx) * c + (cams[:, 1] - cy) * s
+    cv = -(cams[:, 0] - cx) * s + (cams[:, 1] - cy) * c
+    cam_inside = bool(np.any((np.abs(cu) < width / 2) & (np.abs(cv) < depth / 2) & (cams[:, 2] < height)))
+
+    cell = max(40.0, max(width, depth, height) / 24)
+
+    def cover(face):
+        a_len, b_len = {"FLOOR": (width, depth), "TOP": (width, depth), "LEFT": (depth, height),
+                        "RIGHT": (depth, height), "BACK": (width, height), "FRONT": (width, height)}[face]
+        na, nb = max(int(math.ceil(a_len / cell)), 1), max(int(math.ceil(b_len / cell)), 1)
+        u, v = us - left, vs - front
+        if face == "FLOOR":
+            a, b, near = u, v, np.abs(hs) <= FLOOR_BAND_MM
+        elif face == "TOP":
+            a, b, near = u, v, np.abs(hs - height) <= band
+        elif face == "LEFT":
+            a, b, near = v, hs, np.abs(us - left) <= band
+        elif face == "RIGHT":
+            a, b, near = v, hs, np.abs(us - right) <= band
+        elif face == "BACK":
+            a, b, near = u, hs, np.abs(vs - back) <= band
+        else:
+            a, b, near = u, hs, np.abs(vs - front) <= band
+        ok = near & (a >= 0) & (b >= 0) & (a < a_len) & (b < b_len)
+        if not ok.any():
+            return 0.0
+        ia = np.minimum(na - 1, np.floor(a[ok] / cell).astype(int))
+        ib = np.minimum(nb - 1, np.floor(b[ok] / cell).astype(int))
+        return float(np.unique(ia * nb + ib).size / (na * nb))
+
+    coverage = {f: cover(f) for f in FACES}
+
+    opening = None
+    if not cam_inside:
+        sill_pts = np.nonzero((np.abs(vs - front) <= band) & (hs > FLOOR_BAND_MM) & (hs < height * 0.6)
+                              & (us > left + 2 * band) & (us < right - 2 * band))[0]
+        sill = 0.0
+        if sill_pts.size >= MIN_FACE_POINTS:
+            sill_top = _range(sill_pts, hs, w)[1]
+            sill = sill_top if sill_top < height * 0.5 else 0.0
+        opening = [int(round(width)), int(round(max(height - sill, 0.0)))]
+
+    return dict(centreX=cx, centreY=cy, yaw=yaw_deg, width=width, depth=depth, height=height,
+                coverage=coverage, opening=opening, cameraInside=cam_inside, pointCount=int(n))
+
+
+def select_space(x, y, h, central, cell=SPACE_CELL_MM, max_h=3000.0):
+    """A space's walls: everything standing connected, the middle of the view not required."""
+    return select(x, y, h, None, central, np.zeros(len(x), bool), 0.0, 1.0, cell, 0.0, 0, max_h, False)
+
+
+def fit_space_json(text):
+    p = json.loads(text)
+    return json.dumps({"space": fit_space(p["x"], p["y"], p["h"], p.get("weights"), p.get("cameras", []))})
+
+
+def select_space_json(text):
+    p = json.loads(text)
+    return json.dumps({"keep": select_space(p["x"], p["y"], p["h"], p["central"], p.get("cell", SPACE_CELL_MM), p.get("maxH", 3000.0))})
+
+
+def trace_space(image, box, seed=None, iterations=5):
+    """
+    A space's inside in the picture — the boot's load floor and walls, the inside of a carton or
+    a cupboard, a room's floor — traced from a prompt box round it and a point inside it, the
+    way the object outlines are. What lies round it (the car's bumper and lights, a carton's
+    flaps folded out, the wall a shelf hangs on) is left out, so the depth points on those never
+    reach the fit. Returns the mask and its outline simplified to the space's corners.
+    """
+    if cv2 is None:
+        return None
+    h, w = image.shape[:2]
+    x0, y0, x1, y1 = [int(round(v)) for v in (box[0] * w, box[1] * h, box[2] * w, box[3] * h)]
+    gc = np.full((h, w), cv2.GC_BGD, np.uint8)
+    gc[y0:y1, x0:x1] = cv2.GC_PR_FGD
+    sx, sy = seed if seed is not None else ((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
+    sx, sy = int(sx * w), int(sy * h)
+    # The middle half of the prompt is the space for certain: a space fills its prompt far more
+    # than an object does, and a small seed let a bright back wall be mistaken for outside.
+    rx, ry = max(4, (x1 - x0) // 4), max(4, (y1 - y0) // 4)
+    gc[max(sy - ry, 0):sy + ry, max(sx - rx, 0):sx + rx] = cv2.GC_FGD
+    bgd, fgd = np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64)
+    cv2.grabCut(image, gc, None, bgd, fgd, iterations, cv2.GC_INIT_WITH_MASK)
+    mask = ((gc == cv2.GC_FGD) | (gc == cv2.GC_PR_FGD)).astype(np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
+    n, labels = cv2.connectedComponents(mask, connectivity=8)
+    if n <= 1:
+        return None
+    mask = (labels == labels[sy, sx]).astype(np.uint8) if labels[sy, sx] else mask
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    c = max(contours, key=cv2.contourArea)
+    hull = cv2.convexHull(c)
+    corners = cv2.approxPolyDP(hull, 0.02 * cv2.arcLength(hull, True), True)[:, 0, :]
+    return dict(mask=mask, contour=c[:, 0, :], corners=corners, areaPx=float(cv2.contourArea(c)))
+
+
+if __name__ == "__main__" and "--serve" in sys.argv:
+    serve()

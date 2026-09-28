@@ -192,7 +192,7 @@ private val termsSections = listOf(
     Section(
         "Pack a Bunch Pro",
         listOf(
-            "The free plan lets you plan one pack at a time with up to 20 pieces. Pack a Bunch " +
+            "The free plan keeps up to five saved packs, with up to 20 pieces each. Pack a Bunch " +
                 "Pro lifts those caps.",
             "If you subscribe, Google Play takes the payment and renews it each month until you " +
                 "cancel. You can cancel at any time in Google Play, and you keep Pro until the " +

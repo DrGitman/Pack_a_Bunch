@@ -15,7 +15,7 @@ their phone, usually in a hurry, and have already packed and unpacked at least o
 Pack a Bunch (Android) measures the space and the things with the phone's camera — no tape
 measure — plans where every piece goes in 3D, then guides the packing step by step
 ("lay it flat, push it into the back right corner"). If something doesn't fit, it asks why and
-takes you straight to the fix. Free plans one pack of up to 20 pieces; Pack Plus (weekly or
+takes you straight to the fix. Free keeps five packs of up to 20 pieces each; Pack Plus (weekly or
 monthly) unlocks unlimited packs, pieces, scans and any size of space.
 
 Success: someone packs a car boot once, first time, and it all fits.

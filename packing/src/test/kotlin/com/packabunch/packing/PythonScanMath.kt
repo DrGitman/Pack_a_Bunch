@@ -61,6 +61,35 @@ class PythonScanMath private constructor(private val process: Process) : ScanMat
         )
     }
 
+    override fun selectSpace(samples: List<DetectionPoints.Sample>, maxHeightMm: Float): List<Int> {
+        val sb = StringBuilder("{\"op\":\"selectSpace\"")
+        sb.append(",\"x\":").append(samples.joinToString(",", "[", "]") { it.point.xMm.toString() })
+        sb.append(",\"y\":").append(samples.joinToString(",", "[", "]") { it.point.yMm.toString() })
+        sb.append(",\"h\":").append(samples.joinToString(",", "[", "]") { it.point.hMm.toString() })
+        sb.append(",\"central\":").append(samples.joinToString(",", "[", "]") { it.central.toString() })
+        sb.append(",\"maxH\":").append(maxHeightMm).append('}')
+        @Suppress("UNCHECKED_CAST")
+        return (call(sb.toString())["keep"] as List<Double>).map { it.toInt() }
+    }
+
+    override fun fitSpace(points: List<PlanePoint>, cameras: List<PlanePoint>, weights: FloatArray?): SpaceBox? {
+        val sb = StringBuilder("{\"op\":\"fitSpace\"")
+        sb.append(",\"x\":").append(points.joinToString(",", "[", "]") { it.xMm.toString() })
+        sb.append(",\"y\":").append(points.joinToString(",", "[", "]") { it.yMm.toString() })
+        sb.append(",\"h\":").append(points.joinToString(",", "[", "]") { it.hMm.toString() })
+        if (weights != null) sb.append(",\"weights\":").append(weights.joinToString(",", "[", "]"))
+        sb.append(",\"cameras\":").append(cameras.joinToString(",", "[", "]") { "[${it.xMm},${it.yMm},${it.hMm}]" }).append('}')
+        @Suppress("UNCHECKED_CAST")
+        val f = call(sb.toString())["space"] as Map<String, Any?>? ?: return null
+        fun num(k: String) = (f[k] as Double).toFloat()
+        @Suppress("UNCHECKED_CAST")
+        val cov = (f["coverage"] as Map<String, Double>).mapKeys { SpaceFace.valueOf(it.key) }.mapValues { it.value.toFloat() }
+        @Suppress("UNCHECKED_CAST")
+        val op = (f["opening"] as List<Double>?)?.let { Opening(widthMm = it[0].toInt(), heightMm = it[1].toInt()) }
+        return SpaceBox(num("centreX"), num("centreY"), num("yaw"), num("width"), num("depth"), num("height"),
+            cov, op, f["cameraInside"] as Boolean, (f["pointCount"] as Double).toInt())
+    }
+
     override fun close() {
         runCatching { input.close() }
         process.destroy()

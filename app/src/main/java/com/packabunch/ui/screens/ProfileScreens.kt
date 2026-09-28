@@ -218,7 +218,7 @@ fun ProfileScreen(
                 AccountRow(
                     title = if (tier == Tier.PLUS) "Manage Pack a Bunch Pro" else "Get Pack a Bunch Pro",
                     onClick = onManageSubscription,
-                    subtitle = if (tier == Tier.PLUS) "Billed in Google Play" else "One pack at a time on the free plan",
+                    subtitle = if (tier == Tier.PLUS) "Billed in Google Play" else "Up to 5 saved packs on the free plan",
                     trailing = PackIcons.External,
                 )
                 RowDivider()

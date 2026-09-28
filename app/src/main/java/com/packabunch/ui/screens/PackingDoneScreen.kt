@@ -184,7 +184,7 @@ fun PackingDoneScreen(
                             fontSize = 14.5f.sp,
                         )
                         Text(
-                            "Free holds ${limits.maxSavedPacks} saved pack at a time.",
+                            "Free holds ${limits.maxSavedPacks} saved packs at a time.",
                             color = Color(0xFF7C4223),
                             fontFamily = UiFamily,
                             fontSize = 13.sp,

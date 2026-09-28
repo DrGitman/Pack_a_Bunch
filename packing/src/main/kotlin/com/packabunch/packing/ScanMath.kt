@@ -24,6 +24,14 @@ interface ScanMath {
     ): List<Int>
 
     fun fit(points: List<PlanePoint>, cameras: List<PlanePoint>, voxelMm: Float, weights: FloatArray?): FittedObject?
+
+    /** A space scan's frame: its walls, everything standing connected (see [DetectionPoints.select]). */
+    fun selectSpace(samples: List<DetectionPoints.Sample>, maxHeightMm: Float): List<Int> =
+        DetectionPoints.select(samples, minCentralShare = 0f, minCentralSamples = 0, cellMm = DetectionPoints.SPACE_CELL_MM, maxHeightMm = maxHeightMm)
+
+    /** The inside of a space as a box (see [SpaceFitter.fit]). */
+    fun fitSpace(points: List<PlanePoint>, cameras: List<PlanePoint>, weights: FloatArray?): SpaceBox? =
+        SpaceFitter.fit(points, cameras, weights)
 }
 
 /** The original Kotlin engine: [BoxDepth], [DetectionPoints] and [ShapeFitter]. */

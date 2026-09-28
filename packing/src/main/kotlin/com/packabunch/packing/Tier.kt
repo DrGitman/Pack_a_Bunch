@@ -57,7 +57,7 @@ data class TierLimits(
          */
         val FREE = TierLimits(
             maxPiecesPerPack = 20,
-            maxSavedPacks = 1,
+            maxSavedPacks = 5,
             maxScansPerDay = 3,
             maxScannedSpaceLitres = 120,
             itemLibrary = false,

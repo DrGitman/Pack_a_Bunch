@@ -11,7 +11,10 @@ import com.packabunch.packing.FittedObject
 import com.packabunch.packing.KotlinScanMath
 import com.packabunch.packing.PlanePoint
 import com.packabunch.packing.ScanMath
+import com.packabunch.packing.Opening
 import com.packabunch.packing.ShapeFamily
+import com.packabunch.packing.SpaceBox
+import com.packabunch.packing.SpaceFace
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -75,6 +78,45 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
             KotlinScanMath.fit(points, cameras, voxelMm, weights)
         }
 
+    override fun selectSpace(samples: List<DetectionPoints.Sample>, maxHeightMm: Float): List<Int> = runCatching {
+        val p = JSONObject()
+        p.put("x", JSONArray(samples.map { it.point.xMm.toDouble() }))
+        p.put("y", JSONArray(samples.map { it.point.yMm.toDouble() }))
+        p.put("h", JSONArray(samples.map { it.point.hMm.toDouble() }))
+        p.put("central", JSONArray(samples.map { it.central }))
+        p.put("maxH", maxHeightMm.toDouble())
+        val keep = JSONObject(module.callAttr("select_space_json", p.toString()).toString()).getJSONArray("keep")
+        List(keep.length()) { keep.getInt(it) }
+    }.getOrElse {
+        Log.w(AR_TAG, "python space select failed, using Kotlin", it)
+        KotlinScanMath.selectSpace(samples, maxHeightMm)
+    }
+
+    override fun fitSpace(points: List<PlanePoint>, cameras: List<PlanePoint>, weights: FloatArray?): SpaceBox? = runCatching {
+        val p = JSONObject()
+        p.put("x", JSONArray(points.map { it.xMm.toDouble() }))
+        p.put("y", JSONArray(points.map { it.yMm.toDouble() }))
+        p.put("h", JSONArray(points.map { it.hMm.toDouble() }))
+        if (weights != null) p.put("weights", JSONArray(weights.map { it.toDouble() }))
+        p.put("cameras", JSONArray(cameras.map { JSONArray(listOf(it.xMm.toDouble(), it.yMm.toDouble(), it.hMm.toDouble())) }))
+        val answer = JSONObject(module.callAttr("fit_space_json", p.toString()).toString())
+        if (answer.isNull("space")) return@runCatching null
+        val f = answer.getJSONObject("space")
+        val cov = f.getJSONObject("coverage")
+        SpaceBox(
+            centreXMm = f.getDouble("centreX").toFloat(), centreYMm = f.getDouble("centreY").toFloat(),
+            yawDegrees = f.getDouble("yaw").toFloat(),
+            widthMm = f.getDouble("width").toFloat(), depthMm = f.getDouble("depth").toFloat(), heightMm = f.getDouble("height").toFloat(),
+            coverage = SpaceFace.entries.associateWith { cov.optDouble(it.name, 0.0).toFloat() },
+            opening = if (f.isNull("opening")) null else f.getJSONArray("opening").let { Opening(widthMm = it.getInt(0), heightMm = it.getInt(1)) },
+            cameraInside = f.getBoolean("cameraInside"),
+            pointCount = f.getInt("pointCount"),
+        )
+    }.getOrElse {
+        Log.w(AR_TAG, "python space fit failed, using Kotlin", it)
+        KotlinScanMath.fitSpace(points, cameras, weights)
+    }
+
     /**
      * Traces every detector box's object in a small camera frame (RGB, sensor orientation).
      * One byte per pixel: 0 nothing, i + 1 box i's object. Null when Python is not running.
@@ -101,6 +143,8 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
                     get(app).select(samples, depthsMm, boxSpanPx, focalPx, inMask)
                 override fun fit(points: List<PlanePoint>, cameras: List<PlanePoint>, voxelMm: Float, weights: FloatArray?) =
                     get(app).fit(points, cameras, voxelMm, weights)
+                override fun selectSpace(samples: List<DetectionPoints.Sample>, maxHeightMm: Float) = get(app).selectSpace(samples, maxHeightMm)
+                override fun fitSpace(points: List<PlanePoint>, cameras: List<PlanePoint>, weights: FloatArray?) = get(app).fitSpace(points, cameras, weights)
             }
         }
 

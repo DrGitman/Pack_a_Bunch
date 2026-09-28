@@ -132,7 +132,7 @@ class SpaceScanSimTest {
 
     private class Scan(val box: SpaceBox?, val space: ScannedSpace?, val points: List<PlanePoint>, val cameras: List<PlanePoint>, val last: SceneSim.Camera)
 
-    private fun scan(space: Space, seed: Int = 5): Scan {
+    private fun scan(space: Space, seed: Int = 5, math: ScanMath = KotlinScanMath): Scan {
         val rnd = Random(seed)
         val pf = PlaneFrame(0f, space.floorY, 0f, floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 1f, 0f))
         val cloud = ObjectCloud(voxelMm = 10f, maxVoxels = 40_000, minHeightMm = -BELOW_FLOOR_MM, relativeSightings = 0.03f)
@@ -156,14 +156,14 @@ class SpaceScanSimTest {
                 }
             }
             if (samples.isEmpty()) continue
-            val keep = HashSet(DetectionPoints.select(samples, minCentralShare = 0f, minCentralSamples = 0, cellMm = DetectionPoints.SPACE_CELL_MM, maxHeightMm = 3000f))
+            val keep = HashSet(math.selectSpace(samples, 3000f))
             cloud.add(samples.indices.filter { it in keep || samples[it].point.hMm <= SpaceFitter.FLOOR_BAND_MM }.map { samples[it].point })
             val c = pf.toPlane(cam.pos[0], cam.pos[1], cam.pos[2])
             val last = cams.lastOrNull()
             if (last == null || kotlin.math.hypot(kotlin.math.hypot(c.xMm - last.xMm, c.yMm - last.yMm), c.hMm - last.hMm) > 40f) cams += c
         }
         val snap = cloud.snapshot()
-        val box = SpaceFitter.fit(snap.points, cams, snap.weights)
+        val box = math.fitSpace(snap.points, cams, snap.weights)
         if (System.getenv("SCAN_DEBUG") != null) {
             val hs = snap.points.map { it.hMm }.sorted()
             println("  [${space.name}] frames ${all.size} voxels ${cloud.size} confirmed ${snap.points.size} walls ${hs.count { it > SpaceFitter.FLOOR_BAND_MM }} h ${hs.firstOrNull()}..${hs.lastOrNull()} " +
@@ -212,11 +212,42 @@ class SpaceScanSimTest {
         assertSize(s, 440f, 290f, 295f, 20f, "Carton")
     }
 
+    // The same four spaces, measured by the Python engine the app runs (packscan.py).
+    // Skipped, with a note, where python3 with NumPy and OpenCV is not installed.
+    private fun python(test: (ScanMath) -> Unit) {
+        val py = PythonScanMath.start() ?: return println("SKIPPED: python3 with numpy and opencv not found")
+        py.use(test)
+    }
+
+    @Test fun `the bedroom, Python engine`() = python { m ->
+        val s = scan(room, math = m); println(report("Bedroom (Python)", s))
+        assertSize(s, 2800f, 3600f, 2600f, 90f, "Bedroom")
+        assertTrue(s.box!!.cameraInside); assertNull(s.box.opening)
+    }
+
+    @Test fun `the car boot, Python engine`() = python { m ->
+        val s = scan(boot, math = m); println(report("Car boot (Python)", s))
+        assertSize(s, 1040f, 800f, 600f, 40f, "Car boot")
+        assertEquals(520f, assertNotNull(s.box!!.opening).heightMm.toFloat(), 40f)
+    }
+
+    @Test fun `the open shelf, Python engine`() = python { m ->
+        val s = scan(shelf, math = m); println(report("Open shelf (Python)", s))
+        assertSize(s, 1160f, 380f, 280f, 30f, "Open shelf")
+        assertNotNull(s.box!!.opening)
+    }
+
+    @Test fun `the open carton, Python engine`() = python { m ->
+        val s = scan(carton, math = m); println(report("Carton (Python)", s))
+        assertSize(s, 440f, 290f, 295f, 20f, "Carton")
+    }
+
     /** Writes each fit for the picture of the result, when asked (`SCAN_SIM_OUT=dir`). */
     @Test fun `export for the pictures`() {
         val dir = System.getenv("SCAN_SIM_OUT") ?: return
+        val py = if (System.getenv("SCAN_SIM_ENGINE") == "python") PythonScanMath.start() else null
         for ((key, space) in listOf("room" to room, "boot" to boot, "shelf" to shelf, "carton" to carton)) {
-            val s = scan(space)
+            val s = scan(space, math = py ?: KotlinScanMath)
             val b = s.box
             val sb = StringBuilder("{\"name\":\"${space.name}\",\"floorY\":${space.floorY}")
             val c = s.last
@@ -238,6 +269,7 @@ class SpaceScanSimTest {
             sb.append(",\"points\":[${s.points.filterIndexed { i, _ -> i % 3 == 0 }.joinToString(",") { "[${it.xMm.toInt()},${it.yMm.toInt()},${it.hMm.toInt()}]" }}]}")
             java.io.File(dir, "$key.json").writeText(sb.toString())
         }
+        py?.close()
     }
 
     private companion object {

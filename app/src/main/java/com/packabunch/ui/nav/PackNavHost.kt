@@ -316,11 +316,11 @@ fun PackNavHost(
     var deletedForUndo by remember { mutableStateOf<com.packabunch.data.Project?>(null) }
     // Onboarding runs before sign-in (RequiredAccount), so a signed-in person always lands on their packs.
     val startRoute = Routes.PROJECTS
-    // Free keeps one saved pack. Starting or copying another goes to Pack Plus instead, with
-    // the reason said; deleting the one there is always the free way out.
+    // Free keeps five saved packs. Starting or copying another goes to Pack Plus instead, with
+    // the reason said; deleting one is always the free way out.
     fun packRoomOrUpsell(): Boolean {
         if (viewModel.limits.allowsAnotherPack(viewModel.savedPackCount())) return true
-        notice = "Free keeps ${viewModel.limits.maxSavedPacks} pack. Delete it to start another, or get Pack Plus for as many as you like."
+        notice = "Free keeps ${viewModel.limits.maxSavedPacks} packs. Delete one to start another, or get Pack Plus for as many as you like."
         navController.navigate(Routes.UPGRADE)
         return false
     }

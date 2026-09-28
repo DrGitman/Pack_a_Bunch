@@ -90,7 +90,7 @@ artboard. Never hardcode a hex value in a composable — colour, type and spacin
 | | Free | Pack Plus |
 |---|---|---|
 | Pieces per pack | 20 | unlimited |
-| Saved packs | 1 | unlimited |
+| Saved packs | 5 | unlimited |
 | Scans per day | 3 | unlimited |
 | Size of space you can scan | 120 L | any |
 | Item library | — | ✓ |

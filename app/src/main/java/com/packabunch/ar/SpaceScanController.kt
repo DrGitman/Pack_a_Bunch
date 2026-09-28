@@ -76,6 +76,9 @@ class SpaceScanController(
     private val density: Float,
 ) : GLSurfaceView.Renderer {
 
+    /** The measuring engine: Python (packscan.py), with the Kotlin one as its fallback. */
+    private val math = PythonEngine.lazy(context)
+
     private val _ui = MutableStateFlow(SpaceScanUi())
     val ui: StateFlow<SpaceScanUi> = _ui.asStateFlow()
 
@@ -159,7 +162,7 @@ class SpaceScanController(
     /** The finished space for the planner, or null if nothing usable was fitted. Call off the main thread. */
     fun buildScannedSpace(): ScannedSpace? = worker.submit<ScannedSpace?> {
         val snap = cloud.snapshot()
-        val box = SpaceFitter.fit(snap.points, cameras, snap.weights) ?: return@submit null
+        val box = math.fitSpace(snap.points, cameras, snap.weights) ?: return@submit null
         SpaceFitter.toScannedSpace(box, snap.points, snap.weights)
     }.get()
 
@@ -337,7 +340,7 @@ class SpaceScanController(
     private fun accumulate(samples: List<DetectionPoints.Sample>, cam: PlanePoint) {
         // The walls are whatever stands connected around the middle of the view; the floor is
         // kept wherever it lies inside the outline.
-        val keep = HashSet(DetectionPoints.select(samples, minCentralShare = 0f, minCentralSamples = 0, cellMm = DetectionPoints.SPACE_CELL_MM, maxHeightMm = MAX_HEIGHT_MM))
+        val keep = HashSet(math.selectSpace(samples, MAX_HEIGHT_MM))
         val points = samples.indices.filter { it in keep || samples[it].point.hMm <= SpaceFitter.FLOOR_BAND_MM }.map { samples[it].point }
         cloud.add(points)
         val last = cameras.lastOrNull()
@@ -349,7 +352,7 @@ class SpaceScanController(
         if (now - lastFitMs < FIT_INTERVAL_MS) return
         lastFitMs = now
         val snap = cloud.snapshot()
-        val box = SpaceFitter.fit(snap.points, cameras, snap.weights)
+        val box = math.fitSpace(snap.points, cameras, snap.weights)
         drawn = box
         _ui.value = _ui.value.copy(box = box)
     }

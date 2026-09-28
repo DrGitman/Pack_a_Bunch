@@ -162,9 +162,9 @@ fun UpgradeScreen(
             Spacer(Modifier.height(10.dp))
             Text(
                 text = if (plusOn) "Cancel any time; your packs stay either way. Free keeps " +
-                    "${TierLimits.FREE.maxSavedPacks} pack, up to ${TierLimits.FREE.maxPiecesPerPack} pieces."
-                else "Free keeps ${TierLimits.FREE.maxSavedPacks} pack, up to " +
-                    "${TierLimits.FREE.maxPiecesPerPack} pieces, and the whole packing guide.",
+                    "${TierLimits.FREE.maxSavedPacks} packs, up to ${TierLimits.FREE.maxPiecesPerPack} pieces each."
+                else "Free keeps ${TierLimits.FREE.maxSavedPacks} packs, up to " +
+                    "${TierLimits.FREE.maxPiecesPerPack} pieces each, and the whole packing guide.",
                 color = TextTertiary,
                 fontFamily = UiFamily,
                 fontSize = 12.5f.sp,
