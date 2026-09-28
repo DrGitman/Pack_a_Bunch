@@ -53,6 +53,8 @@ class AppViewModel(
     private val cloudSettings: com.packabunch.data.cloud.CloudSettings? = null,
     /** Only for the Realtime connection that tells sync when another device changed a pack. */
     private val account: com.packabunch.auth.SupabaseAccount? = null,
+    /** Puts each new notice on the phone too, not only on the Notifications page. */
+    private val notifier: com.packabunch.notify.SystemNotifier? = null,
 ) : ViewModel() {
     val syncState = cloudSync?.state ?: MutableStateFlow(com.packabunch.data.cloud.CloudSyncState()).asStateFlow()
     fun syncNow() { viewModelScope.launch { cloudSync?.sync() } }
@@ -236,6 +238,27 @@ class AppViewModel(
         }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
     }
 
+    /**
+     * Every notice goes on the phone once, when it first appears, as long as its switch is on
+     * (the list above already leaves out the switched-off kinds). What was already there when
+     * this first ran is not replayed.
+     */
+    private fun postToPhone() = notifier?.let { n ->
+        viewModelScope.launch {
+            notifications.collect { list ->
+                val posted = preferences.getStringSet("postedNotifications", null)
+                if (posted == null) {
+                    preferences.edit().putStringSet("postedNotifications", list.map { it.id }.toSet()).apply()
+                    return@collect
+                }
+                val fresh = list.filter { it.unread && it.id !in posted }
+                if (fresh.isEmpty()) return@collect
+                fresh.forEach { n.post(it.id, it.title, it.body, it.atMillis) }
+                preferences.edit().putStringSet("postedNotifications", posted + fresh.map { it.id }).apply()
+            }
+        }
+    }
+
     fun markNotificationRead(id: String) {
         if (id in readNotifications.value) return
         val all = readNotifications.value + id
@@ -417,6 +440,8 @@ class AppViewModel(
 
     // After _settings on purpose: RevenueCat may report cached entitlement synchronously.
     init {
+        // Last, once everything the notices are worked out from exists.
+        postToPhone()
         if (userId != null) viewModelScope.launch {
             // Signing in again is what stops a deletion this account asked for.
             if (runCatching { account?.cancelPendingDeletion() }.getOrNull() == true) {
@@ -923,7 +948,8 @@ class AppViewModel(
                 context.getSharedPreferences("app_preferences_$userId", Context.MODE_PRIVATE),
                 account?.let { com.packabunch.data.cloud.CloudPackSync(repository,it,userId,
                     context.getSharedPreferences("cloud_sync_$userId",Context.MODE_PRIVATE)) }, userId,
-                account?.let { com.packabunch.data.cloud.CloudSettings(it,userId) }, account) as T
+                account?.let { com.packabunch.data.cloud.CloudSettings(it,userId) }, account,
+                com.packabunch.notify.SystemNotifier(context.applicationContext)) as T
         }
     }
 }

@@ -23,6 +23,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // Opened from a password-reset email.
         if (savedInstanceState == null) com.packabunch.auth.RecoveryLink.offer(intent?.data)
+        com.packabunch.notify.NotificationLink.offer(intent)
+        askForNotifications()
         setContent {
             PackABunchTheme {
                 // Once per app launch, not per screen rotation.
@@ -57,5 +59,23 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         com.packabunch.auth.RecoveryLink.offer(intent.data)
+        com.packabunch.notify.NotificationLink.offer(intent)
+    }
+
+    /**
+     * Android 13 and later need a yes before any notice reaches the phone. Asked once; after a
+     * no the app never nags, and the Notifications page keeps working either way.
+     */
+    private val notificationPermission =
+        registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) {}
+
+    private fun askForNotifications() {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) return
+        val prefs = getSharedPreferences("app_launch", MODE_PRIVATE)
+        if (prefs.getBoolean("askedNotifications", false)) return
+        if (androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.POST_NOTIFICATIONS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED) return
+        prefs.edit().putBoolean("askedNotifications", true).apply()
+        notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
     }
 }

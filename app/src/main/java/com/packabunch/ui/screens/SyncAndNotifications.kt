@@ -240,15 +240,13 @@ data class AppNotification(
  * Notification centre — `design/artboards/Notifications.dc.html`.
  *
  * Everything the app has said, kept in one place so nothing is only ever a banner you
- * swiped away. The link out to the settings is at the bottom because the honest answer to
- * "why am I getting this" should always be one tap from the thing itself.
+ * swiped away. Which kinds show up is chosen in Settings → Notifications.
  */
 @Composable
 fun NotificationsScreen(
     notifications: List<AppNotification>,
     onMarkAllRead: () -> Unit,
     onOpen: (AppNotification) -> Unit,
-    onChooseWhatShows: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -328,15 +326,6 @@ fun NotificationsScreen(
             }
         }
 
-        Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            SecondaryButton(
-                text = "Choose what shows up here",
-                onClick = onChooseWhatShows,
-                icon = PackIcons.Settings,
-            )
-        }
-
-        Spacer(Modifier.height(Spacing.base))
     }
 }
 

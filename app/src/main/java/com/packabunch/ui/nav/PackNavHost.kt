@@ -239,6 +239,14 @@ fun PackNavHost(
     val projectsLoading by viewModel.projectsLoading.collectAsStateWithLifecycle()
     val dismissedResumes by viewModel.dismissedResumes.collectAsStateWithLifecycle()
     val syncState by viewModel.syncState.collectAsStateWithLifecycle()
+    // Tapped a notification on the phone: straight to the Notifications page.
+    val openNotifications by com.packabunch.notify.NotificationLink.pending.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(openNotifications) {
+        if (openNotifications) {
+            com.packabunch.notify.NotificationLink.pending.value = false
+            navController.navigate(Routes.NOTIFICATIONS) { launchSingleTop = true }
+        }
+    }
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var notice by remember { mutableStateOf<String?>(null) }
@@ -309,6 +317,29 @@ fun PackNavHost(
             }
         }
     }
+    // A free limit reached: a small card that says which one, with the way on to Pack Plus —
+    // not the whole Pack Plus page thrown up in the middle of what the person was doing.
+    var limitHit by remember { mutableStateOf<LimitHit?>(null) }
+    limitHit?.let { hit ->
+        androidx.compose.ui.window.Popup(
+            onDismissRequest = { limitHit = null },
+            properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+        ) {
+            com.packabunch.ui.components.PackPopup(
+                icon = com.packabunch.ui.components.PackIcons.Cube,
+                iconTint = com.packabunch.ui.theme.Primary,
+                iconBackground = com.packabunch.ui.theme.BrandTint,
+                title = hit.title,
+                body = hit.body,
+                primary = "Try Pack Plus",
+                onPrimary = { limitHit = null; navController.navigate(Routes.UPGRADE) },
+                secondary = hit.otherWay,
+                onSecondary = { limitHit = null; hit.onOtherWay() },
+                footnote = "Pack Plus has no limits: packs, pieces, scans and any size of space.",
+                onDismiss = { limitHit = null },
+            )
+        }
+    }
     var editItemId by rememberSaveable { mutableStateOf<String?>(null) }
     var packMenuOpen by rememberSaveable { mutableStateOf(false) }
     var renamePack by remember { mutableStateOf<com.packabunch.data.Project?>(null) }
@@ -320,8 +351,11 @@ fun PackNavHost(
     // the reason said; deleting one is always the free way out.
     fun packRoomOrUpsell(): Boolean {
         if (viewModel.limits.allowsAnotherPack(viewModel.savedPackCount())) return true
-        notice = "Free keeps ${viewModel.limits.maxSavedPacks} packs. Delete one to start another, or get Pack Plus for as many as you like."
-        navController.navigate(Routes.UPGRADE)
+        val max = viewModel.limits.maxSavedPacks
+        limitHit = LimitHit(
+            title = "You've used your $max free packs",
+            body = "Free keeps $max saved packs. Delete one to start another, or try Pack Plus to keep as many as you like.",
+        )
         return false
     }
     fun newPack() {
@@ -332,8 +366,12 @@ fun PackNavHost(
     // Free includes a few scans a day; typing sizes in is never limited, so that is offered.
     fun scanOrType(route: String, typed: () -> Unit) {
         if (viewModel.tryStartScan()) { navController.navigate(route); return }
-        notice = "Free includes ${viewModel.limits.maxScansPerDay} scans a day. Type the sizes in, or get Pack Plus to scan as often as you like."
-        typed()
+        limitHit = LimitHit(
+            title = "No scans left today",
+            body = "Free includes ${viewModel.limits.maxScansPerDay} scans a day, and they come back tomorrow. Type the sizes in for now, or try Pack Plus to scan as often as you like.",
+            otherWay = "Type the sizes in",
+            onOtherWay = typed,
+        )
     }
     fun home() = navController.navigate(Routes.PROJECTS) {
         popUpTo(navController.graph.id) { inclusive = true }
@@ -432,7 +470,6 @@ fun PackNavHost(
                             else -> Unit
                         }
                     },
-                    onChooseWhatShows = { navController.navigate(Routes.NOTIFICATION_SETTINGS) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -681,8 +718,10 @@ fun PackNavHost(
                     val g = scan.baseGrid
                     val litres = g.countX.toDouble() * g.countY * g.countZ * g.resolutionMm.toDouble().let { it * it * it } / 1e6
                     if (!viewModel.limits.allowsSpaceLitres(litres)) {
-                        notice = "Free maps spaces up to ${viewModel.limits.maxScannedSpaceLitres} litres; this one is about ${litres.toInt()}. Type its size in, or get Pack Plus to map any size."
-                        navController.navigate(Routes.UPGRADE)
+                        limitHit = LimitHit(
+                            title = "This space is too big for Free",
+                            body = "Free maps spaces up to ${viewModel.limits.maxScannedSpaceLitres} litres; this one is about ${litres.toInt()}. Type its size in, or try Pack Plus to map any size.",
+                        )
                         return@SpaceScanScreen
                     }
                     viewModel.setScannedSpace(scan)
@@ -1281,3 +1320,10 @@ val sheetExit: ExitTransition = slideOutVertically(
     targetOffsetY = { it },
 ) + fadeOut(tween(Motion.SHORT_MS))
 
+/** Which free limit was reached, in words, and the free way on when there is one. */
+private data class LimitHit(
+    val title: String,
+    val body: String,
+    val otherWay: String = "Not now",
+    val onOtherWay: () -> Unit = {},
+)
