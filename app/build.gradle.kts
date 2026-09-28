@@ -142,8 +142,9 @@ dependencies {
 // Building needs a Python 3.11 on this computer for Chaquopy to install them; point
 // PACKSCAN_BUILD_PYTHON in local.properties at it if it is not found on its own
 // (e.g. C:/Users/you/AppData/Local/Programs/Python/Python311/python.exe).
-// PACKSCAN_OPENCV=false leaves OpenCV out (if pip finds no Android build of it): measuring still
+// OpenCV is left out by default (Chaquopy has no Android build of it for Python 3.11): measuring
 // runs on NumPy; only the picture outline tracing is skipped and the depth outline is used instead.
+// PACKSCAN_OPENCV=true adds it, for a Python version Chaquopy does have it for.
 chaquopy {
     defaultConfig {
         version = "3.11"
@@ -154,7 +155,8 @@ chaquopy {
             // would not run on a phone anyway).
             options("--only-binary", ":all:")
             install("numpy")
-            if (cloudProperties.getProperty("PACKSCAN_OPENCV", "true") != "false") install("opencv-python")
+            // Chaquopy has no Android build of OpenCV for Python 3.11, so it is off unless asked for.
+            if (cloudProperties.getProperty("PACKSCAN_OPENCV", "false") == "true") install("opencv-python")
         }
     }
 }
