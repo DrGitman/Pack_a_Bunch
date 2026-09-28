@@ -45,42 +45,22 @@ object ReviewPrompt {
         context.getSharedPreferences("review_prompt", Context.MODE_PRIVATE).getInt("packs_finished", 0)
 
     /**
-     * The app's own "How are we doing?" card: due once every 5 to 10 finished packs, the next
-     * count picked at random each time so it never feels like clockwork, and never within a
-     * month of the last one. It is only feedback to us; it has nothing to do with the Play
-     * review above, which is asked for on its own and whatever the stars were.
+     * The app's own "How are we doing?" card: right after a finished pack, once or twice a week
+     * for someone using the app — never sooner than three and a half days after the last one,
+     * so a busy week of packing sees it twice at most and a quiet one once. It is only feedback
+     * to us; it has nothing to do with the Play review above, which is asked for on its own and
+     * whatever the stars were.
      */
     fun feedbackDue(context: Context): Boolean {
         val prefs = context.getSharedPreferences("review_prompt", Context.MODE_PRIVATE)
-        val finished = prefs.getInt("packs_finished", 0)
-        var next = prefs.getInt("feedback_next", 0)
-        if (next == 0) {
-            next = (5..10).random()
-            prefs.edit().putInt("feedback_next", next).apply()
-        }
-        if (finished < next) return false
-        if (System.currentTimeMillis() - prefs.getLong("feedback_at", 0) < FEEDBACK_QUIET_DAYS * DAY_MS) return false
-        prefs.edit()
-            .putLong("feedback_at", System.currentTimeMillis())
-            .putInt("feedback_next", finished + (5..10).random())
-            .apply()
+        val now = System.currentTimeMillis()
+        if (now - prefs.getLong("feedback_at", 0) < FEEDBACK_GAP_MS) return false
+        prefs.edit().putLong("feedback_at", now).apply()
         return true
     }
 
-    /**
-     * Opens the person's email app addressed to support, with the version filled in so a bug
-     * report says what it is about. False when the phone has no email app, so the caller can
-     * show the address instead.
-     */
-    fun feedback(context: Context, address: String, version: String): Boolean {
-        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
-            putExtra(Intent.EXTRA_EMAIL, arrayOf(address))
-            putExtra(Intent.EXTRA_SUBJECT, "Pack a Bunch feedback ($version)")
-        }
-        return runCatching { context.startActivity(intent) }.isSuccess
-    }
-
     private const val QUIET_DAYS = 90
-    private const val FEEDBACK_QUIET_DAYS = 30
+    /** Half a week: twice a week at most. */
+    private const val FEEDBACK_GAP_MS = 84 * 60 * 60 * 1000L
     private const val DAY_MS = 24 * 60 * 60 * 1000L
 }

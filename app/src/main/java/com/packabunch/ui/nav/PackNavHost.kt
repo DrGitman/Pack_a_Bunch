@@ -1121,7 +1121,7 @@ fun PackNavHost(
                 onDone = {
                     // Whatever they answered about the fit: the prompt never depends on it.
                     val askedPlay = (context as? android.app.Activity)?.let(com.packabunch.review.ReviewPrompt::packFinished) ?: false
-                    // Every 5 to 10 finished packs, our own card — never on top of Play's.
+                    // Once or twice a week, our own card — never on top of Play's.
                     if (!askedPlay && com.packabunch.review.ReviewPrompt.feedbackDue(context)) feedbackOpen = true
                     home()
                 },
