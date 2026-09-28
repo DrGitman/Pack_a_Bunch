@@ -339,10 +339,17 @@ fun PackNavHost(
         popUpTo(navController.graph.id) { inclusive = true }
         launchSingleTop = true
     }
-    fun items() = navController.navigate(Routes.ITEMS) {
-        popUpTo(Routes.ITEMS) { inclusive = true }
+    /**
+     * A pack's main pages — its items, its plan and the packing guide. Opening one clears
+     * whatever pages were stacked in front of it, so back from any of them is one step to
+     * Projects instead of a walk back through every screen the pack went through. The steps
+     * in between (scans, reviews, the space's type) still go back to where they came from.
+     */
+    fun toPackPage(route: String) = navController.navigate(route) {
+        popUpTo(Routes.PROJECTS)
         launchSingleTop = true
     }
+    fun items() = toPackPage(Routes.ITEMS)
     fun finishSetup() {
         viewModel.completeSetup()
         home()
@@ -364,7 +371,7 @@ fun PackNavHost(
                     newPack()
                 },
                 onTrySample = {
-                    viewModel.openPack("sample") { navController.navigate(Routes.ITEMS) }
+                    viewModel.openPack("sample") { toPackPage(Routes.ITEMS) }
                 },
                 onSeeProjects = { home() },
             )
@@ -413,11 +420,11 @@ fun PackNavHost(
                         when {
                             n.id.startsWith("progress-") -> {
                                 val packId = n.id.removePrefix("progress-").substringBeforeLast('-')
-                                viewModel.openPack(packId) { viewModel.resumeGuide(); navController.navigate(Routes.PACKING_GUIDE) }
+                                viewModel.openPack(packId) { viewModel.resumeGuide(); toPackPage(Routes.PACKING_GUIDE) }
                             }
                             n.id.startsWith("done-") -> {
                                 val packId = n.id.removePrefix("done-").substringBeforeLast('-')
-                                viewModel.openPack(packId) { navController.navigate(Routes.PLAN_RESULT) }
+                                viewModel.openPack(packId) { toPackPage(Routes.PLAN_RESULT) }
                             }
                             n.id.startsWith("plus-ending-") || n.id.startsWith("plus-ended-") ->
                                 navController.navigate(Routes.UPGRADE)
@@ -564,7 +571,7 @@ fun PackNavHost(
                 state = editor,
                 onStartLoading = {
                     viewModel.resumeGuide()
-                    navController.navigate(Routes.PACKING_GUIDE)
+                    toPackPage(Routes.PACKING_GUIDE)
                 },
                 onFixOpening = { navController.navigate(Routes.CREATE_SPACE) },
                 onBack = { navController.popBackStack() },
@@ -620,13 +627,13 @@ fun PackNavHost(
                 onResumePacking = { project ->
                     viewModel.openPack(project.id) {
                         viewModel.resumeGuide()
-                        navController.navigate(Routes.PACKING_GUIDE)
+                        toPackPage(Routes.PACKING_GUIDE)
                     }
                 },
                 onStartOver = { project ->
                     viewModel.openPack(project.id) {
                         viewModel.restartPacking()
-                        navController.navigate(Routes.PACKING_GUIDE)
+                        toPackPage(Routes.PACKING_GUIDE)
                     }
                 },
                 onDismissResume = { viewModel.dismissResume(it.id) },
@@ -726,7 +733,7 @@ fun PackNavHost(
                     scan = scan,
                     report = scan.report(),
                     onToggle = viewModel::setObstructionIncluded,
-                    onContinue = { navController.navigate(Routes.ITEMS) },
+                    onContinue = { toPackPage(Routes.ITEMS) },
                     onBack = { navController.popBackStack() },
                 )
             }
@@ -740,7 +747,7 @@ fun PackNavHost(
                 onNameChange = viewModel::setSpaceName,
                 onDimensionsChange = viewModel::setSpaceDimensions,
                 habit = settings.packingHabit,
-                onNext = { navController.navigate(Routes.ITEMS) },
+                onNext = { toPackPage(Routes.ITEMS) },
                 onBack = { navController.popBackStack() },
                 onMeasureWithCamera = {
                     if (settings.cameraMeasuring) navController.navigate(Routes.MEASURE)
@@ -908,11 +915,11 @@ fun PackNavHost(
                 unit = settings.unit,
                 onStartPacking = {
                     viewModel.resumeGuide()
-                    navController.navigate(Routes.PACKING_GUIDE)
+                    toPackPage(Routes.PACKING_GUIDE)
                 },
                 // Goes to the items list rather than back: a planned pack opens on its plan, so
                 // there is nothing underneath to pop to.
-                onEditItems = { navController.navigate(Routes.ITEMS) { launchSingleTop = true } },
+                onEditItems = { toPackPage(Routes.ITEMS) },
                 onShowLayers = { navController.navigate(Routes.PLAN_LAYERS) },
                 onMenu = { packMenuOpen = true },
                 onBack = { navController.popBackStack() },
@@ -984,7 +991,7 @@ fun PackNavHost(
                 onShowOverview = { navController.popBackStack() },
                 onStartPacking = {
                     viewModel.resumeGuide()
-                    navController.navigate(Routes.PACKING_GUIDE)
+                    toPackPage(Routes.PACKING_GUIDE)
                 },
                 onBack = { navController.popBackStack() },
             )
