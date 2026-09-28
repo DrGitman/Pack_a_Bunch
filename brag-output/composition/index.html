@@ -21,7 +21,7 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
 .grain { position:absolute; inset:0; background-image:radial-gradient(rgba(63,39,24,0.05) 1px, transparent 1px); background-size:6px 6px; }
 
 /* scene 1 */
-#s1-photo { position:absolute; inset:0; background:url("assets/img/desk.jpg") center/cover; }
+#s1-photo { position:absolute; inset:0; background:url("assets/img/tray.jpg") center/cover; }
 #s1-dim { position:absolute; inset:0; background:linear-gradient(180deg, rgba(43,29,20,0.55), rgba(43,29,20,0.82)); }
 .s1-line { position:absolute; left:140px; right:140px; color:#FFF8F0; font-weight:800; letter-spacing:-2px; }
 #s1-l1 { top:380px; font-size:88px; }
@@ -61,7 +61,7 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
 /* scene 3 boot */
 #s3-boot { position:absolute; inset:0; background:radial-gradient(ellipse at 50% 55%, #6B5646 0%, #3A2B20 55%, #1F150E 100%); }
 #s3-scan { position:absolute; top:0; bottom:0; width:140px; background:linear-gradient(90deg, rgba(242,160,61,0), rgba(242,160,61,0.28), rgba(242,160,61,0)); }
-#s3-wire .dr { fill:none; stroke:#FFFFFF; stroke-width:4; stroke-dasharray:2400; stroke-linejoin:round; filter:drop-shadow(0 0 5px rgba(255,255,255,0.7)); }
+#s3-wire .dr { fill:none; stroke:#FFFFFF; stroke-width:2; stroke-dasharray:2400; stroke-linejoin:round; filter:drop-shadow(0 0 5px rgba(255,255,255,0.7)); }
 
 /* scene 5 */
 #s5-svg { position:absolute; left:640px; top:40px; width:1200px; height:760px; }
@@ -106,8 +106,7 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
 #s8-logo .mark img { width:106px; height:101px; }
 #s8-logo .name { height:120px; width:929px; }
 #s8-line { font-weight:700; font-size:52px; color:var(--muted); margin-top:30px; letter-spacing:-1px; }
-#s8-cta { margin-top:56px; padding:26px 56px; border-radius:60px; background:#A65C34; color:#FFFFFF; font-weight:800; font-size:44px; }
-#s8-foot { margin-top:30px; font-family:"DM Mono"; font-weight:500; font-size:28px; color:#8E4A26; letter-spacing:1px; }
+#s8-foot { margin-top:48px; font-family:"DM Mono"; font-weight:500; font-size:28px; color:#8E4A26; letter-spacing:1px; }
 
 /* captions */
 #caps { position:absolute; left:0; right:0; bottom:56px; height:80px; }
@@ -160,21 +159,17 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
         <div class="b">Width, depth and height in seconds. It knows the floor, the walls and the lip.</div>
       </div>
       <div class="phone" id="s3-phone"><div class="screen">
-        <div id="s3-boot"></div>
-        <svg class="overlay" viewBox="0 0 1084 604" preserveAspectRatio="none">
-          <polygon points="330,170 754,170 770,392 314,392" fill="#4E3D30"/>
-          <polygon points="314,392 770,392 930,560 150,560" fill="#5C4A3B"/>
-          <polygon points="150,560 314,392 330,170 110,110" fill="#3F3027"/>
-          <polygon points="930,560 770,392 754,170 974,110" fill="#3F3027"/>
-          <g id="s3-wire"><path class="dr" d="M150 560 L930 560 L770 392 L314 392 Z M314 392 L330 170 L754 170 L770 392 M330 170 L110 110 M754 170 L974 110 M110 110 L150 560 M974 110 L930 560"/></g>
+        <svg class="overlay" viewBox="10 0 520 290" preserveAspectRatio="xMidYMid slice">
+          <image href="assets/img/boot.jpg" x="0" y="0" width="540" height="360" />
+          <g id="s3-wire"><path class="dr" d="M140 228 L400 228 L362 175 L178 175 Z M178 175 L185 95 M362 175 L357 95 M185 95 L357 95 M140 228 L158 45 L385 45 L400 228 M158 45 L185 95 M385 45 L357 95"/></g>
         </svg>
         <div id="s3-scan"></div>
         <div class="dark" style="right:30px;top:26px"><b>Car boot</b>&nbsp;&nbsp;<span id="s3-pct" style="font-family:'DM Mono'">0% mapped</span></div>
         <div class="dark" id="s3-hint1" style="left:50%;top:100px;transform:translateX(-50%)"><span class="dot"></span>Move slowly round the edges</div>
         <div class="dark" id="s3-hint2" style="left:50%;top:100px;transform:translateX(-50%);opacity:0"><span class="dot ok"></span>All mapped — use this space</div>
-        <div class="pill" id="s3-p0" style="left:470px;top:430px"><i>W</i>104 cm</div>
-        <div class="pill" id="s3-p1" style="left:150px;top:390px"><i>D</i>80 cm</div>
-        <div class="pill amber" id="s3-p2" style="left:470px;top:250px"><i>H</i>59 cm</div>
+        <div class="pill" id="s3-p0" style="left:450px;top:430px"><i>W</i>104 cm</div>
+        <div class="pill" id="s3-p1" style="left:196px;top:382px"><i>D</i>80 cm</div>
+        <div class="pill amber" id="s3-p2" style="left:470px;top:232px"><i>H</i>59 cm</div>
         <div class="btn" id="s3-btn">✓&nbsp;Use this space</div>
         <div class="tap" id="s3-tap"></div>
         <div class="round" style="left:28px;top:26px"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M15 5l-7 7 7 7"/></svg></div>
@@ -253,7 +248,6 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
     <div class="centre">
       <div id="s8-logo"><div class="mark"><img src="assets/img/box_white.svg" alt="" /></div><img class="name" src="assets/img/wordtext_brown.svg" alt="Pack-a-Bunch" /></div>
       <div id="s8-line">Pack it once. It fits.</div>
-      <div id="s8-cta">Try Pack Plus — code on the Pack Plus page</div>
       <div id="s8-foot">ON ANDROID</div>
     </div>
   </section>
@@ -441,7 +435,6 @@ body { margin:0; background:var(--ground); color:var(--ink); font-family:"Jakart
   tl.to("#s7-inner",{opacity:0,duration:0.5},107.5);
   tl.fromTo("#s8-logo",{scale:0.7,opacity:0},{scale:1,opacity:1,duration:0.7,ease:"back.out(1.7)"},108.2);
   tl.fromTo("#s8-line",{y:30,opacity:0},{y:0,opacity:1,duration:0.6,ease:"power3.out"},109.0);
-  tl.fromTo("#s8-cta",{y:30,opacity:0},{y:0,opacity:1,duration:0.6,ease:"back.out(1.5)"},110.0);
   tl.fromTo("#s8-foot",{opacity:0},{opacity:1,duration:0.5},110.8);
   tl.fromTo("#cap0",{y:24,opacity:0},{y:0,opacity:1,duration:0.35,ease:"power3.out"},10.4);
   tl.to("#cap0",{y:-10,opacity:0,duration:0.3,ease:"power2.in"},14.70);
