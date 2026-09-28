@@ -8,3 +8,9 @@ GOOGLE_WEB_CLIENT_ID=YOUR_WEB_CLIENT_ID.apps.googleusercontent.com
 REVENUECAT_API_KEY=goog_YOUR_PUBLIC_KEY
 # These four values are public Android client configuration, embedded in the APK.
 # NEVER add Paddle API keys, OAuth client secrets, service_role keys or DB passwords.
+
+# The measuring engine runs on Python (Chaquopy). If the build says it can't find Python 3.11,
+# install it and put its path here, e.g. C:/Users/you/AppData/Local/Programs/Python/Python311/python.exe
+#PACKSCAN_BUILD_PYTHON=
+# Set to false only if the build can't download OpenCV for Python; the engine then uses NumPy alone.
+#PACKSCAN_OPENCV=true

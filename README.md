@@ -109,6 +109,27 @@ convert it for every other country at current rates, so the prices differ on scr
 the same once converted. No location permission is needed; Play already knows the country.
 The offering itself (which of weekly, monthly and yearly exist) is set in RevenueCat.
 
+## The measuring engine (Python)
+
+Item scans are measured by `app/src/main/python/packscan.py` — NumPy and OpenCV, run on the phone
+through [Chaquopy](https://chaquo.com/chaquopy/). ARCore supplies the scale (every depth pixel in
+millimetres) and where the phone is; ML Kit boxes each thing and names it; the Python engine does
+the rest:
+
+1. **Outline** — about once a second each box's object is traced in the camera picture (OpenCV
+   GrabCut, prompted by the box the way SAM is), neighbours kept apart.
+2. **Body** — depth points outside that outline are dropped; the rest are sliced into a height
+   map and labelled with connected components, and the piece that owns the middle of the box is
+   the object.
+3. **Size** — the points' footprint gets OpenCV's minimum-area rotated rectangle (the object's
+   turn, as PCA gives it), faces are placed at the median of the points on them, and round things
+   are fitted slice by slice as circles (cylinder, tapered or ball).
+
+If Python cannot start, the original Kotlin engine (`packing/…/ScanMath.kt`) measures instead.
+Building needs Python 3.11 on the computer (see `local.properties.example`). The JVM tests run the
+same `packscan.py` through `python3` when it has NumPy and OpenCV (`pip install numpy
+opencv-python`), and skip those two tests when it does not.
+
 ## Getting started
 
 ```bash

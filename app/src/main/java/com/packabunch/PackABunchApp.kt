@@ -7,5 +7,7 @@ class PackABunchApp : Application() {
         super.onCreate()
         // No-op without a RevenueCat key, so builds without billing stay honest.
         com.packabunch.billing.Billing.configure(this)
+        // The measuring engine's Python takes a moment to start; start it before the first scan.
+        com.packabunch.ar.PythonEngine.warmUp(this)
     }
 }

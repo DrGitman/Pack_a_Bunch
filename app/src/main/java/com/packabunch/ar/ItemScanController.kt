@@ -145,7 +145,19 @@ class ItemScanController(
     private val outlines = GlowOutlineRenderer()
     private val detector = ItemScanDetector()
 
-    private val tracker = ItemTracker(maxItems)
+    /**
+     * The latest outlines traced in the picture (see [PythonEngine.segmentFrame]): one byte per
+     * pixel of a small sensor-oriented frame, with the tracking ids of the boxes in label order.
+     */
+    private class Traced(val labels: ByteArray, val width: Int, val height: Int, val ids: List<Int?>, val boxes: List<FloatArray>, val atNs: Long)
+    @Volatile private var traced: Traced? = null
+    private val tracing = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val tracer = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "outline-tracer").apply { isDaemon = true } }
+    private var lastTraceNs = 0L
+
+    /** The measuring engine: Python (packscan.py), with the Kotlin one as its fallback. */
+    private val math = PythonEngine.lazy(context)
+    private val tracker = ItemTracker(maxItems, math = math)
     private val smoother = ScanStateSmoother()
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "item-scan").apply { priority = Thread.NORM_PRIORITY - 1 } }
     private val workerBusy = AtomicBoolean(false)
@@ -226,6 +238,7 @@ class ItemScanController(
     fun release() {
         scope.cancel()
         worker.shutdownNow()
+        tracer.shutdownNow()
         detector.close()
         session?.close()
         session = null
@@ -335,7 +348,8 @@ class ItemScanController(
 
     private class PlaneSnap(val y: Float, val polygonXZ: FloatArray)
 
-    private class BoxSamples(val box: ScanBox, val pixels: IntArray, val world: FloatArray, val central: BooleanArray, val edge: BooleanArray)
+    private class BoxSamples(val box: ScanBox, val pixels: IntArray, val world: FloatArray, val central: BooleanArray, val edge: BooleanArray,
+                             val depths: IntArray, val spanPx: Float, val focalPx: Float, val inMask: BooleanArray?)
 
     private fun sampleAndSubmit(frame: Frame, planes: List<Plane>, wallPlanes: List<Plane>) {
         val camera = frame.camera
@@ -350,6 +364,35 @@ class ItemScanController(
                 val picture = yuvToUprightBitmap(image, sensorRotationDegrees)
                 val boxes = detector.latest
                 if (picture != null) scope.launch { nameAndCrop(picture, boxes) }
+            }
+            if (frame.timestamp - lastTraceNs >= TRACE_INTERVAL_NS && !tracing.get()) {
+                val engine = PythonEngine.tracer()
+                val boxes = detector.latest.filter { frame.timestamp - it.frameTimestampNs < MAX_BOX_AGE_NS && it.area <= MAX_BOX_AREA }
+                if (engine != null && boxes.isNotEmpty()) {
+                    val small = yuvToUprightBitmap(image, 0)?.let { full ->
+                        val w = TRACE_WIDTH; val h = (full.height * TRACE_WIDTH / full.width.toFloat()).toInt().coerceAtLeast(1)
+                        Bitmap.createScaledBitmap(full, w, h, true).also { if (it !== full) full.recycle() }
+                    }
+                    if (small != null) {
+                        lastTraceNs = frame.timestamp
+                        tracing.set(true)
+                        val at = frame.timestamp
+                        tracer.execute {
+                            try {
+                                val px = IntArray(small.width * small.height)
+                                small.getPixels(px, 0, small.width, 0, 0, small.width, small.height)
+                                val rgb = ByteArray(px.size * 3)
+                                for (i in px.indices) { val c = px[i]; rgb[3 * i] = (c shr 16).toByte(); rgb[3 * i + 1] = (c shr 8).toByte(); rgb[3 * i + 2] = c.toByte() }
+                                engine.segmentFrame(rgb, small.width, small.height, boxes.map { it.sensor })?.let { labels ->
+                                    traced = Traced(labels, small.width, small.height, boxes.map { it.trackingId }, boxes.map { it.sensor }, at)
+                                }
+                            } finally {
+                                small.recycle()
+                                tracing.set(false)
+                            }
+                        }
+                    }
+                }
             }
             detector.offer(image, sensorRotationDegrees, frame.timestamp)
         } catch (_: NotYetAvailableException) {
@@ -395,7 +438,14 @@ class ItemScanController(
                 fun depthAt(u: Int, v: Int): Int =
                     if (u < 0 || v < 0 || u >= depth.width || v >= depth.height) 0
                     else buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
+                val outline = traced?.takeIf { frame.timestamp - it.atNs < MAX_TRACE_AGE_NS }
                 for (box in boxes) {
+                    // This box's traced object: same tracking id, or failing that the same place.
+                    val label = outline?.let { t ->
+                        val byId = box.trackingId?.let { id -> t.ids.indexOf(id) }?.takeIf { it >= 0 }
+                        (byId ?: t.boxes.indexOfFirst { b -> (0..3).all { k -> kotlin.math.abs(b[k] - box.sensor[k]) < 0.04f } }.takeIf { it >= 0 })?.plus(1)
+                    }
+                    val masked = ArrayList<Boolean>()
                     val w = box.sensor[2] - box.sensor[0]; val h = box.sensor[3] - box.sensor[1]
                     val u0 = ((box.sensor[0] + w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
                     val u1 = ((box.sensor[2] - w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
@@ -422,12 +472,12 @@ class ItemScanController(
                         v += step
                     }
                     val depths = rawMm.toIntArray(); val centralArr = rawCentral.toBooleanArray()
-                    val keep = BoxDepth.keepRange(depths, centralArr, maxOf(u1 - u0, v1 - v0).toFloat(), focal) ?: continue
-                    // Second pass: only depths that can be this object, and nothing on a wall.
+                    // Second pass: world points, nothing on a wall. Which depths are the object is the
+                    // engine's call (ScanMath.select), made on the worker thread.
                     val px = ArrayList<Int>(); val pts = ArrayList<Float>(); val central = ArrayList<Boolean>(); val edge = ArrayList<Boolean>()
+                    val kept = ArrayList<Int>()
                     for (k in depths.indices) {
                         val mm = depths[k]
-                        if (mm !in keep) continue
                         val pix = raw[k]
                         val pu = pix % depth.width; val pv = pix / depth.width
                         val p = projection.point(pu, pv, mm)
@@ -438,8 +488,16 @@ class ItemScanController(
                         pts += world[0]; pts += world[1]; pts += world[2]
                         central += centralArr[k]
                         edge += DetectionPoints.isEdge(mm, depthAt(pu - 1, pv), depthAt(pu + 1, pv), depthAt(pu, pv - 1), depthAt(pu, pv + 1))
+                        kept += mm
+                        if (label != null && outline != null) {
+                            // Depth and camera image share the field of view; scale across.
+                            val mx = (pu * outline.width / depth.width).coerceIn(0, outline.width - 1)
+                            val my = (pv * outline.height / depth.height).coerceIn(0, outline.height - 1)
+                            masked += (outline.labels[my * outline.width + mx].toInt() and 0xff) == label
+                        }
                     }
-                    if (px.isNotEmpty()) samples += BoxSamples(box, px.toIntArray(), pts.toFloatArray(), central.toBooleanArray(), edge.toBooleanArray())
+                    if (px.isNotEmpty()) samples += BoxSamples(box, px.toIntArray(), pts.toFloatArray(), central.toBooleanArray(), edge.toBooleanArray(),
+                        kept.toIntArray(), maxOf(u1 - u0, v1 - v0).toFloat(), focal, if (label != null) masked.toBooleanArray() else null)
                 }
             }
         } catch (_: NotYetAvailableException) {
@@ -467,7 +525,8 @@ class ItemScanController(
             val list = keep.map { i ->
                 DetectionPoints.Sample(frame.toPlane(bs.world[3 * i], bs.world[3 * i + 1], bs.world[3 * i + 2]), bs.central[i], bs.edge[i])
             }
-            val picked = DetectionPoints.select(list)
+            val picked = math.select(list, IntArray(keep.size) { bs.depths[keep[it]] }, bs.spanPx, bs.focalPx,
+                bs.inMask?.let { m -> BooleanArray(keep.size) { m[keep[it]] } })
             if (picked.isEmpty()) continue
             for (j in picked) claimed += bs.pixels[keep[j]]
             val b = bs.box.sensor
@@ -696,6 +755,11 @@ class ItemScanController(
         const val PROCESS_INTERVAL_NS = 100_000_000L
         const val NAMING_INTERVAL_NS = 1_000_000_000L
         const val MAX_BOX_AGE_NS = 400_000_000L
+        /** Outlines are traced in the picture this often, on a frame this many pixels wide. */
+        const val TRACE_INTERVAL_NS = 700_000_000L
+        const val TRACE_WIDTH = 240
+        /** An outline older than this is from a view the phone has moved on from. */
+        const val MAX_TRACE_AGE_NS = 1_500_000_000L
         const val MIN_DEPTH_MM = 150
         /**
          * Items are scanned at arm's length. Past this the depth is mostly the room behind the

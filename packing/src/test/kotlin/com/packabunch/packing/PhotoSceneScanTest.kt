@@ -127,7 +127,8 @@ class PhotoSceneScanTest {
 
     // -- the scan: the same steps as ItemScanController, in the same order ------------------------
 
-    private class Sampled(val det: Detection, val pixels: IntArray, val world: FloatArray, val central: BooleanArray, val edge: BooleanArray)
+    private class Sampled(val det: Detection, val pixels: IntArray, val world: FloatArray, val central: BooleanArray, val edge: BooleanArray,
+                          val depths: IntArray, val spanPx: Float)
 
     private fun sample(img: SceneSim.DepthImage, cam: SceneSim.Camera, dets: List<Detection>, walls: List<WallPlane>): List<Sampled> {
         val out = ArrayList<Sampled>()
@@ -154,10 +155,10 @@ class PhotoSceneScanTest {
                 v += step
             }
             val depths = rawMm.toIntArray(); val centralArr = rawCentral.toBooleanArray()
-            val keep = BoxDepth.keepRange(depths, centralArr, max(u1 - u0, v1 - v0).toFloat(), F) ?: continue
+            // The depth window around the middle of the box is the engine's first step now (see ScanMath).
             val px = ArrayList<Int>(); val pts = ArrayList<Float>(); val central = ArrayList<Boolean>(); val edge = ArrayList<Boolean>()
+            val kept = ArrayList<Int>()
             for (k in depths.indices) {
-                if (depths[k] !in keep) continue
                 val i = raw[k]; val uu = i % DW; val vv = i / DW
                 val onEdge = DetectionPoints.isEdge(
                     depths[k], if (uu > 0) img.mm[i - 1] else 0, if (uu < DW - 1) img.mm[i + 1] else 0,
@@ -165,23 +166,24 @@ class PhotoSceneScanTest {
                 )
                 val p = cam.world((raw[k] % DW).toFloat(), (raw[k] / DW).toFloat(), depths[k] / 1000f)
                 if (walls.any { it.contains(p[0], p[1], p[2]) }) continue
-                px += raw[k]; pts += p[0]; pts += p[1]; pts += p[2]; central += centralArr[k]; edge += onEdge
+                px += raw[k]; pts += p[0]; pts += p[1]; pts += p[2]; central += centralArr[k]; edge += onEdge; kept += depths[k]
             }
-            if (px.isNotEmpty()) out += Sampled(det, px.toIntArray(), pts.toFloatArray(), central.toBooleanArray(), edge.toBooleanArray())
+            if (px.isNotEmpty()) out += Sampled(det, px.toIntArray(), pts.toFloatArray(), central.toBooleanArray(), edge.toBooleanArray(),
+                kept.toIntArray(), max(u1 - u0, v1 - v0).toFloat())
         }
         return out
     }
 
     private val table = PlaneFrame(0f, 0f, 0f, floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 1f, 0f))
 
-    private fun observations(samples: List<Sampled>, cam: SceneSim.Camera): List<ItemTracker.Observation> {
+    private fun observations(samples: List<Sampled>, cam: SceneSim.Camera, math: ScanMath): List<ItemTracker.Observation> {
         val claimed = HashSet<Int>()
         val out = ArrayList<ItemTracker.Observation>()
         for (bs in samples.sortedBy { it.det.area }) {
             val keep = bs.pixels.indices.filter { bs.pixels[it] !in claimed }
             if (keep.size < DetectionPoints.MIN_SAMPLES) continue
             val list = keep.map { i -> DetectionPoints.Sample(table.toPlane(bs.world[3 * i], bs.world[3 * i + 1], bs.world[3 * i + 2]), bs.central[i], bs.edge[i]) }
-            val picked = DetectionPoints.select(list)
+            val picked = math.select(list, IntArray(keep.size) { bs.depths[keep[it]] }, bs.spanPx, F)
             if (picked.isEmpty()) continue
             for (j in picked) claimed += bs.pixels[keep[j]]
             val b = bs.det.box
@@ -210,9 +212,9 @@ class PhotoSceneScanTest {
 
     private class Result(val update: ItemTracker.Update, val shown: Map<Int, ItemScanState>, val last: SceneSim.Camera)
 
-    private fun scan(seed: Int, wallFound: Boolean, frames: Int = 150): Result {
+    private fun scan(seed: Int, wallFound: Boolean, frames: Int = 150, math: ScanMath = KotlinScanMath): Result {
         val rnd = Random(seed)
-        val tracker = ItemTracker()
+        val tracker = ItemTracker(math = math)
         val smoother = ScanStateSmoother()
         val walls = if (wallFound) listOf(WallPlane(floatArrayOf(0f, 0.4f, wallZ), floatArrayOf(0f, 0f, 1f), floatArrayOf(1f, 0f, 0f), floatArrayOf(0f, 1f, 0f), 0.7f, 0.4f)) else emptyList()
         var update: ItemTracker.Update? = null
@@ -220,7 +222,7 @@ class PhotoSceneScanTest {
         val cams = sweep(frames, rnd)
         for ((i, cam) in cams.withIndex()) {
             val img = SceneSim.depthImage(::scene, cam, rnd)
-            val obs = observations(sample(img, cam, detections(img, i, rnd), walls), cam)
+            val obs = observations(sample(img, cam, detections(img, i, rnd), walls), cam, math)
             update = tracker.update(obs, table.toPlane(cam.pos[0], cam.pos[1], cam.pos[2]))
             smoother.retain(update.visible.map { it.id }.toSet())
             shown = update.visible.associate { it.id to smoother.smooth(it.id, it.state, i * 100L) }
@@ -293,10 +295,24 @@ class PhotoSceneScanTest {
 
     @Test fun `the desk in the photo, when ARCore never finds the wall`() = check(scan(seed = 12, wallFound = false))
 
+    // The same desk, the same frames, measured by the Python engine the app runs (packscan.py).
+    // Skipped, with a note, where python3 with NumPy and OpenCV is not installed.
+    @Test fun `the desk in the photo, Python engine, with the wall found`() {
+        val py = PythonScanMath.start() ?: return println("SKIPPED: python3 with numpy and opencv not found")
+        py.use { check(scan(seed = 11, wallFound = true, math = it)) }
+    }
+
+    @Test fun `the desk in the photo, Python engine, when ARCore never finds the wall`() {
+        val py = PythonScanMath.start() ?: return println("SKIPPED: python3 with numpy and opencv not found")
+        py.use { check(scan(seed = 12, wallFound = false, math = it)) }
+    }
+
     /** Writes the result for the overlay drawn on the photo, when asked (`-DscanSim=path`). */
     @Test fun `export for the photo overlay`() {
         val path = System.getProperty("scanSim") ?: System.getenv("SCAN_SIM_OUT") ?: return
-        val r = scan(seed = 11, wallFound = true)
+        // SCAN_SIM_ENGINE=python measures with packscan.py, as the app does.
+        val py = if (System.getenv("SCAN_SIM_ENGINE") == "python") PythonScanMath.start() else null
+        val r = try { scan(seed = 11, wallFound = true, math = py ?: KotlinScanMath) } finally { py?.close() }
         val cam = table.toPlane(r.last.pos[0], r.last.pos[1], r.last.pos[2])
         val sb = StringBuilder("{\"tracks\":[")
         r.update.visible.forEachIndexed { n, t ->

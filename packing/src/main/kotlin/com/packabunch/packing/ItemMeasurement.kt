@@ -77,7 +77,7 @@ sealed interface ItemScanState {
  * Once measured, the result is frozen. Dimensions are the median of the stable window, and
  * the tolerance is what that window actually varied by — never a made-up number.
  */
-class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
+class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM, private val math: ScanMath = KotlinScanMath) {
 
     val cloud = ObjectCloud(voxelMm)
     private val cameras = ArrayList<PlanePoint>()
@@ -191,7 +191,7 @@ class ItemMeasurement(voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM) {
             return state
         }
         lowestMm = points.map { it.hMm }.sorted()[points.size / 10]
-        val fit = ShapeFitter.fit(points, cameras, cloud.voxelMm, snap.weights) ?: return state
+        val fit = math.fit(points, cameras, cloud.voxelMm, snap.weights) ?: return state
         lastFit = fit
         window.addLast(fit)
         while (window.size > STABLE_WINDOW) window.removeFirst()

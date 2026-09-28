@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.chaquopy)
 }
 
 val cloudProperties = Properties().apply {
@@ -33,6 +34,9 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Python (the measuring engine) ships per processor type; these cover phones and the emulator.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
     // Room writes the schema out so migrations can be written against a real diff rather
@@ -132,4 +136,20 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test.junit)
+}
+
+// The measuring engine, app/src/main/python/packscan.py, runs on Python with NumPy and OpenCV.
+// Building needs a Python 3.11 on this computer for Chaquopy to install them; point
+// PACKSCAN_BUILD_PYTHON in local.properties at it if it is not found on its own
+// (e.g. C:/Users/you/AppData/Local/Programs/Python/Python311/python.exe).
+// PACKSCAN_OPENCV=false leaves OpenCV out: the engine then uses its NumPy versions of the same steps.
+chaquopy {
+    defaultConfig {
+        version = "3.11"
+        cloudProperties.getProperty("PACKSCAN_BUILD_PYTHON")?.let { buildPython(it) }
+        pip {
+            install("numpy")
+            if (cloudProperties.getProperty("PACKSCAN_OPENCV", "true") != "false") install("opencv-python")
+        }
+    }
 }

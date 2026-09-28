@@ -30,6 +30,8 @@ import kotlin.math.sin
 class ItemTracker(
     val maxItems: Int = FREE_PLAN_MAX_ITEMS,
     private val voxelMm: Float = ObjectCloud.DEFAULT_VOXEL_MM,
+    /** The engine that fits each object's shape (see [ScanMath]). */
+    private val math: ScanMath = KotlinScanMath,
 ) {
     class Track internal constructor(val id: Int, val measurement: ItemMeasurement) {
         internal val ids = HashSet<Int>()
@@ -104,7 +106,7 @@ class ItemTracker(
             val track = match(obs.trackingId, cx, cy) ?: run {
                 if (obs.points.size < MIN_POINTS_TO_START) return@run null
                 if (tracks.size >= maxItems) { capReached = true; return@run null }
-                Track(nextId++, ItemMeasurement(voxelMm)).also { it.centreX = cx; it.centreY = cy; tracks += it }
+                Track(nextId++, ItemMeasurement(voxelMm, math)).also { it.centreX = cx; it.centreY = cy; tracks += it }
             } ?: continue
             obs.trackingId?.let { id ->
                 // A tracking id belongs to one object at a time.
