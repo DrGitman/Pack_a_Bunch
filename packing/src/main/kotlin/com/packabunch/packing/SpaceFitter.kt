@@ -230,25 +230,38 @@ object SpaceFitter {
         // The median over the walls, so one wall that runs on (the kitchen wall behind a shelf)
         // does not carry the rest. A ceiling, lid or parcel shelf seen spread over the
         // footprint at that height wins when there is one.
-        fun topOf(s: Side, vals: FloatArray, along: FloatArray, lo: Float, hi: Float): Float? {
+        /** A wall's top, and whether the surface carries on above it (a steep flap). */
+        fun topOf(s: Side, vals: FloatArray, along: FloatArray, lo: Float, hi: Float): Pair<Float, Boolean>? {
             if (s.count == 0) return null
             val len = hi - lo
+            fun inMiddle(i: Int) = along[i] > lo + 0.1f * len && along[i] < hi - 0.1f * len
             // As tight to the wall as its own points allow: a flap leaning out from the rim
             // leaves a band this thin within a centimetre or two.
             val tight = max(8f, 2f * s.spread)
-            val hsOn = wallIdx.filter { abs(vals[it] - s.at) <= tight && along[it] > lo + 0.1f * len && along[it] < hi - 0.1f * len }
-                .map { hs[it] }.sorted()
-            if (hsOn.size < MIN_FACE_POINTS) return null
+            val tight2 = max(5f, 1.5f * s.spread)
+            val hsOn = wallIdx.filter { abs(vals[it] - s.at) <= tight2 && inMiddle(it) }.map { hs[it] }.sorted()
+            if (wallIdx.count { abs(vals[it] - s.at) <= tight && inMiddle(it) } < MIN_FACE_POINTS || hsOn.size < MIN_FACE_POINTS) return null
             val gap = max(50f, 0.08f * wallTop)
             var top = hsOn.first()
             for (hh in hsOn) { if (hh - top > gap) break; top = hh }
-            return top
+            // A steep flap carries the wall on past its rim: surface just above the top, leaning
+            // off the wall's line by no more than it rises. A wall whose top is its rim has
+            // nothing there (a ceiling sits level with the top, not above it).
+            val flap = wallIdx.count {
+                val rise = hs[it] - top
+                rise > 15f && rise <= 120f && abs(vals[it] - s.at) <= tight + rise && inMiddle(it)
+            } >= MIN_FACE_POINTS
+            return top to flap
         }
         // Not the front: that is where the person stands, and in a boot or a cupboard it is only
         // the lip they lift things over.
-        val tops = listOfNotNull(
+        val found = listOfNotNull(
             topOf(leftSide, us, vs, front, back), topOf(rightSide, us, vs, front, back), topOf(backSide, vs, us, left, right),
-        ).sorted()
+        )
+        // A flap only ever adds height to its wall: the walls without one give the rim. When every
+        // wall carries on above (a shelf against a taller wall), they are all read as they are.
+        val clean = found.filter { !it.second }.map { it.first }.sorted()
+        val tops = clean.ifEmpty { found.map { it.first }.sorted() }
         val wallsTop = if (tops.isEmpty()) wallTop else tops[tops.size / 2]
         val topBand = max(60f, 0.1f * wallsTop)
         val high = wallIdx.filter { abs(hs[it] - wallsTop) <= topBand && us[it] > left + band && us[it] < right - band && vs[it] > front + band && vs[it] < back - band }
