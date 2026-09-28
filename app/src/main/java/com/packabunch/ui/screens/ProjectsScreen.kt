@@ -616,9 +616,6 @@ private fun SwipeAwayCard(
 @Composable
 private fun ProjectSearchBar(query: String, onQueryChange: (String) -> Unit) {
     val shape = RoundedCornerShape(16.dp)
-    val edge = androidx.compose.ui.graphics.Brush.horizontalGradient(
-        listOf(Color(0xFF4DA3E6), Color(0xFF7A5CE8), Color(0xFFB45CE0), Color(0xFFE85CB4)),
-    )
     androidx.compose.foundation.text.BasicTextField(
         value = query,
         onValueChange = onQueryChange,
@@ -630,7 +627,7 @@ private fun ProjectSearchBar(query: String, onQueryChange: (String) -> Unit) {
             .fillMaxWidth()
             .padding(start = 20.dp, end = 20.dp, top = 10.dp)
             .background(Color.White, shape)
-            .border(1.5.dp, edge, shape)
+            .border(1.5.dp, com.packabunch.ui.theme.Primary, shape)
             .height(52.dp),
         decorationBox = { inner ->
             Row(Modifier.fillMaxSize().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
