@@ -182,7 +182,7 @@ fun UpgradeScreen(
                 PackTextButton(text = "Restore purchases", onClick = onRestore, color = Primary)
                 if (!plusOn) {
                     Text("·", color = TextTertiary, fontFamily = UiFamily)
-                    PackTextButton(text = "Have a promo code?", onClick = onHaveCode, color = Primary)
+                    PackTextButton(text = "Promo code?", onClick = onHaveCode, color = Primary)
                 }
             }
             Row(

@@ -457,6 +457,7 @@ fun PackNavHost(
                     else notice = "Couldn't upload that picture. Check your connection and try again."
                 }
             }
+            androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshAccountSettings() }
             ProfileScreen(
                 modifier = pageModifier,
                 avatarUrl = settings.avatarUrl ?: account.providerPhoto,
@@ -1061,6 +1062,7 @@ fun PackNavHost(
         }
 
         composable(Routes.SETTINGS) {
+            androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshAccountSettings() }
             SettingsScreen(
                 settings = settings,
                 savedPackCount = projects.size,

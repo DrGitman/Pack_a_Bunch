@@ -8,6 +8,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
@@ -47,7 +49,13 @@ class CloudSettings(private val account: SupabaseAccount, private val owner: Str
     /** Saves go one at a time, in the order they were asked for, so an older one never lands last. */
     private val order = kotlinx.coroutines.sync.Mutex()
 
-    suspend fun save(unit: String, habit: String?, avatarUrl: String? = null) = order.withLock {
+    /**
+     * Saves the unit and habit — and never the photo. Only [saveAvatar] writes that, because a
+     * new phone saves its setup choices before the account's settings have even loaded, and a
+     * save that carried "no photo" erased the photo from the account for every phone.
+     * The upsert merges: columns not sent keep what the account already has.
+     */
+    suspend fun save(unit: String, habit: String?) = order.withLock {
         runCatching {
             withContext(Dispatchers.IO) {
                 request(
@@ -56,14 +64,50 @@ class CloudSettings(private val account: SupabaseAccount, private val owner: Str
                         .put("user_id", owner)
                         .put("unit", unit)
                         .put("habit", habit ?: JSONObject.NULL)
-                        .put("avatar_url", avatarUrl ?: JSONObject.NULL)
                         .put("updated_at", java.time.Instant.now().toString()),
-                    // Upsert: the row is created the first time and replaced after that.
                     prefer = "resolution=merge-duplicates,return=minimal",
                 )
             }
         }
     }
+
+    /** The photo alone: a new one, or null when the person removed it. */
+    suspend fun saveAvatar(unit: String, avatarUrl: String?) = order.withLock {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                val photo = JSONObject()
+                    .put("avatar_url", avatarUrl ?: JSONObject.NULL)
+                    .put("updated_at", java.time.Instant.now().toString())
+                // Change only the photo on the row the account already has…
+                val updated = JSONArray(patch("/rest/v1/user_settings?user_id=eq.$owner", photo))
+                // …and only when there is no row yet, make one, with this phone's unit.
+                if (updated.length() == 0) request(
+                    path = "/rest/v1/user_settings?on_conflict=user_id",
+                    body = photo.put("user_id", owner).put("unit", unit),
+                    prefer = "resolution=merge-duplicates,return=minimal",
+                )
+            }
+        }
+    }
+
+    /** A PATCH, which HttpsURLConnection cannot send; returns the changed rows. */
+    private suspend fun patch(path: String, body: JSONObject): String {
+        check(account.userId == owner)
+        val token = account.accessToken()
+        val request = okhttp3.Request.Builder()
+            .url(BuildConfig.SUPABASE_URL.trimEnd('/') + path)
+            .header("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY)
+            .header("Authorization", "Bearer $token")
+            .header("Prefer", "return=representation")
+            .patch(body.toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        http.newCall(request).execute().use { response ->
+            check(response.isSuccessful) { "Settings HTTP ${response.code}" }
+            return response.body?.string().orEmpty().ifBlank { "[]" }
+        }
+    }
+
+    private val http = okhttp3.OkHttpClient()
 
     private suspend fun request(path: String, body: JSONObject? = null, prefer: String? = null): String {
         check(account.userId == owner)
@@ -73,7 +117,7 @@ class CloudSettings(private val account: SupabaseAccount, private val owner: Str
             connection.instanceFollowRedirects = false
             connection.connectTimeout = 15_000
             connection.readTimeout = 20_000
-            connection.requestMethod = if (body == null) "GET" else "POST"
+connection.requestMethod = if (body == null) "GET" else "POST"
             connection.setRequestProperty("apikey", BuildConfig.SUPABASE_PUBLISHABLE_KEY)
             connection.setRequestProperty("Authorization", "Bearer $token")
             connection.setRequestProperty("Content-Type", "application/json")

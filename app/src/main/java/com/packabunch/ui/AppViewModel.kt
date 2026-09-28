@@ -369,8 +369,8 @@ class AppViewModel(
         if (cloudSettings != null) viewModelScope.launch {
             cloudSettings.load().onSuccess { remote ->
                 if (remote == null) {
-                    cloudSettings.save(_settings.value.unit.name, _settings.value.packingHabit?.name,
-                        _settings.value.avatarUrl)
+                    cloudSettings.save(_settings.value.unit.name, _settings.value.packingHabit?.name)
+                    _settings.value.avatarUrl?.let { cloudSettings.saveAvatar(_settings.value.unit.name, it) }
                 } else {
                     applyRemoteSettings(remote)
                 }
@@ -402,10 +402,16 @@ class AppViewModel(
         }
     }
 
+    /** Reads the account's settings again — a photo changed on another phone shows up here. */
+    fun refreshAccountSettings() {
+        val cloud = cloudSettings ?: return
+        viewModelScope.launch { cloud.load().onSuccess { remote -> if (remote != null) applyRemoteSettings(remote) } }
+    }
+
     private fun pushSettings() {
         val settings = cloudSettings ?: return
         viewModelScope.launch {
-            settings.save(_settings.value.unit.name, _settings.value.packingHabit?.name, _settings.value.avatarUrl)
+            settings.save(_settings.value.unit.name, _settings.value.packingHabit?.name)
         }
     }
 
@@ -476,7 +482,7 @@ class AppViewModel(
         _settings.update { it.copy(avatarUrl = url) }
         val settings = cloudSettings ?: return
         viewModelScope.launch {
-            settings.save(_settings.value.unit.name, _settings.value.packingHabit?.name, url)
+            settings.saveAvatar(_settings.value.unit.name, url)
         }
     }
 
