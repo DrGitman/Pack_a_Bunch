@@ -217,5 +217,3 @@ If something goes wrong:
 - **Your own email sender.** Supabase's built-in mail sends about two messages an hour,
   which will not survive real sign-ups. Set SMTP in the Supabase dashboard.
 - **The application id** `com.packabunch` is permanent once uploaded. Confirm it first.
-- Target Android 16 / API 36, verify 16 KB page-size compatibility, and keep signing keys
-  and service-account credentials out of this repo.
