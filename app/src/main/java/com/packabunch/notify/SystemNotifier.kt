@@ -55,7 +55,7 @@ class SystemNotifier(private val context: Context) {
         val notification = NotificationCompat.Builder(context, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
             .setColor(BRAND)
-            .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.logo_tile))
+            .setLargeIcon(BitmapFactory.decodeResource(context.resources, R.drawable.notification_logo))
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body).setBigContentTitle(title))
@@ -75,8 +75,8 @@ class SystemNotifier(private val context: Context) {
 
     companion object {
         private const val CHANNEL = "packs"
-        /** The brand terracotta, #A65C34. */
-        private const val BRAND = 0xFFA65C34.toInt()
+        /** The brown of the app logo tile, #955532. */
+        private const val BRAND = 0xFF955532.toInt()
         const val EXTRA_OPEN = "open"
         const val OPEN_NOTIFICATIONS = "notifications"
     }

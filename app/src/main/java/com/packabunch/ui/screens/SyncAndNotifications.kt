@@ -234,6 +234,11 @@ data class AppNotification(
     val tile: Color = BrandTint,
     /** When it happened, for ordering. */
     val atMillis: Long = 0L,
+    /**
+     * Whether it also goes on the phone, and as what: notices with the same key replace each
+     * other there. Null keeps it on the Notifications page only.
+     */
+    val phoneKey: String? = null,
 )
 
 /**

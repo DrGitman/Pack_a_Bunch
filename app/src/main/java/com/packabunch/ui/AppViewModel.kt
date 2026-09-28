@@ -167,6 +167,8 @@ class AppViewModel(
                             body = "You stopped at step ${packed + 1} of $total. $left ${if (left == 1) "piece" else "pieces"} still to go in.",
                             whenText = whenText(p.updatedAtMillis), unread = false,
                             tint = com.packabunch.ui.theme.Caution, tile = com.packabunch.ui.theme.CautionTint, atMillis = p.updatedAtMillis,
+                            // Not every step on the phone: once, when the pack is nearly done and left.
+                            phoneKey = if (packed * 4 >= total * 3) "almost-${p.id}" else null,
                         ))
                     } else if (packed >= total && show.askHowItWent) {
                         add(com.packabunch.ui.screens.AppNotification(
@@ -176,6 +178,7 @@ class AppViewModel(
                             body = "All $total ${if (total == 1) "piece" else "pieces"} went in. Did it go to plan? Tell us if something didn't fit.",
                             whenText = whenText(p.updatedAtMillis), unread = false,
                             tint = com.packabunch.ui.theme.Success, tile = com.packabunch.ui.theme.SuccessTint, atMillis = p.updatedAtMillis,
+                            phoneKey = "done-${p.id}",
                         ))
                     }
                 }
@@ -234,27 +237,37 @@ class AppViewModel(
                     ))
                 }
                 // "New kinds of space" has no source yet — it gets a notice only when one ships.
-            }.map { it.copy(unread = it.id !in read) }.sortedByDescending { it.atMillis }
+            }.map { n ->
+                // Backups (at most one a day) and Pack Plus going through, ending soon or ended
+                // are worth the phone; pack notices set their own key above.
+                val pack = n.id.startsWith("progress-") || n.id.startsWith("done-")
+                n.copy(unread = n.id !in read, phoneKey = if (pack) n.phoneKey else n.id)
+            }.sortedByDescending { it.atMillis }
         }.stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, emptyList())
     }
 
+    /** On screen or not, for the phone notices: a pack nearly done is only worth one once it is left. */
+    private val onScreen = MutableStateFlow(true)
+
     /**
-     * Every notice goes on the phone once, when it first appears, as long as its switch is on
-     * (the list above already leaves out the switched-off kinds). What was already there when
-     * this first ran is not replayed.
+     * The notices that earn a place on the phone go there once: a pack nearly done and left, a
+     * pack finished, a backup done or failed, Pack Plus starting or ending. Each kind obeys its
+     * switch (the list above already leaves out the switched-off ones). What was already there
+     * when this first ran is not replayed.
      */
     private fun postToPhone() = notifier?.let { n ->
         viewModelScope.launch {
-            notifications.collect { list ->
+            kotlinx.coroutines.flow.combine(notifications, onScreen) { list, shown -> list to shown }.collect { (list, shown) ->
+                val candidates = list.filter { it.unread && it.phoneKey != null }
                 val posted = preferences.getStringSet("postedNotifications", null)
                 if (posted == null) {
-                    preferences.edit().putStringSet("postedNotifications", list.map { it.id }.toSet()).apply()
+                    preferences.edit().putStringSet("postedNotifications", candidates.map { it.phoneKey!! }.toSet()).apply()
                     return@collect
                 }
-                val fresh = list.filter { it.unread && it.id !in posted }
+                val fresh = candidates.filter { it.phoneKey!! !in posted && !(shown && it.phoneKey.startsWith("almost-")) }
                 if (fresh.isEmpty()) return@collect
-                fresh.forEach { n.post(it.id, it.title, it.body, it.atMillis) }
-                preferences.edit().putStringSet("postedNotifications", posted + fresh.map { it.id }).apply()
+                fresh.forEach { n.post(it.phoneKey!!, it.title, it.body, it.atMillis) }
+                preferences.edit().putStringSet("postedNotifications", posted + fresh.map { it.phoneKey!! }).apply()
             }
         }
     }
@@ -315,6 +328,7 @@ class AppViewModel(
 
     /** Called when the app's screen starts. Catches up on anything missed while away. */
     fun onForeground() {
+        onScreen.value = true
         if (foreground) return
         foreground = true
         requestSync(0)
@@ -322,6 +336,7 @@ class AppViewModel(
     }
 
     fun onBackground() {
+        onScreen.value = false
         foreground = false
         realtime?.stop()
     }
