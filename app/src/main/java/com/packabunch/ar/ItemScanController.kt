@@ -149,7 +149,12 @@ class ItemScanController(
      * The latest outlines traced in the picture (see [PythonEngine.segmentFrame]): one byte per
      * pixel of a small sensor-oriented frame, with the tracking ids of the boxes in label order.
      */
-    private class Traced(val labels: ByteArray, val width: Int, val height: Int, val ids: List<Int?>, val boxes: List<FloatArray>, val atNs: Long)
+    private class Traced(val labels: ByteArray, val width: Int, val height: Int, val ids: List<Int?>, val boxes: List<FloatArray>, val atNs: Long) {
+        // An ambiguous trace has no pixels. Keep depth-only selection available for that box.
+        val availableLabels = BooleanArray(256).also { present ->
+            labels.forEach { present[it.toInt() and 0xff] = true }
+        }
+    }
     @Volatile private var traced: Traced? = null
     private val tracing = java.util.concurrent.atomic.AtomicBoolean(false)
     private val tracer = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "outline-tracer").apply { isDaemon = true } }
@@ -425,32 +430,32 @@ class ItemScanController(
 
         val samples = ArrayList<BoxSamples>()
         try {
-            frame.acquireDepthImage16Bits().use { depth ->
+            MeasurementDepth.acquire(frame).use { depth ->
                 if (depth.timestamp == lastDepthNs) return
                 lastDepthNs = depth.timestamp
-                val intr = camera.imageIntrinsics
+                val intr = camera.textureIntrinsics
                 val f = intr.focalLength; val pp = intr.principalPoint; val dim = intr.imageDimensions
                 val projection = DepthProjection.scaled(f[0], f[1], pp[0], pp[1], dim[0], dim[1], depth.width, depth.height)
-                val plane = depth.planes[0]
-                val buf = plane.buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
                 val local = FloatArray(3); val world = FloatArray(3)
                 val focal = maxOf(projection.fx, projection.fy)
                 fun depthAt(u: Int, v: Int): Int =
                     if (u < 0 || v < 0 || u >= depth.width || v >= depth.height) 0
-                    else buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
+                    else depth.at(u, v)
+                val mapping = DepthImageMapping(frame)
                 val outline = traced?.takeIf { frame.timestamp - it.atNs < MAX_TRACE_AGE_NS }
                 for (box in boxes) {
                     // This box's traced object: same tracking id, or failing that the same place.
                     val label = outline?.let { t ->
-                        val byId = box.trackingId?.let { id -> t.ids.indexOf(id) }?.takeIf { it >= 0 }
-                        (byId ?: t.boxes.indexOfFirst { b -> (0..3).all { k -> kotlin.math.abs(b[k] - box.sensor[k]) < 0.04f } }.takeIf { it >= 0 })?.plus(1)
+                        val byId = box.trackingId?.let { id -> t.ids.indexOf(id) }?.takeIf { i -> i >= 0 && (0..3).all { k -> kotlin.math.abs(t.boxes[i][k] - box.sensor[k]) < 0.025f } }
+                        (byId ?: t.boxes.indexOfFirst { b -> (0..3).all { k -> kotlin.math.abs(b[k] - box.sensor[k]) < 0.04f } }.takeIf { it >= 0 })?.plus(1)?.takeIf { it < t.availableLabels.size && t.availableLabels[it] }
                     }
                     val masked = ArrayList<Boolean>()
-                    val w = box.sensor[2] - box.sensor[0]; val h = box.sensor[3] - box.sensor[1]
-                    val u0 = ((box.sensor[0] + w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
-                    val u1 = ((box.sensor[2] - w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
-                    val v0 = ((box.sensor[1] + h * SHRINK) * depth.height).toInt().coerceIn(0, depth.height - 1)
-                    val v1 = ((box.sensor[3] - h * SHRINK) * depth.height).toInt().coerceIn(0, depth.height - 1)
+                    val depthBox = mapping.depthBox(box.sensor)
+                    val w = depthBox[2] - depthBox[0]; val h = depthBox[3] - depthBox[1]
+                    val u0 = ((depthBox[0] + w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
+                    val u1 = ((depthBox[2] - w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
+                    val v0 = ((depthBox[1] + h * SHRINK) * depth.height).toInt().coerceIn(0, depth.height - 1)
+                    val v1 = ((depthBox[3] - h * SHRINK) * depth.height).toInt().coerceIn(0, depth.height - 1)
                     if (u1 <= u0 || v1 <= v0) continue
                     val step = if ((u1 - u0) * (v1 - v0) > 2400) 2 else 1
                     val cu0 = u0 + (u1 - u0) * 0.3f; val cu1 = u1 - (u1 - u0) * 0.3f
@@ -461,7 +466,7 @@ class ItemScanController(
                     while (v <= v1) {
                         var u = u0
                         while (u <= u1) {
-                            val mm = buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
+                            val mm = depth.at(u, v)
                             if (mm in MIN_DEPTH_MM..MAX_DEPTH_MM) {
                                 raw += v * depth.width + u
                                 rawMm += mm
@@ -490,9 +495,10 @@ class ItemScanController(
                         edge += DetectionPoints.isEdge(mm, depthAt(pu - 1, pv), depthAt(pu + 1, pv), depthAt(pu, pv - 1), depthAt(pu, pv + 1))
                         kept += mm
                         if (label != null && outline != null) {
-                            // Depth and camera image share the field of view; scale across.
-                            val mx = (pu * outline.width / depth.width).coerceIn(0, outline.width - 1)
-                            val my = (pv * outline.height / depth.height).coerceIn(0, outline.height - 1)
+                            // Account for camera-image versus GPU/depth cropping.
+                            val uv = mapping.imagePoint(pu.toFloat() / depth.width, pv.toFloat() / depth.height)
+                            val mx = (uv[0] * outline.width).toInt().coerceIn(0, outline.width - 1)
+                            val my = (uv[1] * outline.height).toInt().coerceIn(0, outline.height - 1)
                             masked += (outline.labels[my * outline.width + mx].toInt() and 0xff) == label
                         }
                     }
@@ -756,10 +762,10 @@ class ItemScanController(
         const val NAMING_INTERVAL_NS = 1_000_000_000L
         const val MAX_BOX_AGE_NS = 400_000_000L
         /** Outlines are traced in the picture this often, on a frame this many pixels wide. */
-        const val TRACE_INTERVAL_NS = 700_000_000L
+        const val TRACE_INTERVAL_NS = 250_000_000L
         const val TRACE_WIDTH = 240
         /** An outline older than this is from a view the phone has moved on from. */
-        const val MAX_TRACE_AGE_NS = 1_500_000_000L
+        const val MAX_TRACE_AGE_NS = 400_000_000L
         const val MIN_DEPTH_MM = 150
         /**
          * Items are scanned at arm's length. Past this the depth is mostly the room behind the
@@ -773,7 +779,7 @@ class ItemScanController(
         /** A detector box bigger than this share of the picture is the scene, not an object. */
         const val MAX_BOX_AREA = 0.5f
         /** Share of a detector box trimmed off each side before sampling depth. */
-        const val SHRINK = 0.06f
+        const val SHRINK = 0.01f
         /** Space between an object's outline and the bottom of its tag. */
         const val TAG_GAP_DP = 6f
         /** One full march of the scanning dashes (three dash periods) takes this long. */

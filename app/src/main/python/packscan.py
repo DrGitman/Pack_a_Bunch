@@ -31,7 +31,7 @@ import sys
 
 import numpy as np
 
-try:  # OpenCV does the image work when it is there; NumPy fallbacks keep the maths identical.
+try:  # Android uses the tested NumPy implementation; OpenCV is an optional desktop backend.
     import cv2
 except Exception:  # pragma: no cover — only when OpenCV is missing
     cv2 = None
@@ -102,9 +102,10 @@ def _dilate(mask):
     if cv2 is not None:
         return cv2.dilate(mask.astype(np.uint8), np.ones((3, 3), np.uint8)) > 0
     out = mask.copy()
+    padded = np.pad(mask, 1)
     for da in (-1, 0, 1):
         for db in (-1, 0, 1):
-            out |= np.roll(np.roll(mask, da, 0), db, 1)
+            out |= padded[1 + da:1 + da + mask.shape[0], 1 + db:1 + db + mask.shape[1]]
     return out
 
 
@@ -138,15 +139,16 @@ def select(x, y, h, depth, central, edge, span_px, focal_px, cell=CELL_MM, min_s
     n = x.size
     if n == 0:
         return []
-    ok = np.ones(n, bool)
+    ok = np.isfinite(x) & np.isfinite(y) & np.isfinite(h)
     if in_mask is not None and len(in_mask) == n:
         inside = np.asarray(in_mask, bool)
-        # A mask that misses the object entirely (a bad trace) must not blank the frame.
-        if inside[central].sum() >= MIN_CENTRAL:
-            ok &= inside
+        # A failed trace is missing evidence, not permission to measure the background.
+        if inside[central].sum() < MIN_CENTRAL:
+            return []
+        ok &= inside
     if use_depth_window and depth is not None and len(depth) == n:
         d = np.asarray(depth, np.float64)
-        win = depth_window(d, central, span_px, focal_px)
+        win = depth_window(d, central & ok, span_px, focal_px)
         if win is None:
             return []
         ok &= (d >= win[0]) & (d <= win[1])
@@ -157,9 +159,9 @@ def select(x, y, h, depth, central, edge, span_px, focal_px, cell=CELL_MM, min_s
         return []
 
     # The height map: a grid on the surface, one layer per cell of height.
-    gi = np.floor(x / cell).astype(np.int64)
-    gj = np.floor(y / cell).astype(np.int64)
-    gk = np.floor(h / cell).astype(np.int64)
+    gi = np.floor(np.where(ok, x, 0) / cell).astype(np.int64)
+    gj = np.floor(np.where(ok, y, 0) / cell).astype(np.int64)
+    gk = np.floor(np.where(ok, h, 0) / cell).astype(np.int64)
     i0, j0 = gi[body].min() - 1, gj[body].min() - 1
     ni, nj = int(gi[body].max() - i0 + 2), int(gj[body].max() - j0 + 2)
     kmax = int(gk[body].max()) + 1
@@ -249,8 +251,13 @@ def min_area_rect(xs, ys):
         (_, _), (_, _), ang = cv2.minAreaRect(hull)
         return float(ang) % 90.0
     # NumPy fallback: rotating calipers over the hull's edge directions.
+    hull = np.asarray(convex_hull(xs, ys), np.float64)
+    if len(hull) < 2:
+        return 0.0
+    edges = np.roll(hull, -1, axis=0) - hull
+    angles = np.unique(np.degrees(np.arctan2(edges[:, 1], edges[:, 0])) % 90)
     best, best_deg = None, 0.0
-    for deg in np.arange(0, 90, 0.1):
+    for deg in angles:
         r = math.radians(deg)
         u = xs * math.cos(r) + ys * math.sin(r)
         v = -xs * math.sin(r) + ys * math.cos(r)
@@ -283,7 +290,48 @@ def convex_hull(xs, ys):
         hull = cv2.convexHull(pts)[:, 0, :]
         # OpenCV returns it clockwise in a y-down image, which is anticlockwise here.
         return [(float(a), float(b)) for a, b in hull]
-    return []
+    # Andrew's monotone chain: the Android build has NumPy but not OpenCV.
+    points = sorted(set(zip(np.asarray(xs).tolist(), np.asarray(ys).tolist())))
+    if len(points) < 3:
+        return points
+    def cross(o, a, b):
+        return (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0])
+    def half(seq):
+        out = []
+        for p in seq:
+            while len(out) >= 2 and cross(out[-2], out[-1], p) <= 0:
+                out.pop()
+            out.append(p)
+        return out
+    return half(points)[:-1] + half(reversed(points))[:-1]
+
+
+def clean_cloud(x, y, h, weights):
+    """Reject invalid readings and isolated spikes before they can set the fitted angle.
+
+    The generous MAD gate removes distant depth failures, not ordinary shape detail.
+    It does not claim to remove coherent background surfaces; segmentation must do that.
+    """
+    p = np.column_stack((x, y, h)).astype(np.float64)
+    w = np.ones(len(p)) if weights is None or len(weights) != len(p) else np.asarray(weights, np.float64)
+    valid = np.isfinite(p).all(axis=1) & np.isfinite(w) & (w > 0)
+    p, w = p[valid], w[valid]
+    if len(p) >= MIN_POINTS:
+        centre = np.median(p, axis=0)
+        scale = np.maximum(np.median(np.abs(p-centre), axis=0)*1.4826, 20.0)
+        keep = (np.abs(p[:, :2]-centre[:2]) <= 6*scale[:2]).all(axis=1)
+        # A sparsely seen side wall can be far from a dominant back wall. Preserve
+        # supported geometry there; discard only isolated suspicious samples.
+        cells = np.floor(p / 40.0).astype(np.int64)
+        unique, counts = np.unique(cells, axis=0, return_counts=True)
+        density = {tuple(k): int(v) for k, v in zip(unique, counts)}
+        for i in np.flatnonzero(~keep):
+            a, b, c = cells[i]
+            support = sum(density.get((a+da,b+db,c+dc),0)
+                          for da in (-1,0,1) for db in (-1,0,1) for dc in (-1,0,1))
+            keep[i] = support >= 3
+        p, w = p[keep], w[keep]
+    return p[:, 0], p[:, 1], p[:, 2], w
 
 
 def polygon_area(poly):
@@ -391,7 +439,7 @@ def fit_round(xs, ys, hs, height, voxel):
 
 def fit(x, y, h, weights=None, cameras=(), voxel=5.0):
     """The fitted object as a dict with the fields of Kotlin's FittedObject, or None."""
-    xs = np.asarray(x, np.float64); ys = np.asarray(y, np.float64); hs = np.asarray(h, np.float64)
+    xs, ys, hs, weights = clean_cloud(x, y, h, weights)
     n = xs.size
     if n < MIN_POINTS:
         return None
@@ -515,8 +563,8 @@ def serve():
         line = line.strip()
         if not line:
             continue
-        req = json.loads(line)
         try:
+            req = json.loads(line)
             if req["op"] == "select":
                 out = select_json(json.dumps(req))
             elif req["op"] == "fit":
@@ -541,14 +589,59 @@ def serve():
 # the object's outline in the picture — the segmentation step
 
 
+def _segment_numpy(image, bounds, depth_mask, exclude):
+    """Conservative colour-background subtraction for the NumPy-only phone runtime.
+
+    A local ring supplies background colour prototypes. Keep the centre-connected
+    foreground only. This is not semantic segmentation: ambiguous colours return no
+    mask rather than a detector rectangle falsely described as an object outline.
+    """
+    h, w = image.shape[:2]
+    x0, y0, x1, y1 = bounds
+    inside = np.zeros((h, w), bool)
+    inside[y0:y1, x0:x1] = True
+    pad = max(3, min(x1-x0, y1-y0)//8)
+    ring = np.zeros_like(inside)
+    ring[max(0,y0-pad):min(h,y1+pad), max(0,x0-pad):min(w,x1+pad)] = True
+    ring &= ~inside
+    background = image[ring].astype(np.float32)
+    if len(background) < 12:
+        return None
+    # Quantisation bounds the cost and preserves several background colours.
+    colours, counts = np.unique((background//16).astype(int), axis=0, return_counts=True)
+    colours = colours[np.argsort(counts)[-32:]]*16 + 7.5
+    pixels = image[y0:y1, x0:x1].astype(np.float32)
+    distance = np.full(pixels.shape[:2], np.inf)
+    for colour in colours:
+        distance = np.minimum(distance, np.linalg.norm(pixels-colour, axis=2))
+    candidate = np.zeros_like(inside)
+    candidate[y0:y1,x0:x1] = distance > 32.0
+    if depth_mask is not None:
+        candidate &= np.asarray(depth_mask, bool)
+    if exclude is not None:
+        candidate &= ~np.asarray(exclude, bool)
+    count, labels = _label_layer(candidate)
+    if count <= 1:
+        return None
+    dx, dy = (x1-x0)//8, (y1-y0)//8
+    cx, cy = (x0+x1)//2, (y0+y1)//2
+    votes = np.bincount(labels[cy-dy:cy+dy+1, cx-dx:cx+dx+1].ravel(), minlength=count)
+    votes[0] = 0
+    if votes.max() < 6:
+        return None
+    mask = labels == votes.argmax()
+    if mask.sum() > .95*inside.sum():
+        return None
+    return mask.astype(np.uint8)
+
+
 def segment(image, box, depth_mask=None, exclude=None, iterations=5):
     """
     The object's own pixels inside a detector box, as a 0/1 mask the size of the image.
 
-    This is the segmentation step of the pipelines this engine follows — a detector's box, then a
-    pixel-exact mask of the thing (what SAM or YOLO-seg give on a server), then its contour. On
-    the phone it is OpenCV's GrabCut, prompted by the box the way SAM is: colour models of the
-    thing and of what is round it split them along the real edge.
+    With OpenCV this uses GrabCut; the NumPy-only Android build uses conservative local
+    background-colour subtraction. Neither method guarantees an exact semantic mask.
+    A missing mask is reported rather than replaced with the detector rectangle.
 
     [depth_mask] (0/1, the image's size) marks pixels ARCore's depth says stand up off the
     surface. Depth is coarse and a pixel or two off at edges, so it is only trusted where it is
@@ -563,11 +656,7 @@ def segment(image, box, depth_mask=None, exclude=None, iterations=5):
     if x1 - x0 < 8 or y1 - y0 < 8:
         return None
     if cv2 is None:
-        mask = np.zeros((h, w), np.uint8)
-        mask[y0:y1, x0:x1] = 1
-        if depth_mask is not None:
-            mask &= depth_mask.astype(np.uint8)
-        return mask
+        return _segment_numpy(image, (x0, y0, x1, y1), depth_mask, exclude)
     gc = np.full((h, w), cv2.GC_BGD, np.uint8)
     gc[y0:y1, x0:x1] = cv2.GC_PR_FGD
     inside = np.zeros((h, w), bool)
@@ -722,7 +811,7 @@ def _wmedian(idx, v, w):
 
 def fit_space(x, y, h, weights=None, cameras=()):
     """The inside of a space as a box, in its floor's frame: the fields of Kotlin's SpaceBox."""
-    xs = np.asarray(x, np.float64); ys = np.asarray(y, np.float64); hs = np.asarray(h, np.float64)
+    xs, ys, hs, weights = clean_cloud(x, y, h, weights)
     n = xs.size
     cams = np.asarray(cameras, np.float64).reshape(-1, 3)
     walls = np.nonzero(hs > FLOOR_BAND_MM)[0]
@@ -948,13 +1037,16 @@ def trace_space(image, box, seed=None, iterations=5):
 def largest_quad(contour):
     """The largest four-sided shape inside a traced outline, corners TL, TR, BR, BL."""
     from itertools import combinations
-    hull = cv2.convexHull(np.asarray(contour, np.float32).reshape(-1, 1, 2))[:, 0, :]
+    points = np.asarray(contour, np.float64).reshape(-1, 2)
+    hull = np.asarray(convex_hull(points[:, 0], points[:, 1]), np.float64)
+    if len(hull) < 4 or polygon_area(hull) < 1:
+        return None
     if len(hull) > 36:
         hull = hull[np.linspace(0, len(hull) - 1, 36).astype(int)]
     best, best_a = None, -1.0
     for idx in combinations(range(len(hull)), 4):
         q = hull[list(idx)]
-        a = cv2.contourArea(q.reshape(-1, 1, 2))
+        a = polygon_area(q)
         if a > best_a:
             best_a, best = a, q
     s = best[best[:, 1].argsort()]
@@ -970,6 +1062,8 @@ def snap_quad(image, quad, reach=None):
     the sides meet. A space's sides are straight — a boot's lip, a shelf's frame, a room's skirting —
     so a side the colour trace cut short or let wander is put back on the real edge.
     """
+    if quad is None or cv2 is None:
+        return quad
     h, w = image.shape[:2]
     reach = reach or 0.06 * max(w, h)
     grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

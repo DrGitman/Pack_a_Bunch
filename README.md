@@ -41,8 +41,6 @@ These are product decisions, not gaps to fill in later without a conversation:
 - It does not report an "optimisation percentage". The metric is **modelled fill**,
   with a stated basis.
 
-The full copy rules are in `docs/UX.md` and are requirements, not suggestions.
-
 ## Stack
 
 | Layer | Choice |
@@ -81,9 +79,6 @@ Pack_a_bunch_App/
 └── logos/                      ← official app mark and wordmark
 ```
 
-Read `docs/UX.md` before building a screen, and lift exact values from that screen's
-artboard. Never hardcode a hex value in a composable — colour, type and spacing come from
-`app/.../ui/theme/`.
 
 ## Plans
 
@@ -221,8 +216,6 @@ If something goes wrong:
   someone without the app can ask for the same.
 - **Your own email sender.** Supabase's built-in mail sends about two messages an hour,
   which will not survive real sign-ups. Set SMTP in the Supabase dashboard.
-- **Measurement accuracy.** The tape-measure check needs a phone that supports ARCore
-  Depth; the P30 Lite used for testing does not.
 - **The application id** `com.packabunch` is permanent once uploaded. Confirm it first.
 - Target Android 16 / API 36, verify 16 KB page-size compatibility, and keep signing keys
   and service-account credentials out of this repo.

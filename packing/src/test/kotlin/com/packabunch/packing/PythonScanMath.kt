@@ -98,12 +98,12 @@ class PythonScanMath private constructor(private val process: Process) : ScanMat
     companion object {
         fun start(): PythonScanMath? = runCatching {
             val script = listOfNotNull(System.getenv("PACKSCAN"), "../app/src/main/python/packscan.py", "app/src/main/python/packscan.py").map(::File).first { it.exists() }
-            val p = ProcessBuilder("python3", script.path, "--serve").redirectError(ProcessBuilder.Redirect.INHERIT).start()
+            val p = ProcessBuilder(System.getenv("PACKSCAN_PYTHON") ?: "python3", script.path, "--serve").redirectError(ProcessBuilder.Redirect.INHERIT).start()
             val math = PythonScanMath(p)
             val pong = math.call("{\"op\":\"ping\"}")
             println("Python engine up, OpenCV ${pong["opencv"]}")
             math
-        }.getOrNull()
+        }.getOrElse { if (System.getenv("PACKSCAN_PYTHON") != null) throw it else null }
     }
 }
 

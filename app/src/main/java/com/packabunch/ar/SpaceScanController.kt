@@ -292,25 +292,23 @@ class SpaceScanController(
         val margin = FloorOutline.wallMargin(poly)
         val samples = ArrayList<DetectionPoints.Sample>(6000)
         try {
-            frame.acquireDepthImage16Bits().use { depth ->
+            MeasurementDepth.acquire(frame).use { depth ->
                 if (depth.timestamp == lastDepthNs) return
                 lastDepthNs = depth.timestamp
-                val intr = camera.imageIntrinsics
+                val intr = camera.textureIntrinsics
                 val f = intr.focalLength; val pp = intr.principalPoint; val dim = intr.imageDimensions
                 val projection = DepthProjection.scaled(f[0], f[1], pp[0], pp[1], dim[0], dim[1], depth.width, depth.height)
-                val plane = depth.planes[0]
-                val buf = plane.buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
                 val local = FloatArray(3); val world = FloatArray(3)
                 fun depthAt(u: Int, v: Int): Int =
                     if (u < 0 || v < 0 || u >= depth.width || v >= depth.height) 0
-                    else buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
+                    else depth.at(u, v)
                 val cu0 = depth.width * 0.3f; val cu1 = depth.width * 0.7f
                 val cv0 = depth.height * 0.3f; val cv1 = depth.height * 0.7f
                 var v = 0
                 while (v < depth.height) {
                     var u = 0
                     while (u < depth.width) {
-                        val mm = buf.getShort(v * plane.rowStride + u * plane.pixelStride).toInt() and 0xffff
+                        val mm = depth.at(u, v)
                         // A space's surfaces are big; a pixel on a jump in depth is only ever a
                         // smear between a flap's edge and the floor behind it, so it is dropped.
                         if (mm in MIN_DEPTH_MM..MAX_DEPTH_MM &&
