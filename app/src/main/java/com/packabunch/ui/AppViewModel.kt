@@ -332,6 +332,8 @@ class AppViewModel(
         if (foreground) return
         foreground = true
         requestSync(0)
+        // Back in the app: a photo changed or removed on another phone shows here too.
+        refreshAccountSettings()
         realtime?.start()
     }
 
@@ -429,13 +431,15 @@ class AppViewModel(
         preferences.edit().apply {
             unit?.let { putString("unit", it.name) }
             habit?.let { putString("habit", it.name) }
-            remote.avatarUrl?.let { putString("avatar", it) }
+            // The account's photo is the photo, removed included: only saveAvatar ever writes it,
+            // so an empty one means it was taken off on some phone, not that a save lost it.
+            putString("avatar", remote.avatarUrl)
         }.apply()
         _settings.update { current ->
             current.copy(
                 unit = unit ?: current.unit,
                 packingHabit = habit ?: current.packingHabit,
-                avatarUrl = remote.avatarUrl ?: current.avatarUrl,
+                avatarUrl = remote.avatarUrl,
             )
         }
     }
