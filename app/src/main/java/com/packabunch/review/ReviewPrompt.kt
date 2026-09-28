@@ -22,17 +22,49 @@ import com.google.android.play.core.review.ReviewManagerFactory
  */
 object ReviewPrompt {
 
-    fun packFinished(activity: Activity) {
+    /**
+     * Counts a finished pack and asks Google Play for its review sheet when due. True when it
+     * asked, so the app's own feedback card waits for another pack rather than stacking on it.
+     */
+    fun packFinished(activity: Activity): Boolean {
         val prefs = activity.getSharedPreferences("review_prompt", Context.MODE_PRIVATE)
         val finished = prefs.getInt("packs_finished", 0) + 1
         prefs.edit().putInt("packs_finished", finished).apply()
         val now = System.currentTimeMillis()
-        if (finished < 2 || now - prefs.getLong("asked_at", 0) < QUIET_DAYS * 24 * 60 * 60 * 1000L) return
+        if (finished < 2 || now - prefs.getLong("asked_at", 0) < QUIET_DAYS * DAY_MS) return false
         prefs.edit().putLong("asked_at", now).apply()
         val manager = ReviewManagerFactory.create(activity)
         manager.requestReviewFlow().addOnCompleteListener { request ->
             if (request.isSuccessful) manager.launchReviewFlow(activity, request.result)
         }
+        return true
+    }
+
+    /** How many packs this phone has seen finished. */
+    fun packsFinished(context: Context): Int =
+        context.getSharedPreferences("review_prompt", Context.MODE_PRIVATE).getInt("packs_finished", 0)
+
+    /**
+     * The app's own "How are we doing?" card: due once every 5 to 10 finished packs, the next
+     * count picked at random each time so it never feels like clockwork, and never within a
+     * month of the last one. It is only feedback to us; it has nothing to do with the Play
+     * review above, which is asked for on its own and whatever the stars were.
+     */
+    fun feedbackDue(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("review_prompt", Context.MODE_PRIVATE)
+        val finished = prefs.getInt("packs_finished", 0)
+        var next = prefs.getInt("feedback_next", 0)
+        if (next == 0) {
+            next = (5..10).random()
+            prefs.edit().putInt("feedback_next", next).apply()
+        }
+        if (finished < next) return false
+        if (System.currentTimeMillis() - prefs.getLong("feedback_at", 0) < FEEDBACK_QUIET_DAYS * DAY_MS) return false
+        prefs.edit()
+            .putLong("feedback_at", System.currentTimeMillis())
+            .putInt("feedback_next", finished + (5..10).random())
+            .apply()
+        return true
     }
 
     /**
@@ -49,4 +81,6 @@ object ReviewPrompt {
     }
 
     private const val QUIET_DAYS = 90
+    private const val FEEDBACK_QUIET_DAYS = 30
+    private const val DAY_MS = 24 * 60 * 60 * 1000L
 }

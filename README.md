@@ -165,6 +165,9 @@ Three dashboard settings go with the migrations:
   was off when it ran, switch it on and run the last block of that file again.
 - `202609270005_fit_reports.sql` keeps the "It doesn't fit" reports: the reason picked and the
   sizes, never names. Read them in Table Editor → `fit_reports`; the app cannot read them back.
+- `202609280001_app_feedback.sql` keeps the "How are we doing?" card: the stars, the words
+  if any, packs finished and the app version. Read them in Table Editor → `app_feedback`; the
+  app cannot read them back.
 - **Authentication → URL Configuration → Redirect URLs** → add `packabunch://reset-password`.
   The password-reset email sends people back into the app with it; without it the link opens
   the Site URL instead and the reset cannot be finished on the phone.

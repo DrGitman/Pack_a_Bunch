@@ -340,6 +340,30 @@ fun PackNavHost(
             )
         }
     }
+    // "How are we doing?" — now and then after a pack is finished, over whatever comes next.
+    var feedbackOpen by rememberSaveable { mutableStateOf(false) }
+    if (feedbackOpen) {
+        var sending by remember { mutableStateOf(false) }
+        var problem by remember { mutableStateOf<String?>(null) }
+        androidx.compose.ui.window.Popup(
+            onDismissRequest = { feedbackOpen = false },
+            properties = androidx.compose.ui.window.PopupProperties(focusable = true),
+        ) {
+            com.packabunch.ui.screens.FeedbackCard(
+                sending = sending,
+                problem = problem,
+                onSend = { stars, words ->
+                    sending = true; problem = null
+                    viewModel.sendFeedback(stars, words, com.packabunch.review.ReviewPrompt.packsFinished(context)) { sent ->
+                        sending = false
+                        if (sent) { feedbackOpen = false; notice = "Thank you. We read every one." }
+                        else problem = "Couldn't send it. Check your connection and try again."
+                    }
+                },
+                onSkip = { feedbackOpen = false },
+            )
+        }
+    }
     var editItemId by rememberSaveable { mutableStateOf<String?>(null) }
     var packMenuOpen by rememberSaveable { mutableStateOf(false) }
     var renamePack by remember { mutableStateOf<com.packabunch.data.Project?>(null) }
@@ -1096,7 +1120,9 @@ fun PackNavHost(
                 savedPackCount = projects.size,
                 onDone = {
                     // Whatever they answered about the fit: the prompt never depends on it.
-                    (context as? android.app.Activity)?.let(com.packabunch.review.ReviewPrompt::packFinished)
+                    val askedPlay = (context as? android.app.Activity)?.let(com.packabunch.review.ReviewPrompt::packFinished) ?: false
+                    // Every 5 to 10 finished packs, our own card — never on top of Play's.
+                    if (!askedPlay && com.packabunch.review.ReviewPrompt.feedbackDue(context)) feedbackOpen = true
                     home()
                 },
                 onSeePlan = {

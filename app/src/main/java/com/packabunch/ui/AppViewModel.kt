@@ -917,6 +917,13 @@ class AppViewModel(
      * sent anywhere, and it must not be until there is a privacy policy and a Data safety
      * declaration that cover it.
      */
+    private val feedback = account?.let { com.packabunch.data.cloud.CloudFeedback(it) }
+
+    /** Sends the "How are we doing?" card; [done] is told whether it arrived. */
+    fun sendFeedback(stars: Int, words: String, packsFinished: Int, done: (Boolean) -> Unit) {
+        viewModelScope.launch { done(feedback?.send(stars, words, packsFinished) ?: false) }
+    }
+
     fun recordDidItFit(fitted: Boolean) {
         _editor.update { it.copy(realWorldFitReport = fitted) }
     }
