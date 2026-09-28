@@ -59,6 +59,19 @@ object ReviewPrompt {
         return true
     }
 
+    /**
+     * Opens the person's email app addressed to support, with the version filled in so a bug
+     * report says what it is about. False when the phone has no email app, so the caller can
+     * show the address instead.
+     */
+    fun feedback(context: Context, address: String, version: String): Boolean {
+        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
+            putExtra(Intent.EXTRA_EMAIL, arrayOf(address))
+            putExtra(Intent.EXTRA_SUBJECT, "Pack a Bunch feedback ($version)")
+        }
+        return runCatching { context.startActivity(intent) }.isSuccess
+    }
+
     private const val QUIET_DAYS = 90
     /** Half a week: twice a week at most. */
     private const val FEEDBACK_GAP_MS = 84 * 60 * 60 * 1000L
