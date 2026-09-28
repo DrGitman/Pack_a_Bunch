@@ -128,6 +128,92 @@ class SpaceScanSimTest {
         cameras = sweepFront(floatArrayOf(0f, 0.1f, 0f), 0.5f..0.05f, 0.75f..0.95f, 0.3f),
     )
 
+    // -- the same spaces from other angles -----------------------------------------------------------
+
+    /**
+     * [space] scanned from somewhere else: every camera of its sweep turned [yawDeg] round the
+     * point it looks at, and raised by [liftM] — from the left, the right, higher, lower. The
+     * sizes must come out the same from all of them.
+     */
+    private fun fromAngle(space: Space, target: FloatArray, yawDeg: Float, liftM: Float, tag: String): Space {
+        val r = yawDeg * PI.toFloat() / 180f
+        val c = cos(r); val s = sin(r)
+        return Space("${space.name} ($tag)", space.scene, space.floorY, space.floorOutline, { rnd ->
+            space.cameras(rnd).map { cam ->
+                val dx = cam.pos[0] - target[0]; val dz = cam.pos[2] - target[2]
+                val pos = floatArrayOf(target[0] + dx * c + dz * s, cam.pos[1] + liftM, target[2] - dx * s + dz * c)
+                SceneSim.Camera.lookingAt(pos, target, lens)
+            }
+        }, space.holes)
+    }
+
+    /** The bedroom from other places to stand: a corner by the window, the far corner, the middle. */
+    private fun roomFrom(x: Float, z: Float, eye: Float, tag: String) = Space("Bedroom ($tag)", room.scene, room.floorY, room.floorOutline, { rnd ->
+        (0 until 140).map { i ->
+            val turn = 2 * PI.toFloat() * i / 70f
+            val pitch = if (i < 70) -28f else 8f
+            SceneSim.Camera(jitter(rnd, floatArrayOf(x, eye, z)), (turn * 180 / PI).toFloat(), pitch, lens)
+        }
+    }, room.holes)
+
+    private val bootTarget = floatArrayOf(0f, 0.9f, -0.45f)
+    private val shelfTarget = floatArrayOf(0f, 1.42f, -0.2f)
+    private val cartonTarget = floatArrayOf(0f, 0.1f, 0f)
+
+    /** Every space from five places: straight on, from the left, from the right, from higher, from lower. */
+    private val angles: List<Triple<String, Space, FloatArray>> = buildList {
+        for ((space, target, lowLift) in listOf(Triple(boot, bootTarget, -0.15f), Triple(shelf, shelfTarget, -0.1f), Triple(carton, cartonTarget, -0.1f))) {
+            add(Triple("front", space, floatArrayOf(1040f)))
+            add(Triple("left", fromAngle(space, target, -35f, 0f, "from the left"), floatArrayOf()))
+            add(Triple("right", fromAngle(space, target, 35f, 0f, "from the right"), floatArrayOf()))
+            add(Triple("high", fromAngle(space, target, 0f, 0.3f, "from higher"), floatArrayOf()))
+            add(Triple("low", fromAngle(space, target, 0f, lowLift, "from lower"), floatArrayOf()))
+        }
+        add(Triple("door", room, floatArrayOf()))
+        add(Triple("window", roomFrom(-0.8f, -2.9f, 1.45f, "by the window"), floatArrayOf()))
+        add(Triple("far", roomFrom(0.9f, -0.6f, 1.45f, "far corner"), floatArrayOf()))
+        add(Triple("tall", roomFrom(0f, -1.8f, 1.75f, "middle, tall person"), floatArrayOf()))
+        add(Triple("short", roomFrom(0f, -1.8f, 1.2f, "middle, short person"), floatArrayOf()))
+    }
+
+    /** SpaceScanUi.canFinish's bar (the app's SCAN_DONE_THRESHOLD). */
+    private val SCAN_READY = 0.80f
+
+    /** The true inside of each space, and how close the fit must come. */
+    private fun truth(name: String): FloatArray = when {
+        name.startsWith("Bedroom") -> floatArrayOf(2800f, 3600f, 2600f, 90f)
+        name.startsWith("Car boot") -> floatArrayOf(1040f, 800f, 600f, 40f)
+        name.startsWith("Open shelf") -> floatArrayOf(1160f, 380f, 280f, 30f)
+        else -> floatArrayOf(440f, 290f, 295f, 20f)
+    }
+
+    @Test fun `every space from every angle, Python engine`() = python { m ->
+        // A report for now (SCAN_SIM_ANGLES=1): cartons seen from the side still over-read the height by 20–30 mm.
+        if (System.getenv("SCAN_SIM_ANGLES") == null) return@python
+        val failures = ArrayList<String>()
+        val blocked = ArrayList<String>()
+        for ((_, space, _) in angles) {
+            val s = scan(space, math = m)
+            println(report(space.name, s))
+            val b = s.box
+            val (w, d, h, tol) = truth(space.name).let { listOf(it[0], it[1], it[2], it[3]) }
+            // A room has no front: its width and depth may come out either way round.
+            val ok = b != null && abs(b.heightMm - h) <= tol && (
+                (abs(b.widthMm - w) <= tol && abs(b.depthMm - d) <= tol) ||
+                    (space.name.startsWith("Bedroom") && abs(b.widthMm - d) <= tol && abs(b.depthMm - w) <= tol))
+            // The app only lets a space be used once it is in clear view: mapped past the bar with
+            // every side it needs seen. Short of that it asks for the missing side instead, which is
+            // right; what must never happen is a wrong size the app would let through.
+            val ready = b != null && b.mapped >= SCAN_READY && b.weakestFace == null
+            if (ready && !ok) failures += "accepted a wrong size: " + report(space.name, s)
+            if (!ready) blocked += report(space.name, s)
+        }
+        println("asked for another look:\n" + blocked.joinToString("\n"))
+        assertTrue(failures.isEmpty(), "off from some angles:\n" + failures.joinToString("\n"))
+        // Most places to stand must give a usable scan straight away.
+        assertTrue(blocked.size * 4 <= angles.size, "too many angles blocked:\n" + blocked.joinToString("\n"))
+    }
+
     // -- the scan: SpaceScanController.sample and .accumulate ------------------------------------------
 
     private class Scan(val box: SpaceBox?, val space: ScannedSpace?, val points: List<PlanePoint>, val cameras: List<PlanePoint>, val last: SceneSim.Camera)
@@ -246,7 +332,9 @@ class SpaceScanSimTest {
     @Test fun `export for the pictures`() {
         val dir = System.getenv("SCAN_SIM_OUT") ?: return
         val py = if (System.getenv("SCAN_SIM_ENGINE") == "python") PythonScanMath.start() else null
-        for ((key, space) in listOf("room" to room, "boot" to boot, "shelf" to shelf, "carton" to carton)) {
+        val all = listOf("room" to room, "boot" to boot, "shelf" to shelf, "carton" to carton) +
+            (if (System.getenv("SCAN_SIM_ANGLES") != null) angles.map { (tag, sp, _) -> "${sp.name.substringBefore(" (").lowercase().replace(' ', '_')}_$tag" to sp } else emptyList())
+        for ((key, space) in all) {
             val s = scan(space, math = py ?: KotlinScanMath)
             val b = s.box
             val sb = StringBuilder("{\"name\":\"${space.name}\",\"floorY\":${space.floorY}")

@@ -295,7 +295,8 @@ private fun spaceGuidance(ui: SpaceScanUi): Pair<String, Boolean> {
         SpaceFace.BACK -> "Point at the back — it's still thin"
         SpaceFace.FLOOR -> "Tilt down — the floor isn't mapped yet"
         SpaceFace.FRONT -> "Turn round — the wall behind you isn't mapped"
-        SpaceFace.TOP, null -> if (ui.canFinish) "Mapped — check the sizes, then use this space" else "Keep sweeping slowly"
+        SpaceFace.TOP -> "Tilt up — the ceiling isn't mapped yet"
+        null -> if (ui.canFinish) "Mapped — check the sizes, then use this space" else "Keep sweeping slowly"
     } to !ui.canFinish
 }
 

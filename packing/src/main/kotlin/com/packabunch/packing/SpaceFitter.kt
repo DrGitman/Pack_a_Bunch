@@ -53,7 +53,8 @@ data class SpaceBox(
     val requiredFaces: List<SpaceFace>
         get() = buildList {
             add(SpaceFace.FLOOR); add(SpaceFace.LEFT); add(SpaceFace.RIGHT); add(SpaceFace.BACK)
-            if (cameraInside) add(SpaceFace.FRONT)
+            // Standing in a room, its height is only known once the ceiling has been in view.
+            if (cameraInside) { add(SpaceFace.FRONT); add(SpaceFace.TOP) }
         }
 
     /** The required face seen least — what the guidance asks for next. */

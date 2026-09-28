@@ -43,8 +43,11 @@ data class SpaceScanUi(
 ) {
     val mappedPercent: Int get() = ((box?.mapped ?: 0f) * 100).toInt().coerceIn(0, 100)
 
-    /** The same bar the space scan has always had: below it, a plan would be mostly guesswork. */
-    val canFinish: Boolean get() = (box?.mapped ?: 0f) >= SCAN_DONE_THRESHOLD
+    /**
+     * The space is in clear view: mapped past the bar, and every side it needs (the ceiling too,
+     * in a room) seen well. Short of that the guidance names the side to sweep to instead.
+     */
+    val canFinish: Boolean get() = box?.let { it.mapped >= SCAN_DONE_THRESHOLD && it.weakestFace == null } ?: false
 }
 
 /** Where the space's labels go, in 0..1 of the view; null when that point is off screen. */

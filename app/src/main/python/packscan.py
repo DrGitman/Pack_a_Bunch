@@ -780,6 +780,9 @@ def fit_space(x, y, h, weights=None, cameras=()):
             return min(ok, key=lambda f: (f[0] - outer) * inward)
         if low.size < MIN_FACE_POINTS:
             return (outer, 0, 0.0)
+        # Open or unseen: bounded by the furthest thing standing along the middle of the side —
+        # not its two ends, where a boot's tail-light pillars and a carton's corners stand
+        # outside the space.
         lo, hi = _range(low, vals, w, trim=0.002)
         return (lo if inward > 0 else hi, 0, 0.0)
 
@@ -797,7 +800,12 @@ def fit_space(x, y, h, weights=None, cameras=()):
         ln = hi - lo
         tight = max(8.0, 2 * sd[2])
         sel = walls[(np.abs(vals[walls] - sd[0]) <= tight) & (along[walls] > lo + 0.1 * ln) & (along[walls] < hi - 0.1 * ln)]
-        hh = np.sort(hs[sel])
+        if sel.size < MIN_FACE_POINTS:
+            return None
+        # A flap folded out from the rim carries on from the wall with no gap, leaning away;
+        # the band round the wall is kept tight so it is left within a few millimetres.
+        tight2 = max(5.0, 1.5 * sd[2])
+        hh = np.sort(hs[sel[np.abs(vals[sel] - sd[0]) <= tight2]])
         if hh.size < MIN_FACE_POINTS:
             return None
         gap = max(50.0, 0.08 * wall_top)
@@ -816,6 +824,15 @@ def fit_space(x, y, h, weights=None, cameras=()):
     high = hw[(np.abs(hs[hw] - walls_top) <= top_band) & (us[hw] > left + band) & (us[hw] < right - band)
               & (vs[hw] > front + band) & (vs[hw] < back - band)]
     height = _wmedian(high, hs, w) if high.size >= MIN_FACE_POINTS * 3 else walls_top
+    # Seen from low down, the near walls' tops are out of view and stop short; a ceiling seen
+    # over the middle of the space is the height itself.
+    over = hw[(hs[hw] > 0.6 * wall_top) & (us[hw] > left + 2 * band) & (us[hw] < right - 2 * band)
+              & (vs[hw] > front + 2 * band) & (vs[hw] < back - 2 * band)]
+    if over.size >= MIN_FACE_POINTS * 3:
+        ceiling = _wmedian(over, hs, w)
+        # Only a surface spread flat over the middle, not a wall's upper stretch.
+        if np.std(hs[over]) < max(40.0, 0.04 * ceiling) and ceiling > height:
+            height = ceiling
 
     um, vm = (left + right) / 2, (front + back) / 2
     cx, cy = um * c - vm * s, um * s + vm * c
@@ -914,7 +931,81 @@ def trace_space(image, box, seed=None, iterations=5):
     c = max(contours, key=cv2.contourArea)
     hull = cv2.convexHull(c)
     corners = cv2.approxPolyDP(hull, 0.02 * cv2.arcLength(hull, True), True)[:, 0, :]
-    return dict(mask=mask, contour=c[:, 0, :], corners=corners, areaPx=float(cv2.contourArea(c)))
+    quad = snap_quad(image, largest_quad(c[:, 0, :]))
+    return dict(mask=mask, contour=c[:, 0, :], corners=corners, quad=quad, areaPx=float(cv2.contourArea(c)))
+
+
+def largest_quad(contour):
+    """The largest four-sided shape inside a traced outline, corners TL, TR, BR, BL."""
+    from itertools import combinations
+    hull = cv2.convexHull(np.asarray(contour, np.float32).reshape(-1, 1, 2))[:, 0, :]
+    if len(hull) > 36:
+        hull = hull[np.linspace(0, len(hull) - 1, 36).astype(int)]
+    best, best_a = None, -1.0
+    for idx in combinations(range(len(hull)), 4):
+        q = hull[list(idx)]
+        a = cv2.contourArea(q.reshape(-1, 1, 2))
+        if a > best_a:
+            best_a, best = a, q
+    s = best[best[:, 1].argsort()]
+    top = s[:2][s[:2, 0].argsort()]
+    bot = s[2:][s[2:, 0].argsort()]
+    return np.array([top[0], top[1], bot[1], bot[0]], np.float64)
+
+
+def snap_quad(image, quad, reach=None):
+    """
+    Moves each side of a traced quad onto the strongest straight edge in the picture near it and
+    running the same way (Canny edges, probabilistic Hough lines), then re-finds the corners where
+    the sides meet. A space's sides are straight — a boot's lip, a shelf's frame, a room's skirting —
+    so a side the colour trace cut short or let wander is put back on the real edge.
+    """
+    h, w = image.shape[:2]
+    reach = reach or 0.06 * max(w, h)
+    grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(cv2.GaussianBlur(grey, (5, 5), 0), 40, 120)
+    lines = cv2.HoughLinesP(edges, 1, np.pi / 360, 40, minLineLength=int(0.12 * min(w, h)), maxLineGap=12)
+    if lines is None:
+        return quad
+    lines = np.asarray(lines).reshape(-1, 4).astype(np.float64)
+    sides = []
+    for i in range(4):
+        a, b = quad[i], quad[(i + 1) % 4]
+        d = b - a
+        ang = math.atan2(d[1], d[0])
+        n = np.array([-d[1], d[0]]) / (np.linalg.norm(d) + 1e-9)
+        best, score = None, 0.0
+        for x1, y1, x2, y2 in lines:
+            la = math.atan2(y2 - y1, x2 - x1)
+            dang = abs((la - ang + math.pi / 2) % math.pi - math.pi / 2)
+            if dang > math.radians(10):
+                continue
+            mid = np.array([(x1 + x2) / 2, (y1 + y2) / 2])
+            off = abs(np.dot(mid - a, n))
+            along = np.dot(mid - a, d) / (np.dot(d, d) + 1e-9)
+            if off > reach or along < -0.2 or along > 1.2:
+                continue
+            length = math.hypot(x2 - x1, y2 - y1)
+            sc = length / (1.0 + off / 10.0)
+            if sc > score:
+                score, best = sc, (np.array([x1, y1]), np.array([x2, y2]))
+        sides.append(best if best is not None else (a, b))
+
+    def meet(l1, l2):
+        p, r = l1[0], l1[1] - l1[0]
+        q, s_ = l2[0], l2[1] - l2[0]
+        den = r[0] * s_[1] - r[1] * s_[0]
+        if abs(den) < 1e-9:
+            return None
+        t = ((q[0] - p[0]) * s_[1] - (q[1] - p[1]) * s_[0]) / den
+        return p + t * r
+
+    out = []
+    for i in range(4):
+        c = meet(sides[i - 1], sides[i])
+        # Keep the traced corner if the snapped one flies off (near-parallel sides).
+        out.append(c if c is not None and np.linalg.norm(c - quad[i]) < 2.5 * reach else quad[i])
+    return np.array(out)
 
 
 if __name__ == "__main__" and "--serve" in sys.argv:
