@@ -814,10 +814,20 @@ def fit_space(x, y, h, weights=None, cameras=()):
             if v - top > gap:
                 break
             top = v
-        return float(top)
+        # A steep flap carries the wall on past its rim: surface just above the top, leaning off the
+        # wall's line by no more than it rises. A wall whose top is its rim has nothing there (a
+        # ceiling sits level with the top, not above it).
+        rise = hs[walls] - top
+        cone = walls[(rise > 15.0) & (rise <= 120.0) & (np.abs(vals[walls] - sd[0]) <= tight + rise)
+                     & (along[walls] > lo + 0.1 * ln) & (along[walls] < hi - 0.1 * ln)]
+        return float(top), cone.size >= MIN_FACE_POINTS
 
-    tops = sorted(t for t in (top_of(left_s, us, vs, front, back), top_of(right_s, us, vs, front, back),
-                              top_of(back_s, vs, us, left, right)) if t is not None)
+    found = [t for t in (top_of(left_s, us, vs, front, back), top_of(right_s, us, vs, front, back),
+                         top_of(back_s, vs, us, left, right)) if t is not None]
+    # A flap only ever adds height to its wall: the walls without one give the rim. When every wall
+    # carries on above (a shelf against a taller wall), they are all read as they are.
+    clean = sorted(t for t, flap in found if not flap)
+    tops = clean if clean else sorted(t for t, _ in found)
     walls_top = wall_top if not tops else tops[len(tops) // 2]
     top_band = max(60.0, 0.1 * walls_top)
     hw = walls

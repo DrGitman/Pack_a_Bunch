@@ -101,7 +101,7 @@ Transition mood: soft → Scene 7
 
 ### Scene 7 — Pack Plus — 95–108 s
 A recreation of the Pack Plus card, "Keep every pack you plan", with its three benefit rows and a Weekly/Monthly toggle that switches. There's no price, so the video works in every region.
-Side copy: "Free: one pack, up to 20 pieces. Pack Plus: unlimited packs, pieces and any size of space."
+Side copy: "Free: up to 5 packs, up to 20 pieces each. Pack Plus: unlimited packs, pieces and any size of space."
 Transition mood: clean → Scene 8
 
 ### Scene 8 — CTA — 108–115 s

@@ -329,6 +329,30 @@ class SpaceScanSimTest {
     }
 
     /** Writes each fit for the picture of the result, when asked (`SCAN_SIM_OUT=dir`). */
+    /** Where the phone stands for the picture: the scan's own spot, backed off until the space fits the screen. */
+    private fun pictureView(space: Space, b: SpaceBox?, last: SceneSim.Camera): SceneSim.Camera {
+        val cams = space.cameras(Random(5))
+        val mean = FloatArray(3) { k -> cams.map { it.pos[k] }.average().toFloat() }
+        if (b == null) return SceneSim.Camera.lookingAt(last.pos, FloatArray(3) { last.pos[it] + last.fwd[it] }, SceneSim.Lens(360, 720, 420f))
+        val (cx, cy) = b.toPlan(0f, 0f)
+        // Plane to world: x across, y = -z, h up from the floor.
+        val centre = floatArrayOf(cx / 1000f, space.floorY + b.heightMm / 2000f, -cy / 1000f)
+        if (b.cameraInside) {
+            // In a room: stand where the scan was made, look across to the far side, a wide lens.
+            var dx = centre[0] - mean[0]; var dz = centre[2] - mean[2]
+            if (kotlin.math.hypot(dx, dz) < 0.4f) { dx = 0f; dz = -1f }
+            val l = kotlin.math.hypot(dx, dz)
+            val pos = floatArrayOf(mean[0] - dx / l * 0.3f, mean[1], mean[2] - dz / l * 0.3f)
+            val target = floatArrayOf(pos[0] + dx / l * 3f, space.floorY + b.heightMm / 2000f - 0.1f, pos[2] + dz / l * 3f)
+            return SceneSim.Camera.lookingAt(pos, target, SceneSim.Lens(360, 720, 230f))
+        }
+        val d = FloatArray(3) { mean[it] - centre[it] }
+        val l = kotlin.math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])
+        val need = 1.35f * maxOf(b.widthMm, b.depthMm, b.heightMm) / 1000f + b.depthMm / 2000f
+        val k = maxOf(l, need) / l
+        return SceneSim.Camera.lookingAt(FloatArray(3) { centre[it] + d[it] * k }, centre, SceneSim.Lens(360, 720, 420f))
+    }
+
     @Test fun `export for the pictures`() {
         val dir = System.getenv("SCAN_SIM_OUT") ?: return
         val py = if (System.getenv("SCAN_SIM_ENGINE") == "python") PythonScanMath.start() else null
@@ -349,11 +373,12 @@ class SpaceScanSimTest {
                 b.weakestFace?.let { sb.append(",\"weakest\":\"${it.label}\"") }
                 sb.append("}")
             }
-            // A sharper picture of the last view, for the drawing.
-            val big = SceneSim.Lens(480, 360, 375f)
-            val view = SceneSim.Camera.lookingAt(c.pos, FloatArray(3) { k -> c.pos[k] + c.fwd[k] }, big)
+            // A portrait phone view for the drawing: from where the scan was made, the whole space in frame.
+            val view = pictureView(space, b, c)
+            val big = view.lens
             val img = SceneSim.depthImage(space.scene, view, Random(1), maxRangeM = 8f, holes = 0f)
-            sb.append(",\"view\":{\"w\":480,\"h\":360,\"f\":375,\"depth\":[${img.mm.joinToString(",")}]}")
+            sb.append(",\"shot\":{\"pos\":[${view.pos.joinToString(",")}],\"fwd\":[${view.fwd.joinToString(",")}],\"right\":[${view.right.joinToString(",")}],\"up\":[${view.up.joinToString(",")}]}")
+            sb.append(",\"view\":{\"w\":${big.width},\"h\":${big.height},\"f\":${big.focal},\"depth\":[${img.mm.joinToString(",")}]}")
             sb.append(",\"points\":[${s.points.filterIndexed { i, _ -> i % 3 == 0 }.joinToString(",") { "[${it.xMm.toInt()},${it.yMm.toInt()},${it.hMm.toInt()}]" }}]}")
             java.io.File(dir, "$key.json").writeText(sb.toString())
         }
