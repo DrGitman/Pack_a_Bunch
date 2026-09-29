@@ -186,7 +186,10 @@ fun PlanLayersScreen(
         Spacer(Modifier.height(Spacing.md))
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            PrimaryButton(text = "Start packing", onClick = onStartPacking)
+            PrimaryButton(
+                text = if (state.packedInstanceIds.isNotEmpty()) "Continue packing" else "Start packing",
+                onClick = onStartPacking,
+            )
         }
 
         Spacer(Modifier.height(Spacing.sm))

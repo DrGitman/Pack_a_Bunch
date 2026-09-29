@@ -193,7 +193,7 @@ fun PlanResultScreen(
                 )
             }
             PrimaryButton(
-                text = "Start packing",
+                text = if (state.packedInstanceIds.isNotEmpty()) "Continue packing" else "Start packing",
                 onClick = onStartPacking,
                 enabled = plan != null && plan.placements.isNotEmpty(),
                 modifier = Modifier.weight(1f),

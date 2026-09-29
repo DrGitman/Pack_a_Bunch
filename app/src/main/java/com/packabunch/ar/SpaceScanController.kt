@@ -40,6 +40,7 @@ data class SpaceScanUi(
     val box: SpaceBox? = null,
     val torchOn: Boolean = false,
     val fatalError: String? = null,
+    val scanHint: String? = null,
 ) {
     val mappedPercent: Int get() = ((box?.mapped ?: 0f) * 100).toInt().coerceIn(0, 100)
 
@@ -92,6 +93,7 @@ class SpaceScanController(
     private var config: Config? = null
     private val background = CameraBackgroundRenderer()
     private val outlines = GlowOutlineRenderer()
+    private val diagnostics = ScanDiagnostics("space")
 
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(r, "space-scan").apply { priority = Thread.NORM_PRIORITY - 1 } }
     private val workerBusy = AtomicBoolean(false)
@@ -205,6 +207,7 @@ class SpaceScanController(
             background.draw(frame)
             val camera = frame.camera
             if (camera.trackingState != TrackingState.TRACKING) {
+                diagnostics.record("tracking", camera.trackingFailureReason.name)
                 _ui.value = _ui.value.copy(
                     status = if (_ui.value.box == null) TrackingStatus.INITIALISING else TrackingStatus.LOST,
                     failureReason = camera.trackingFailureReason,
@@ -217,6 +220,7 @@ class SpaceScanController(
             if (_ui.value.status != TrackingStatus.TRACKING) _ui.value = _ui.value.copy(status = TrackingStatus.TRACKING, failureReason = null)
 
             lockFloor(frame, s)
+            if (floorY == null) diagnostics.record("floor_missing")
             if (floorY != null && frame.timestamp - lastProcessedNs >= PROCESS_INTERVAL_NS) {
                 lastProcessedNs = frame.timestamp
                 sample(frame)
@@ -328,8 +332,12 @@ class SpaceScanController(
                 }
             }
         } catch (_: NotYetAvailableException) {
+            _ui.value = _ui.value.copy(scanHint = "Waiting for depth — move slowly sideways")
+            diagnostics.record("depth_unavailable")
             return
         }
+        _ui.value = _ui.value.copy(scanHint = if (samples.isEmpty()) "No usable depth yet — include the floor and nearby edges" else null)
+        diagnostics.record("depth_sampled", "samples=${samples.size}")
         if (samples.isEmpty()) return
         val cam = pf.toPlane(pose.tx(), pose.ty(), pose.tz())
         workerBusy.set(true)
@@ -354,6 +362,7 @@ class SpaceScanController(
         lastFitMs = now
         val snap = cloud.snapshot()
         val box = math.fitSpace(snap.points, cameras, snap.weights)
+        diagnostics.record("fitted", "points=${snap.points.size}, fitted=${box != null}")
         drawn = box
         _ui.value = _ui.value.copy(box = box)
     }

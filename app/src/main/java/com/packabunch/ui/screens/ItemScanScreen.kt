@@ -396,7 +396,7 @@ private fun guidance(ui: ItemScanUi): Pair<String, Boolean> {
     if (!ui.surfaceFound) return "Point at the table or floor they're standing on" to true
     val items = ui.items
     if (ui.capReached) return "That's ${ui.maxItems} — the free plan stops there" to true
-    if (items.isEmpty()) return "Point at your things — leave a little gap between them" to true
+    if (items.isEmpty()) return (ui.scanHint ?: "Point at your things — leave a little gap between them") to true
     val scanning = items.count { it.state is ItemScanState.Scanning || it.state is ItemScanState.NeedsAngle }
     if (scanning == 0) {
         return if (ui.measuredCount > 0) "All measured — tap Done, or add more" to false
@@ -431,7 +431,7 @@ private fun CapturedCard(items: List<ScanItem>, alreadyInPack: Int, planLimit: I
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "CAPTURED",
+                "IN PACK",
                 color = Color.White.copy(alpha = 0.75f),
                 fontFamily = UiFamily,
                 fontWeight = FontWeight.Bold,

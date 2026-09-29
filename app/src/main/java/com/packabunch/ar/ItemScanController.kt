@@ -84,6 +84,7 @@ data class ItemScanUi(
     val torchOn: Boolean = false,
     val torchAvailable: Boolean = false,
     val fatalError: String? = null,
+    val scanHint: String? = null,
 ) {
     val measuredCount: Int get() = items.count { it.state is ItemScanState.Measured }
 }
@@ -144,6 +145,7 @@ class ItemScanController(
     private val background = CameraBackgroundRenderer()
     private val outlines = GlowOutlineRenderer()
     private val detector = ItemScanDetector()
+    private val diagnostics = ScanDiagnostics("items")
 
     /**
      * The latest outlines traced in the picture (see [PythonEngine.segmentFrame]): one byte per
@@ -310,6 +312,7 @@ class ItemScanController(
             background.draw(frame)
             val camera = frame.camera
             if (camera.trackingState != TrackingState.TRACKING) {
+                diagnostics.record("tracking", camera.trackingFailureReason.name)
                 val u = _ui.value
                 _ui.value = u.copy(
                     status = if (u.items.isEmpty() && u.status == TrackingStatus.INITIALISING) TrackingStatus.INITIALISING else TrackingStatus.LOST,
@@ -323,6 +326,7 @@ class ItemScanController(
 
             val tracked = s.getAllTrackables(Plane::class.java).filter { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null }
             val planes = tracked.filter { it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
+            if (planes.isEmpty()) diagnostics.record("surface_missing")
             val walls = tracked.filter { it.type == Plane.Type.VERTICAL && WallPlane.isWallSized(it.extentX, it.extentZ) }
             if (_ui.value.status != TrackingStatus.TRACKING || _ui.value.surfaceFound != planes.isNotEmpty()) {
                 _ui.value = _ui.value.copy(status = TrackingStatus.TRACKING, failureReason = null, surfaceFound = planes.isNotEmpty())
@@ -408,6 +412,16 @@ class ItemScanController(
         if (workerBusy.get()) return
         // A box over most of the picture is ML Kit boxing the scene — the wall, the floor — not a thing.
         val boxes = detector.latest.filter { frame.timestamp - it.frameTimestampNs < MAX_BOX_AGE_NS && it.area <= MAX_BOX_AREA }
+        if (boxes.isEmpty()) {
+            val hint = when {
+                detector.failed -> "Object detection couldn't run — reopen the scanner"
+                detector.latest.any { frame.timestamp - it.frameTimestampNs >= MAX_BOX_AGE_NS } -> "Detection is catching up — hold the phone steady"
+                detector.latest.isNotEmpty() -> "Step back until the whole object fits in view"
+                else -> "No object detected yet — show one whole object clearly"
+            }
+            _ui.value = _ui.value.copy(scanHint = hint)
+            diagnostics.record("no_usable_boxes", "detected=${detector.latest.size}, failed=${detector.failed}")
+        }
         val walls = wallPlanes.map {
             // A plane's own Y axis is its normal; X and Z run along it.
             val c = it.centerPose
@@ -507,8 +521,12 @@ class ItemScanController(
                 }
             }
         } catch (_: NotYetAvailableException) {
+            _ui.value = _ui.value.copy(scanHint = "Waiting for depth — move slowly sideways")
+            diagnostics.record("depth_unavailable")
             return
         }
+        if (boxes.isNotEmpty()) _ui.value = _ui.value.copy(scanHint = if (samples.isEmpty()) "No usable depth on the object — try another angle" else null)
+        diagnostics.record("depth_sampled", "boxes=${boxes.size}, samples=${samples.sumOf { it.pixels.size }}")
         if (samples.isEmpty() && tracker.all.isEmpty()) return
         workerBusy.set(true)
         worker.execute {
@@ -542,6 +560,10 @@ class ItemScanController(
         }
         val defaultY = obsPlaneY.firstOrNull() ?: planes.maxOfOrNull { if (it.y < cam[1]) it.y else Float.NEGATIVE_INFINITY } ?: return
         val update = tracker.update(observations, PlaneFrame(0f, defaultY, 0f, ALONG, UP).toPlane(cam[0], cam[1], cam[2]))
+        if (observations.isEmpty() && samples.isNotEmpty()) {
+            _ui.value = _ui.value.copy(scanHint = "Object depth isn't clear of its surface — try another angle")
+        }
+        diagnostics.record("selected", "sampleBoxes=${samples.size}, observations=${observations.size}, tracks=${update.visible.size}")
         for ((obsIndex, trackId) in update.assigned) {
             val y = obsPlaneY[obsIndex]
             planeHeights[trackId] = planeHeights[trackId]?.let { it * 0.8f + y * 0.2f } ?: y

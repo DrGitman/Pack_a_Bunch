@@ -282,11 +282,12 @@ private fun spaceGuidance(ui: SpaceScanUi): Pair<String, Boolean> {
         return when (ui.failureReason) {
             TrackingFailureReason.INSUFFICIENT_LIGHT -> "Too dark to see inside — try the torch" to true
             TrackingFailureReason.EXCESSIVE_MOTION -> "A little slower — the camera lost its place" to true
-            TrackingFailureReason.INSUFFICIENT_FEATURES -> "Point at something with more detail" to true
+            TrackingFailureReason.INSUFFICIENT_FEATURES -> "Include the floor and door edges; move slowly sideways" to true
             else -> "Move the phone slowly to get started" to true
         }
     }
     if (!ui.floorFound) return "Point at the floor of the space and hold for a moment" to true
+    ui.scanHint?.let { return it to true }
     val box = ui.box ?: return "Now sweep slowly round the sides" to true
     if (ui.canFinish && box.weakestFace == null) return "Mapped — check the sizes, then use this space" to false
     return when (box.weakestFace) {

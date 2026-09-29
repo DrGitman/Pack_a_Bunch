@@ -47,6 +47,8 @@ class ItemScanDetector {
     )
 
     private val busy = AtomicBoolean(false)
+    @Volatile var failed: Boolean = false
+        private set
 
     @Volatile
     var latest: List<ScanBox> = emptyList()
@@ -64,6 +66,7 @@ class ItemScanDetector {
         val uprightH = (if (swapped) sensorW else sensorH).toFloat()
         detector.process(input)
             .addOnSuccessListener { objects ->
+                failed = false
                 latest = objects.map { o ->
                     val b = o.boundingBox
                     ScanBox(
@@ -80,7 +83,11 @@ class ItemScanDetector {
                     )
                 }
             }
-            .addOnFailureListener { android.util.Log.w(AR_TAG, "item detect failed", it) }
+            .addOnFailureListener {
+                failed = true
+                latest = emptyList()
+                android.util.Log.w(AR_TAG, "item detect failed", it)
+            }
             .addOnCompleteListener {
                 image.close()
                 busy.set(false)
