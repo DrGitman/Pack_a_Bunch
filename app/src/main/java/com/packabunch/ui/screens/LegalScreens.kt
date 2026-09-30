@@ -28,10 +28,10 @@ import com.packabunch.ui.theme.UiFamily
  * TODO before the first Play release, these three must be true, not placeholders:
  */
 private const val PUBLISHER = "Pack a Bunch"
-const val SUPPORT_EMAIL = "support@packabunch.app"
+const val SUPPORT_EMAIL = "support@packabunch.site"
 private const val CONTACT = SUPPORT_EMAIL
 private const val COUNTRY = "Namibia"
-private const val LAST_UPDATED = "23 September 2026"
+private const val LAST_UPDATED = "30 September 2026"
 
 private data class Section(val heading: String, val body: List<String>)
 
