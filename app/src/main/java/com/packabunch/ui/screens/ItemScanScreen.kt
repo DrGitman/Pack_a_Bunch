@@ -360,12 +360,17 @@ private data class TagText(val text: String, val badge: ScanBadge, val progress:
 
 private fun tagFor(state: ItemScanState, name: String): TagText = when (state) {
     is ItemScanState.Measured -> TagText(name, ScanBadge.Measured, 1f)
-    is ItemScanState.Scanning -> TagText("$name · scanning", ScanBadge.Working, state.progress)
+    // The size is known long before it is final, so show it as it firms up rather than holding it
+    // back until "measured". The "~" says it may still move.
+    is ItemScanState.Scanning -> TagText(
+        state.fit?.let { "$name · ${liveSize(it)}" } ?: "$name · scanning",
+        ScanBadge.Working, state.progress,
+    )
     is ItemScanState.NeedsAngle -> TagText(
-        when (state.hint) {
-            AngleHint.TILT_DOWN -> "$name · tilt down"
-            AngleHint.STEP_AROUND -> "$name · step around"
-            AngleHint.STEP_BACK -> "$name · step back"
+        "$name · ${liveSize(state.fit)} · " + when (state.hint) {
+            AngleHint.TILT_DOWN -> "tilt down"
+            AngleHint.STEP_AROUND -> "step around"
+            AngleHint.STEP_BACK -> "step back"
         },
         ScanBadge.Working, state.progress,
     )
@@ -636,4 +641,10 @@ private fun DrawScope.drawPreviewObject(fit: FittedObject, solid: Float, shown: 
             drawPath(topFace, line, style = stroke)
         }
     }
+}
+
+/** W × D × H in centimetres, marked as provisional. */
+private fun liveSize(fit: com.packabunch.packing.FittedObject): String {
+    fun cm(mm: Float) = "%.0f".format(mm / 10f)
+    return "~${cm(fit.widthMm)} × ${cm(fit.depthMm)} × ${cm(fit.heightMm)} cm"
 }

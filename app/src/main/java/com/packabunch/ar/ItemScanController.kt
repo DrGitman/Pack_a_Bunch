@@ -16,6 +16,9 @@ import com.google.ar.core.TrackingState
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.UnavailableException
+import com.packabunch.packing.StandingObjects
+import com.packabunch.packing.SensorBox
+import com.packabunch.packing.SupportPlane
 import com.packabunch.packing.Axis
 import com.packabunch.packing.BoxDepth
 import com.packabunch.packing.DetectionPoints
@@ -317,7 +320,10 @@ class ItemScanController(
                 _ui.value = _ui.value.copy(status = TrackingStatus.TRACKING, failureReason = null, surfaceFound = planes.isNotEmpty())
             }
 
-            if (frame.timestamp - lastProcessedNs >= PROCESS_INTERVAL_NS && planes.isNotEmpty()) {
+            // Not gated on planes: ARCore only reports one where it can see visual features, and a
+            // dark or glossy table gives it none. Depth works there regardless, so the surface is
+            // worked out from the depth itself when ARCore has nothing (see SupportPlane).
+            if (frame.timestamp - lastProcessedNs >= PROCESS_INTERVAL_NS) {
                 lastProcessedNs = frame.timestamp
                 sampleAndSubmit(frame, planes, walls)
             }
@@ -392,6 +398,27 @@ class ItemScanController(
                 }
                 pixels
             }
+
+            // ARCore found no surface, so derive one from the depth we just gathered. Without this
+            // the scan sits on "0 measured" forever on any table too plain or too glossy for
+            // feature tracking, which is most dark furniture.
+            val world = FloatArray(captured.size * 3)
+            val uvs = FloatArray(captured.size * 2)
+            for ((i, p) in captured.withIndex()) {
+                world[3 * i] = p.world[0]; world[3 * i + 1] = p.world[1]; world[3 * i + 2] = p.world[2]
+                uvs[2 * i] = p.u; uvs[2 * i + 1] = p.v
+            }
+            // The surface actually in view: the height most depth shares. ARCore may also report
+            // the floor, which is the wrong reference for things on a table.
+            val inView = SupportPlane.detect(world)
+            val support = snaps.ifEmpty { inView?.let { listOf(PlaneSnap(it.y, it.polygonXZ)) }.orEmpty() }
+            val standingY = inView?.y ?: snaps.firstOrNull()?.y
+            // Objects from geometry, independent of the detector: whatever stands on that surface.
+            val standing = standingY?.let { StandingObjects.find(world, uvs, it) }.orEmpty()
+            if (support.isNotEmpty() && !_ui.value.surfaceFound) {
+                _ui.value = _ui.value.copy(surfaceFound = true)
+            }
+            diagnostics.record("support", "arcore=${snaps.size} used=${support.size} depth=${captured.size} standing=${standing.size}")
             image = frame.acquireCameraImage()
             val focal = camera.imageIntrinsics.focalLength
             val imageWidth = image.width
@@ -414,9 +441,17 @@ class ItemScanController(
                                 val picture = yuvToUprightBitmap(detectedImage, 0) ?: error("Camera image conversion failed")
                                 capturedPicture = picture
                                 detectedImage.close()
-                                val boxes = detected.filter { it.frameTimestampNs == timestamp && it.area <= MAX_BOX_AREA }
+                                val named = detected.filter { it.frameTimestampNs == timestamp && it.area <= MAX_BOX_AREA }
+                                // The detector goes blind in dim light while depth does not, so it
+                                // must never be the only way an object gets measured. Anything
+                                // standing on the table that it missed is added unnamed.
+                                val fromDepth = standing
+                                    .filter { s -> named.none { StandingObjects.overlap(it.sensor, s.box) > DEPTH_BOX_MATCH } }
+                                    .map { ScanBox(null, it.box, SensorBox.sensorToUpright(it.box, sensorRotationDegrees), timestamp) }
+                                    .filter { it.area <= MAX_BOX_AREA }
+                                val boxes = named + fromDepth
                                 val samples = samplesForBoxes(captured, picture, boxes, imageWidth, imageHeight, focal)
-                                track(samples, snaps, cam)
+                                track(samples, support, cam)
                                 _ui.value = _ui.value.copy(scanHint = when {
                                     detector.failed -> "Object detection couldn't run — reopen the scanner"
                                     boxes.isEmpty() -> "Show the whole object and leave a little gap between items"
@@ -746,6 +781,8 @@ class ItemScanController(
         val ALONG = floatArrayOf(1f, 0f, 0f)
         val UP = floatArrayOf(0f, 1f, 0f)
         const val PROCESS_INTERVAL_NS = 100_000_000L
+        /** A depth-found object overlapping a detector box this much is the same object. */
+        const val DEPTH_BOX_MATCH = 0.3f
         const val NAMING_INTERVAL_NS = 1_000_000_000L
         /** Outlines are traced in the picture this often, on a frame this many pixels wide. */
         const val TRACE_WIDTH = 240

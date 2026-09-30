@@ -183,4 +183,19 @@ object SensorBox {
         }
         return floatArrayOf(l.coerceIn(0f, 1f), t.coerceIn(0f, 1f), r.coerceIn(0f, 1f), b.coerceIn(0f, 1f))
     }
+
+    /** The reverse: a 0..1 sensor box to 0..1 upright, for boxes found from depth rather than ML Kit. */
+    fun sensorToUpright(box: FloatArray, rotationDegrees: Int): FloatArray {
+        var l = Float.MAX_VALUE; var t = Float.MAX_VALUE; var r = -Float.MAX_VALUE; var b = -Float.MAX_VALUE
+        for (sx in floatArrayOf(box[0], box[2])) for (sy in floatArrayOf(box[1], box[3])) {
+            val (xu, yu) = when (rotationDegrees) {
+                90 -> 1f - sy to sx
+                180 -> 1f - sx to 1f - sy
+                270 -> sy to 1f - sx
+                else -> sx to sy
+            }
+            l = minOf(l, xu); r = maxOf(r, xu); t = minOf(t, yu); b = maxOf(b, yu)
+        }
+        return floatArrayOf(l.coerceIn(0f, 1f), t.coerceIn(0f, 1f), r.coerceIn(0f, 1f), b.coerceIn(0f, 1f))
+    }
 }
