@@ -21,8 +21,20 @@ test('mobile navigation, information dialog, and keyboard dismissal',async({page
  await page.setViewportSize({width:390,height:844});await page.goto('/');
  const menu=page.locator('.menu-toggle');await menu.click();await expect(menu).toHaveAttribute('aria-expanded','true');
  await page.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Get the app'}).click();await expect(page).toHaveURL(/#download$/);await expect(menu).toHaveAttribute('aria-expanded','false');
- await page.getByRole('button',{name:'Privacy',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();await expect(page.getByRole('button',{name:'Privacy',exact:true})).toBeFocused();
+ await page.getByRole('button',{name:'Support',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.keyboard.press('Escape');await expect(page.getByRole('dialog')).not.toBeVisible();await expect(page.getByRole('button',{name:'Support',exact:true})).toBeFocused();
 });
+// Privacy and Terms are their own pages now, not dialogs.
+for(const [name,heading] of [['Privacy','Privacy policy'],['Terms','Terms of use']]){
+ test(`the ${name} page opens, reads back to the site, and has no violations`,async({page})=>{
+  await page.setViewportSize({width:390,height:844});await page.goto('/');
+  await page.getByRole('button',{name,exact:true}).click();
+  await expect(page.getByRole('heading',{level:1,name:heading})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  const result=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa','wcag21aa']).analyze();expect(result.violations).toEqual([]);
+  await page.getByRole('link',{name:'Back to site'}).click();
+  await expect(page.getByRole('heading',{level:1,name:/A place for everything/})).toBeVisible();
+ });
+}
 test('APK button serves the actual build with a matching checksum',async({page,request},testInfo)=>{
  const head=await request.head(release.url);expect(head.status()).toBe(200);expect(Number(head.headers()['content-length'])).toBe(release.bytes);
  await page.goto('/#download');const event=page.waitForEvent('download');await page.getByRole('link',{name:'Download Android APK'}).click();const download=await event;

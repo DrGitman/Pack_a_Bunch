@@ -23,6 +23,10 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
 body { margin: 0; font-size: 16px; line-height: 1.5; }
 button, a, input { -webkit-tap-highlight-color: transparent; }
 button, a { touch-action: manipulation; }
@@ -251,8 +255,8 @@ details p { margin-top: 12px; font-size: 14px; color: var(--muted); }
 .site-footer { padding: 50px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 40px; }
 .site-footer p { font-size: 14.5px; margin-top: 6px; }
 .site-footer nav { display: flex; gap: 24px; }
-.site-footer nav button { font-size: 14.5px; font-weight: 600; color: var(--muted); transition: color .16s; }
-.site-footer nav button:hover { color: var(--brand); }
+.site-footer nav button, .site-footer nav a { font-size: 14.5px; font-weight: 600; color: var(--muted); transition: color .16s; }
+.site-footer nav button:hover, .site-footer nav a:hover { color: var(--brand); }
 /* --- Dialog Sheets Overlay Configurations --- */
 dialog { border: none; border-radius: 16px; padding: 0; max-width: 520px; width: 90%; box-shadow: 0 10px 40px rgba(0,0,0,0.12); }
 dialog::backdrop { background: rgba(41, 34, 29, 0.5); backdrop-filter: blur(4px); }
@@ -261,7 +265,193 @@ dialog::backdrop { background: rgba(41, 34, 29, 0.5); backdrop-filter: blur(4px)
 .dialog-content h2 { margin-bottom: 14px; font-size: 24px; }
 .dialog-content p { font-size: 15.5px; margin-bottom: 24px; color: var(--muted); }
 /* --- Brand-Aligned Legal Form Layout Base --- */
-.legal-container { padding: 60px 24px; max-width: 760px; margin: 0 auto; color: var(--ink); }
-.legal-container h1 { font-size: 2.5rem !important; font-weight: 800; line-height: 1.1; color: var(--ink); margin-bottom: 6px; }
-.legal-container h2 { font-size: 1.45rem !important; font-weight: 700; line-height: 1.3; color: var(--ink); margin-top: 36px; margin-bottom: 12px; }
+.legal-page-wrapper { display: flex; flex-direction: column; min-height: 100vh; }
+.legal-page-wrapper .site-header { border-bottom: 1px solid var(--line); }
+.legal-page-wrapper main { flex: 1; }
+
+.legal-hero { background: var(--warm); padding: 56px 0 60px; text-align: center; }
+.legal-hero .eyebrow { margin-bottom: 14px; }
+.legal-meta { font-size: 14.5px !important; color: var(--muted); margin-top: 14px !important; }
+
+.legal-container { padding: 60px 24px 80px; max-width: 760px; margin: 0 auto; color: var(--ink); }
+.legal-hero h1 { font-size: 2.5rem !important; font-weight: 800; line-height: 1.1; color: var(--ink); margin-bottom: 6px; }
+.legal-container h2 { font-size: 1.45rem !important; font-weight: 700; line-height: 1.3; color: var(--ink); margin-top: 0; margin-bottom: 12px; }
 .legal-container p { font-size: 1.05rem !important; line-height: 1.65 !important; color: var(--muted); margin-bottom: 14px; }
+.legal-container p:last-child { margin-bottom: 0; }
+
+/* Each heading and its paragraphs read as one card, so a long policy scans in blocks. */
+.legal-section { border: 1px solid var(--line); border-radius: 16px; padding: 28px 30px; margin-top: 20px; background: #fff; }
+.legal-section:first-of-type { background: var(--cream); margin-top: 0; }
+.legal-section a { color: var(--brand); font-weight: 600; text-decoration: underline; }
+
+/* =======================================================================
+   Responsive layout. Everything above is the 1140px desktop composition;
+   these two steps take it to tablet and phone.
+   ======================================================================= */
+
+/* --- Tablet and below: the nav collapses to a drawer, type steps down. --- */
+@media (max-width: 1024px) {
+  h1 { font-size: 46px; }
+  h2 { font-size: 34px; line-height: 1.2; }
+  h3 { font-size: 21px; line-height: 1.35; }
+
+  .site-header { height: 76px; position: relative; }
+  .logo { width: 150px; }
+
+  .menu-toggle {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    width: 44px;
+    height: 44px;
+    margin-left: auto;
+    border-radius: 9px;
+  }
+  .menu-toggle span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    margin-inline: auto;
+    background: var(--ink);
+    border-radius: 2px;
+    transition: transform .18s, opacity .18s;
+  }
+  .menu-toggle[aria-expanded='true'] span:first-child { transform: translateY(3.5px) rotate(45deg); }
+  .menu-toggle[aria-expanded='true'] span:last-child { transform: translateY(-3.5px) rotate(-45deg); }
+
+  .site-header nav {
+    display: none;
+    position: absolute;
+    top: calc(100% - 8px);
+    left: 0;
+    right: 0;
+    z-index: 30;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    box-shadow: 0 16px 40px rgba(41, 34, 29, .13);
+  }
+  .site-header nav.is-open { display: flex; }
+  /* Undo the desktop rules that push items to the right of a flex row. */
+  .site-header nav > a:first-child,
+  .nav-download { margin-left: 0 !important; }
+  .site-header nav > a:not(.button) { padding: 12px 14px; border-radius: 9px; font-size: 16px; }
+  .site-header nav > a:not(.button):hover { background: var(--cream); }
+  .nav-download { margin-top: 8px; width: 100%; }
+
+  .hero { padding-top: 24px; }
+  .hero h1 { margin-top: 20px; }
+  .hero-description { font-size: 17px; }
+
+  .product-showcase { height: auto; padding: 40px 36px; gap: 24px; }
+  .product-copy { margin-top: 0; align-self: center; }
+  .product-copy h2 { font-size: 34px; line-height: 1.2; }
+  .product-copy p { font-size: 16.5px; margin-top: 18px; }
+  .phone { --phone-width: 220px; }
+
+  .steps-section { padding: 60px 0; }
+  .steps-grid { gap: 16px; margin-top: 36px; }
+  .step-card { min-height: 0; padding: 22px 20px; }
+
+  .saved-section { grid-template-columns: 46% 48%; gap: 6%; min-height: 0; }
+  .saved-showcase { height: auto; padding: 44px 0; }
+  .saved-showcase .phone { --phone-width: 215px; }
+  .benefits { margin-top: 32px; }
+
+  .measurement-strip h2 { font-size: 27px; line-height: 1.25; max-width: 52%; }
+
+  .plans-section { padding-top: 64px; padding-bottom: 64px; }
+  .plan-card { padding: 28px; min-height: 0; }
+
+  .download-section { padding: 64px 0; }
+  .download-grid { gap: 32px; }
+  .install-card { padding: 28px; }
+
+  .faq-section { padding: 64px 0; }
+  .faq-section h2 { font-size: 32px; }
+  .closing { padding: 64px 0; }
+  .closing h2 { font-size: 30px; }
+
+  .legal-container { padding: 44px 24px 64px; }
+  .legal-hero h1 { font-size: 2.1rem !important; }
+}
+
+/* --- Phone: one column throughout. --- */
+@media (max-width: 640px) {
+  body { font-size: 15.5px; }
+  h1 { font-size: 33px; line-height: 1.15; }
+  h2 { font-size: 26px; line-height: 1.22; }
+  h3 { font-size: 19px; }
+
+  .container { width: 100%; padding-inline: 20px; }
+
+  .site-header { height: 66px; }
+  .logo { width: 132px; }
+
+  .badge { font-size: .8125rem !important; padding: 7px 14px !important; }
+  .eyebrow, .hero-caption { font-size: .8125rem !important; }
+
+  .hero { padding-top: 18px; padding-bottom: 36px; }
+  .hero h1 { margin-top: 16px; }
+  .hero-description { font-size: 15.5px; margin-top: 16px; }
+  /* The copy is written to break on a wide screen; on a phone let it reflow. */
+  .desktop-break { display: none; }
+
+  .hero-actions { flex-direction: column; align-items: stretch; margin-top: 22px; }
+  .hero-actions .button:first-child,
+  .hero-actions .button-secondary { min-width: 0; width: 100%; }
+
+  .product-showcase { flex-direction: column; align-items: stretch; text-align: center; padding: 32px 22px; margin-top: 32px; border-radius: 20px; }
+  .product-copy { max-width: none; }
+  .product-copy h2 { font-size: 26px; }
+  .product-copy p { font-size: 15.5px; margin-top: 14px; }
+  .product-showcase .phone { margin-inline: auto; --phone-width: 210px; }
+
+  .steps-section { padding: 52px 0; }
+  .steps-grid { grid-template-columns: 1fr; margin-top: 28px; }
+
+  .saved-section { grid-template-columns: 1fr; gap: 28px; padding-top: 44px; padding-bottom: 44px; }
+  .saved-showcase { padding: 36px 0; border-radius: 20px; }
+  .saved-copy > p:not(.eyebrow) { font-size: 15.5px; }
+  .benefits { margin-top: 26px; }
+
+  .measurement-strip { padding: 36px 0; }
+  .measurement-strip .container { flex-direction: column; align-items: flex-start; gap: 14px; }
+  .measurement-strip h2 { font-size: 23px; max-width: none; }
+  .measurement-strip p { max-width: none; }
+
+  .plans-section { padding-top: 52px; padding-bottom: 52px; }
+  .plans-grid { grid-template-columns: 1fr; gap: 18px; margin-top: 30px; }
+  .plan-card { padding: 24px; }
+  .plan-card h3 { font-size: 23px; line-height: 1.3; }
+
+  .download-section { padding: 52px 0; }
+  .download-grid { grid-template-columns: 1fr; gap: 26px; }
+  .download-button { width: 100%; }
+  .install-card { padding: 24px 22px; }
+  .install-card ol { padding-left: 18px; }
+
+  .faq-section { padding: 52px 0; }
+  .faq-section h2 { font-size: 26px; margin-bottom: 18px; }
+  .closing { padding: 52px 0; }
+  .closing h2 { font-size: 25px; }
+  .closing .button { width: 100%; }
+
+  .site-footer { flex-direction: column; align-items: flex-start; gap: 22px; padding: 36px 0; }
+  .site-footer nav { flex-wrap: wrap; gap: 8px 20px; }
+
+  .dialog-content { padding: 26px 22px; }
+
+  .legal-page-wrapper .site-header { gap: 14px; }
+  .legal-hero { padding: 36px 0 40px; }
+  .legal-container { padding: 32px 20px 52px; }
+  .legal-hero h1 { font-size: 1.75rem !important; }
+  .legal-container h2 { font-size: 1.2rem !important; }
+  .legal-container p { font-size: 1rem !important; }
+  .legal-section { padding: 22px 20px; border-radius: 14px; }
+}
