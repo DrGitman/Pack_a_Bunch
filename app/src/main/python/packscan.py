@@ -722,8 +722,10 @@ def segment_all(image, boxes, depth_mask=None):
 
 def outline(mask):
     """The mask's outer contour, its PCA turn, and its tightest rotated rectangle (in pixels)."""
-    if cv2 is None or mask is None:
+    if mask is None:
         return None
+    if cv2 is None:
+        return _outline_numpy(mask)
     contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     if not contours:
         return None
@@ -737,6 +739,42 @@ def outline(mask):
     (rx, ry), (rw, rh), rdeg = cv2.minAreaRect(c)
     return dict(contour=pts.tolist(), pcaDeg=pca_deg, rect=dict(cx=rx, cy=ry, w=rw, h=rh, deg=rdeg),
                 areaPx=float(cv2.contourArea(c)))
+
+
+def _outline_numpy(mask):
+    """outline() without OpenCV: the largest region's boundary, its hull, its PCA turn and its
+    tightest rotated rectangle, so the phone build still traces the silhouette instead of
+    falling back to depth alone."""
+    m = np.asarray(mask, bool)
+    if m.sum() < 12:
+        return None
+    count, labels = _label_layer(m)
+    if count <= 1:
+        return None
+    sizes = np.bincount(labels.ravel(), minlength=count)
+    sizes[0] = 0
+    region = labels == int(np.argmax(sizes))
+    # Boundary: region pixels with a 4-neighbour outside it.
+    pad = np.pad(region, 1)
+    inner = pad[1:-1, 1:-1] & pad[:-2, 1:-1] & pad[2:, 1:-1] & pad[1:-1, :-2] & pad[1:-1, 2:]
+    ys, xs = np.nonzero(region & ~inner)
+    if xs.size < 3:
+        return None
+    hull = convex_hull(xs.astype(float), ys.astype(float))
+    hx = np.array([p[0] for p in hull]); hy = np.array([p[1] for p in hull])
+    pts = np.stack([xs, ys], 1).astype(np.float64)
+    mean = pts.mean(0)
+    evals, evecs = np.linalg.eigh(np.cov((pts - mean).T))
+    major = evecs[:, int(np.argmax(evals))]
+    pca_deg = math.degrees(math.atan2(major[1], major[0])) % 180
+    deg = min_area_rect(hx, hy)
+    r = math.radians(deg); c, s_ = math.cos(r), math.sin(r)
+    u = hx * c + hy * s_; v = -hx * s_ + hy * c
+    uc, vc = (u.max() + u.min()) / 2, (v.max() + v.min()) / 2
+    area = 0.5 * abs(float(np.dot(hx, np.roll(hy, 1)) - np.dot(hy, np.roll(hx, 1))))
+    return dict(contour=[[float(a), float(b)] for a, b in hull], pcaDeg=pca_deg,
+                rect=dict(cx=uc * c - vc * s_, cy=uc * s_ + vc * c, w=float(u.max() - u.min()), h=float(v.max() - v.min()), deg=deg),
+                areaPx=float(region.sum()) if area == 0 else area)
 
 
 def segment_json(text):

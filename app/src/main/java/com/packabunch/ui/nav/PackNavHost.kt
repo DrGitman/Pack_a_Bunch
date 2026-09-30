@@ -520,9 +520,11 @@ fun PackNavHost(
                 androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia(),
             ) { picked ->
                 if (picked != null) scope.launch {
-                    val url = avatars.upload(context, picked)
-                    if (url != null) viewModel.setAvatar(url).onFailure { notice = "The picture uploaded, but could not be saved to your account. Please try again." }
-                    else notice = "Couldn't read or upload that picture. Try another photo; if it still fails, try again later."
+                    avatars.uploadOrWhy(context, picked).fold(
+                        { url -> viewModel.setAvatar(url).onFailure { notice = "The picture uploaded, but could not be saved to your account. Please try again." } },
+                        // The real reason, so a refusal from storage is not passed off as bad internet.
+                        { notice = "Couldn't upload that picture. " + (it.message ?: "") },
+                    )
                 }
             }
             androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.refreshAccountSettings() }

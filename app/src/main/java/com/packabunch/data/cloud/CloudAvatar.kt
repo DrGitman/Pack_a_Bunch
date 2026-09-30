@@ -27,14 +27,19 @@ class CloudAvatar(private val account: SupabaseAccount, private val owner: Strin
         get() = BuildConfig.SUPABASE_URL.trimEnd('/') + "/storage/v1/object/public/avatars/" + path
 
     /** Uploads what the picker returned. Returns the address to show, or null if it failed. */
-    suspend fun upload(context: Context, picked: Uri): String? = runCatching {
+    suspend fun upload(context: Context, picked: Uri): String? = uploadOrWhy(context, picked).getOrNull()
+
+    /** As [upload], but a failure says why — the storage answer itself, not a guess about the connection. */
+    suspend fun uploadOrWhy(context: Context, picked: Uri): Result<String> = runCatching {
         withContext(Dispatchers.IO) {
-            val bytes = encodeAvatar(context, picked) ?: error("Couldn't read that picture.")
-            send("POST", bytes, "image/jpeg")
+            val bytes = encodeAvatar(context, picked) ?: error("Couldn't read that picture. Try another photo.")
+            // PUT replaces the one file each person has; POST only creates it. Trying PUT first
+            // and POST when there is nothing to replace yet works whichever way the bucket is set up.
+            runCatching { send("PUT", bytes, "image/jpeg") }.recoverCatching { send("POST", bytes, "image/jpeg") }.getOrThrow()
             // Cache-busting: the address never changes, so without this the old photo lingers.
             publicUrl + "?v=" + System.currentTimeMillis()
         }
-    }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
+    }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }
 
     suspend fun remove(): Boolean = runCatching {
         withContext(Dispatchers.IO) { send("DELETE", null, null) }
@@ -58,7 +63,13 @@ class CloudAvatar(private val account: SupabaseAccount, private val owner: Strin
                 connection.doOutput = true
                 connection.outputStream.use { it.write(body) }
             }
-            check(connection.responseCode in 200..299) { "Storage HTTP ${connection.responseCode}" }
+            val code = connection.responseCode
+            if (code !in 200..299) {
+                val why = runCatching { connection.errorStream?.use { String(it.readBytes()) } }.getOrNull()
+                    ?.let { runCatching { org.json.JSONObject(it).optString("message") }.getOrNull() ?: it }
+                    ?.take(160).orEmpty()
+                error("Storage said $code${if (why.isNotBlank()) ": $why" else ""}")
+            }
             connection.inputStream.use { it.readBytes() }
         } finally {
             connection.disconnect()

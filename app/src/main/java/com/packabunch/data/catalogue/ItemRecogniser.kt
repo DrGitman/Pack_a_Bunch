@@ -154,6 +154,11 @@ class ItemRecogniser {
             // Body parts: a heater's grille came back as "Mouth".
             "mouth", "nose", "ear", "eye", "lip", "tooth", "teeth", "tongue", "face", "finger",
             "nail", "arm", "leg", "foot", "ceiling",
+            // Vehicle parts and scenes: a round plastic tub came back as "Wheel". Nothing packed
+            // on a table is one of these, so they are never a name; the item stays "Item" and
+            // can be named or typed instead.
+            "wheel", "tire", "tyre", "rim", "car", "vehicle", "bicycle", "motorcycle", "road",
+            "desk", "table", "countertop", "shelf", "circle", "rectangle", "font", "screenshot",
         )
     }
 }
