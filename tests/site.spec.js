@@ -9,6 +9,9 @@ for(const width of [320,390,768,834,1024,1440]){
   await page.setViewportSize({width,height:900});await page.goto('/');await page.evaluate(()=>document.fonts.ready);
   await expect(page.getByRole('heading',{level:1})).toBeVisible();await expect(page.locator('.phone')).toHaveCount(2);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  // Nothing may sit flush against the screen edge: a `padding` shorthand on a
+  // .container element silently cancels the gutter the container sets.
+  if(width<=640){const flush=await page.locator('.container').evaluateAll(els=>els.filter(el=>{const r=el.getBoundingClientRect(),s=getComputedStyle(el);return r.height>0&&(r.left+parseFloat(s.paddingLeft)<16||r.right-parseFloat(s.paddingRight)>innerWidth-16);}).map(el=>el.className));expect(flush).toEqual([]);}
   await page.locator('.saved-showcase').scrollIntoViewIfNeeded();
   await expect.poll(()=>page.locator('img').evaluateAll(imgs=>imgs.every(i=>i.complete&&i.naturalWidth>0))).toBe(true);
   await page.evaluate(()=>scrollTo(0,0));

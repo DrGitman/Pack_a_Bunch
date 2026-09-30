@@ -252,7 +252,9 @@ details p { margin-top: 12px; font-size: 14px; color: var(--muted); }
 .closing { text-align: center; padding: 76px 0; background: var(--warm); }
 .closing h2 { font-size: 36px; }
 .closing p { margin-top: 12px; margin-bottom: 24px; font-size: 15.5px; }
-.site-footer { padding: 50px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 40px; }
+/* padding-block, not the shorthand: .site-footer is also a .container, and a
+   shorthand here would wipe out the side gutter the container sets on mobile. */
+.site-footer { padding-block: 50px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; gap: 40px; }
 .site-footer p { font-size: 14.5px; margin-top: 6px; }
 .site-footer nav { display: flex; gap: 24px; }
 .site-footer nav button, .site-footer nav a { font-size: 14.5px; font-weight: 600; color: var(--muted); transition: color .16s; }
@@ -442,7 +444,7 @@ dialog::backdrop { background: rgba(41, 34, 29, 0.5); backdrop-filter: blur(4px)
   .closing h2 { font-size: 25px; }
   .closing .button { width: 100%; }
 
-  .site-footer { flex-direction: column; align-items: flex-start; gap: 22px; padding: 36px 0; }
+  .site-footer { flex-direction: column; align-items: flex-start; gap: 22px; padding-block: 36px; margin-top: 4px; }
   .site-footer nav { flex-wrap: wrap; gap: 8px 20px; }
 
   .dialog-content { padding: 26px 22px; }
