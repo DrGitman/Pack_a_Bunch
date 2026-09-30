@@ -63,6 +63,18 @@ class ItemRecogniser {
         )
     }
 
+    /** Live scanning needs a conservative object label, without OCR/barcode work per frame. */
+    suspend fun scanCategory(bitmap: Bitmap): String? = suspendCancellableCoroutine { continuation ->
+        labeler.process(InputImage.fromBitmap(bitmap, 0))
+            .addOnSuccessListener { labels ->
+                val candidates = labels.filter { it.text.lowercase() !in NOT_AN_ITEM }.sortedByDescending { it.confidence }
+                val best = candidates.firstOrNull()
+                val runnerUp = candidates.getOrNull(1)?.confidence ?: 0f
+                continuation.resume(best?.takeIf { it.confidence >= 0.85f && it.confidence - runnerUp >= 0.10f }?.text)
+            }
+            .addOnFailureListener { continuation.resume(null) }
+    }
+
     /** An exact product code, when the object happens to still have one on it. */
     private suspend fun readBarcode(image: InputImage): String? =
         suspendCancellableCoroutine { continuation ->

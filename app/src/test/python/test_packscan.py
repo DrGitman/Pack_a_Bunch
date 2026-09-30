@@ -9,6 +9,14 @@ spec.loader.exec_module(engine)
 
 
 class PhoneEngineRegression(unittest.TestCase):
+    def test_one_wall_and_floor_are_not_a_fully_mapped_space(self):
+        floor = [[x, y, 0] for x in range(-500, 501, 20) for y in range(-500, 501, 20)]
+        wall = [[x, 500, z] for x in range(-500, 501, 20) for z in range(40, 501, 20)]
+        pts = np.asarray(floor + wall, dtype=float)
+        result = engine.fit_space(*pts.T, cameras=[[0, -800, 800]])
+        self.assertTrue(result is None or result['coverage']['LEFT'] == 0 or result['coverage']['RIGHT'] == 0,
+                        'A single wall cannot prove two opposite walls or the depth of a space')
+
     def setUp(self):
         self.backend = engine.cv2
         engine.cv2 = None  # The backend actually shipped to Android.

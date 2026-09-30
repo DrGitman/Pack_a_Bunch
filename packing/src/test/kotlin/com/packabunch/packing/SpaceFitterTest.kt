@@ -13,6 +13,14 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SpaceFitterTest {
+    @Test fun `one wall and floor cannot be reported as a fully mapped space`() {
+        val points = buildList {
+            for (x in -500..500 step 20) for (y in -500..500 step 20) add(PlanePoint(x.toFloat(), y.toFloat(), 0f))
+            for (x in -500..500 step 20) for (h in 40..500 step 20) add(PlanePoint(x.toFloat(), 500f, h.toFloat()))
+        }
+        val fit = SpaceFitter.fit(points, listOf(PlanePoint(0f, -800f, 800f)))
+        assertTrue(fit == null || fit.coverage[SpaceFace.LEFT] == 0f || fit.coverage[SpaceFace.RIGHT] == 0f)
+    }
 
     /**
      * The inside of a box-shaped space: floor, walls and (optionally) a top, all facing in.

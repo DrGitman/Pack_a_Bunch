@@ -10,7 +10,7 @@ import kotlin.math.sin
  * ### Identity
  * ML Kit's tracking id is the first clue, but it is not trusted on its own: it changes when an
  * object leaves the frame and comes back, and it sometimes jumps between neighbours. So an
- * observation belongs to an existing object when its tracking id is already known **or** its
+ * observation belongs to an existing object only when its
  * points land on that object's footprint (grown by [MATCH_MARGIN_MM]). Only when neither holds
  * does a new object begin.
  *
@@ -101,9 +101,18 @@ class ItemTracker(
         val assigned = HashMap<Int, Track>()
         for ((index, obs) in observations.withIndex()) {
             if (obs.points.isEmpty()) continue
+            // Do not start a new identity for a detector box that already contains a room.
+            if (obs.points.maxOf { it.xMm } - obs.points.minOf { it.xMm } > MAX_FOOTPRINT_MM ||
+                obs.points.maxOf { it.yMm } - obs.points.minOf { it.yMm } > MAX_FOOTPRINT_MM) continue
             val cx = median(obs.points.map { it.xMm })
             val cy = median(obs.points.map { it.yMm })
-            val track = match(obs.trackingId, cx, cy) ?: run {
+            // Duplicate detector rectangles can share actual samples. Centre proximity alone
+            // cannot establish that: two small objects can sit closer than the match margin.
+            val points = obs.points.toHashSet()
+            val duplicate = fed.entries.firstOrNull { (_, previous) ->
+                previous.count { it in points } > minOf(previous.size, points.size) * 0.5f
+            }?.key
+            val track = duplicate ?: match(obs.trackingId, cx, cy, fed.keys, obs.points) ?: run {
                 if (obs.points.size < MIN_POINTS_TO_START) return@run null
                 if (tracks.size >= maxItems) { capReached = true; return@run null }
                 Track(nextId++, ItemMeasurement(voxelMm, math)).also { it.centreX = cx; it.centreY = cy; tracks += it }
@@ -151,13 +160,26 @@ class ItemTracker(
 
     // ---------------------------------------------------------------------------------------
 
-    private fun match(trackingId: Int?, x: Float, y: Float): Track? {
-        if (trackingId != null) tracks.firstOrNull { trackingId in it.ids }?.let { return it }
+    private fun match(trackingId: Int?, x: Float, y: Float, used: Set<Track>, points: List<PlanePoint>): Track? {
+        fun sameBody(t: Track): Boolean {
+            val f = t.fit ?: return false
+            return points.count { p ->
+                distanceOutside(t, p.xMm, p.yMm) <= voxelMm && p.hMm <= f.heightMm + voxelMm
+            } >= points.size * 0.7f
+        }
+        // Detector IDs are hints, not physical identities. Reject ID jumps and enforce a
+        // one-to-one assignment within the frame before accepting any points into a cloud.
+        if (trackingId != null) tracks.firstOrNull {
+            (it !in used || sameBody(it)) && trackingId in it.ids && (distanceOutside(it, x, y) <= MATCH_MARGIN_MM ||
+                points.count { p -> distanceOutside(it, p.xMm, p.yMm) <= MATCH_MARGIN_MM } >= points.size * 0.25f)
+        }?.let { return it }
         var best: Track? = null
         var bestDist = Float.MAX_VALUE
         for (t in tracks) {
+            if (t in used && !sameBody(t)) continue
             val d = distanceOutside(t, x, y)
-            if (d <= MATCH_MARGIN_MM && d < bestDist) { best = t; bestDist = d }
+            val score = d + 0.1f * hypot(x - t.centreX, y - t.centreY)
+            if (d <= MATCH_MARGIN_MM && score < bestDist) { best = t; bestDist = score }
         }
         return best
     }

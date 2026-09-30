@@ -104,6 +104,7 @@ class SpaceScanController(
 
     @Volatile private var floorY: Float? = null
     @Volatile private var floorPolygon: FloatArray? = null
+    private var lockedFloor: Plane? = null
     @Volatile private var drawn: SpaceBox? = null
     @Volatile private var pendingTorch: Boolean? = null
     @Volatile private var pendingRestart = false
@@ -168,6 +169,7 @@ class SpaceScanController(
     fun buildScannedSpace(): ScannedSpace? = worker.submit<ScannedSpace?> {
         val snap = cloud.snapshot()
         val box = math.fitSpace(snap.points, cameras, snap.weights) ?: return@submit null
+        if (!SpaceScanUi(box = box).canFinish) return@submit null
         SpaceFitter.toScannedSpace(box, snap.points, snap.weights)
     }.get()
 
@@ -198,7 +200,7 @@ class SpaceScanController(
             pendingTorch?.let { on -> applyTorch(s, on); pendingTorch = null }
             if (pendingRestart) {
                 pendingRestart = false
-                floorY = null; floorPolygon = null; drawn = null
+                floorY = null; floorPolygon = null; lockedFloor = null; drawn = null
                 worker.execute { cloud = newCloud(); cameras.clear() }
                 _ui.value = _ui.value.copy(floorFound = false, box = null)
             }
@@ -257,17 +259,18 @@ class SpaceScanController(
                         p.isPoseInPolygon(h.hitPose)
                 } ?: return
             val plane = hit.trackable as Plane
+            lockedFloor = plane
             floorY = plane.centerPose.ty()
             floorPolygon = worldPolygon(plane)
             _ui.value = _ui.value.copy(floorFound = true)
             return
         }
-        // Keep the widest outline of any horizontal plane at the locked height.
-        val best = s.getAllTrackables(Plane::class.java)
-            .filter { it.trackingState == TrackingState.TRACKING && it.subsumedBy == null && it.type == Plane.Type.HORIZONTAL_UPWARD_FACING }
-            .filter { kotlin.math.abs(it.centerPose.ty() - locked) < FLOOR_MATCH_M }
-            .maxByOrNull { it.extentX * it.extentZ }
-        if (best != null) floorPolygon = worldPolygon(best)
+        // Follow the selected floor's identity, including ARCore plane merging. Choosing the
+        // largest plane at a similar height can silently switch a boot to the road outside it.
+        var plane = lockedFloor ?: return
+        while (true) { plane = plane.subsumedBy ?: break }
+        lockedFloor = plane
+        if (plane.trackingState == TrackingState.TRACKING) floorPolygon = worldPolygon(plane)
     }
 
     private fun worldPolygon(plane: Plane): FloatArray {

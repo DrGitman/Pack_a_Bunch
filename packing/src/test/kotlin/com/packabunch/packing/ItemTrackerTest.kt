@@ -14,6 +14,32 @@ import kotlin.test.assertTrue
 
 class ItemTrackerTest {
 
+    private fun patchAt(x: Float) = List(60) { i ->
+        PlanePoint(x + (i % 10) * 2f, (i / 10) * 2f, 70f)
+    }
+
+    @Test fun `recycled detector id must not feed a different distant object into an existing cloud`() {
+        val tracker = ItemTracker()
+        val cam = PlanePoint(0f, -600f, 400f)
+        val first = tracker.update(listOf(ItemTracker.Observation(7, patchAt(0f))), cam)
+        val next = tracker.update(listOf(ItemTracker.Observation(7, patchAt(600f))), cam)
+        assertTrue(first.assigned[0] != next.assigned[0])
+        assertEquals(2, next.tracks.size)
+    }
+
+    @Test fun `distinct nearby detections in one frame keep separate identities and count toward the cap`() {
+        val tracker = ItemTracker(maxItems = 2)
+        val cam = PlanePoint(0f, -600f, 400f)
+        val update = tracker.update(listOf(
+            ItemTracker.Observation(1, patchAt(0f)),
+            ItemTracker.Observation(2, patchAt(45f)),
+            ItemTracker.Observation(3, patchAt(300f)),
+        ), cam)
+        assertEquals(2, update.assigned.values.toSet().size)
+        assertTrue(update.assigned[0] != update.assigned[1])
+        assertTrue(update.capReached)
+    }
+
     private fun orbit(cx: Float, cy: Float, frames: Int, distance: Float = 750f, height: Float = 500f) =
         (0 until frames).map {
             val a = it * 2 * PI.toFloat() / frames

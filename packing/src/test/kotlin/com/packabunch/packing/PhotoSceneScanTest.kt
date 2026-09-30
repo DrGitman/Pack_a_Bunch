@@ -244,7 +244,7 @@ class PhotoSceneScanTest {
         "  %-8s %-14s %-9s W %4.0f D %4.0f H %4.0f".format(
             truthOf(t)?.name ?: "PHANTOM", s?.javaClass?.simpleName + ((s as? ItemScanState.CannotMeasure)?.reason?.let { " $it" } ?: ""),
             f?.shape, f?.widthMm ?: 0f, f?.depthMm ?: 0f, f?.heightMm ?: 0f,
-        )
+        ) + " centre=${f?.centreXMm},${f?.centreYMm} yaw=${f?.yawDegrees} ids=${t.trackingIds}"
     }
 
     // -- what the photo should come out as ---------------------------------------------------------

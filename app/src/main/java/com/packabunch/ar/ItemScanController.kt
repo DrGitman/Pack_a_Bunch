@@ -104,9 +104,9 @@ data class ScannedItemResult(
  * The item scan: point the phone at things on a table and each one gets measured.
  *
  * ### Frame by frame
- * On the GL thread, at most ten times a second: the depth image is sampled inside each ML Kit
- * box and turned into world points, and the camera image is handed to ML Kit for the next
- * round. Everything expensive — deciding which points are the object, fitting it, tracking it —
+ * On the GL thread, at most ten times a second: depth, calibration, support planes and camera
+ * pose are copied from the same frame whose camera image goes to ML Kit. Its asynchronous
+ * result selects from that snapshot, never a newer depth image. Everything expensive — deciding which points are the object, fitting it, tracking it —
  * runs on one worker thread and posts back a snapshot. If the worker is still busy, the frame
  * is skipped rather than queued. The GL thread only ever draws the latest snapshot, so the
  * camera never stutters because a fit took long.
@@ -147,21 +147,6 @@ class ItemScanController(
     private val detector = ItemScanDetector()
     private val diagnostics = ScanDiagnostics("items")
 
-    /**
-     * The latest outlines traced in the picture (see [PythonEngine.segmentFrame]): one byte per
-     * pixel of a small sensor-oriented frame, with the tracking ids of the boxes in label order.
-     */
-    private class Traced(val labels: ByteArray, val width: Int, val height: Int, val ids: List<Int?>, val boxes: List<FloatArray>, val atNs: Long) {
-        // An ambiguous trace has no pixels. Keep depth-only selection available for that box.
-        val availableLabels = BooleanArray(256).also { present ->
-            labels.forEach { present[it.toInt() and 0xff] = true }
-        }
-    }
-    @Volatile private var traced: Traced? = null
-    private val tracing = java.util.concurrent.atomic.AtomicBoolean(false)
-    private val tracer = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "outline-tracer").apply { isDaemon = true } }
-    private var lastTraceNs = 0L
-
     /** The measuring engine: Python (packscan.py), with the Kotlin one as its fallback. */
     private val math = PythonEngine.lazy(context)
     private val tracker = ItemTracker(maxItems, math = math)
@@ -175,6 +160,7 @@ class ItemScanController(
 
     private val planeHeights = ConcurrentHashMap<Int, Float>()
     private val names = ConcurrentHashMap<Int, String>()
+    private val nameEvidence = ConcurrentHashMap<Int, com.packabunch.packing.ScanLabelConsensus>()
     private val crops = ConcurrentHashMap<Int, Bitmap>()
     private val cropArea = ConcurrentHashMap<Int, Float>()
     private val measuredAt = ConcurrentHashMap<Int, Long>()
@@ -245,7 +231,6 @@ class ItemScanController(
     fun release() {
         scope.cancel()
         worker.shutdownNow()
-        tracer.shutdownNow()
         detector.close()
         session?.close()
         session = null
@@ -267,7 +252,7 @@ class ItemScanController(
     fun restart() = worker.execute {
         tracker.clear()
         smoother.clear()
-        names.clear(); crops.clear(); cropArea.clear(); measuredAt.clear(); planeHeights.clear()
+        names.clear(); nameEvidence.clear(); crops.clear(); cropArea.clear(); measuredAt.clear(); planeHeights.clear()
         publish(emptyList(), capReached = false)
     }
 
@@ -360,178 +345,161 @@ class ItemScanController(
     private class BoxSamples(val box: ScanBox, val pixels: IntArray, val world: FloatArray, val central: BooleanArray, val edge: BooleanArray,
                              val depths: IntArray, val spanPx: Float, val focalPx: Float, val inMask: BooleanArray?)
 
+    /** Copies all geometry while this ARCore frame is current. No Frame/Image escapes to a worker. */
     private fun sampleAndSubmit(frame: Frame, planes: List<Plane>, wallPlanes: List<Plane>) {
-        val camera = frame.camera
-        val pose = camera.pose
-
-        // Camera image: every processed frame goes to the detector; about once a second one is
-        // also turned into a picture first, for naming and the thumbnail.
+        if (!workerBusy.compareAndSet(false, true)) return
+        var image: android.media.Image? = null
         try {
-            val image = frame.acquireCameraImage()
-            if (frame.timestamp - lastNamingNs >= NAMING_INTERVAL_NS && needsNaming()) {
-                lastNamingNs = frame.timestamp
-                val picture = yuvToUprightBitmap(image, sensorRotationDegrees)
-                val boxes = detector.latest
-                if (picture != null) scope.launch { nameAndCrop(picture, boxes) }
+            val camera = frame.camera
+            val pose = camera.pose
+            val cam = floatArrayOf(pose.tx(), pose.ty(), pose.tz())
+            val walls = wallPlanes.map { p ->
+                val c = p.centerPose
+                WallPlane(c.translation, c.yAxis, c.xAxis, c.zAxis, p.extentX / 2, p.extentZ / 2)
             }
-            if (frame.timestamp - lastTraceNs >= TRACE_INTERVAL_NS && !tracing.get()) {
-                val engine = PythonEngine.tracer()
-                val boxes = detector.latest.filter { frame.timestamp - it.frameTimestampNs < MAX_BOX_AGE_NS && it.area <= MAX_BOX_AREA }
-                if (engine != null && boxes.isNotEmpty()) {
-                    val small = yuvToUprightBitmap(image, 0)?.let { full ->
-                        val w = TRACE_WIDTH; val h = (full.height * TRACE_WIDTH / full.width.toFloat()).toInt().coerceAtLeast(1)
-                        Bitmap.createScaledBitmap(full, w, h, true).also { if (it !== full) full.recycle() }
-                    }
-                    if (small != null) {
-                        lastTraceNs = frame.timestamp
-                        tracing.set(true)
-                        val at = frame.timestamp
-                        tracer.execute {
-                            try {
-                                val px = IntArray(small.width * small.height)
-                                small.getPixels(px, 0, small.width, 0, 0, small.width, small.height)
-                                val rgb = ByteArray(px.size * 3)
-                                for (i in px.indices) { val c = px[i]; rgb[3 * i] = (c shr 16).toByte(); rgb[3 * i + 1] = (c shr 8).toByte(); rgb[3 * i + 2] = c.toByte() }
-                                engine.segmentFrame(rgb, small.width, small.height, boxes.map { it.sensor })?.let { labels ->
-                                    traced = Traced(labels, small.width, small.height, boxes.map { it.trackingId }, boxes.map { it.sensor }, at)
-                                }
-                            } finally {
-                                small.recycle()
-                                tracing.set(false)
-                            }
-                        }
-                    }
+            val snaps = planes.map { p ->
+                val c = p.centerPose
+                val poly = p.polygon.let { buf -> FloatArray(buf.limit()).also { buf.rewind(); buf.get(it) } }
+                val world = FloatArray(poly.size)
+                for (i in 0 until poly.size / 2) {
+                    val v = c.transformPoint(floatArrayOf(poly[2 * i], 0f, poly[2 * i + 1]))
+                    world[2 * i] = v[0]; world[2 * i + 1] = v[2]
                 }
+                PlaneSnap(c.ty(), world)
             }
-            detector.offer(image, sensorRotationDegrees, frame.timestamp)
-        } catch (_: NotYetAvailableException) {
-        } catch (e: Exception) {
-            Log.w(AR_TAG, "camera image", e)
-        }
-
-        if (workerBusy.get()) return
-        // A box over most of the picture is ML Kit boxing the scene — the wall, the floor — not a thing.
-        val boxes = detector.latest.filter { frame.timestamp - it.frameTimestampNs < MAX_BOX_AGE_NS && it.area <= MAX_BOX_AREA }
-        if (boxes.isEmpty()) {
-            val hint = when {
-                detector.failed -> "Object detection couldn't run — reopen the scanner"
-                detector.latest.any { frame.timestamp - it.frameTimestampNs >= MAX_BOX_AGE_NS } -> "Detection is catching up — hold the phone steady"
-                detector.latest.isNotEmpty() -> "Step back until the whole object fits in view"
-                else -> "No object detected yet — show one whole object clearly"
-            }
-            _ui.value = _ui.value.copy(scanHint = hint)
-            diagnostics.record("no_usable_boxes", "detected=${detector.latest.size}, failed=${detector.failed}")
-        }
-        val walls = wallPlanes.map {
-            // A plane's own Y axis is its normal; X and Z run along it.
-            val c = it.centerPose
-            WallPlane(c.translation, c.yAxis, c.xAxis, c.zAxis, it.extentX / 2, it.extentZ / 2)
-        }
-        val snaps = planes.map { p ->
-            val c = p.centerPose
-            val poly = p.polygon.let { buf -> FloatArray(buf.limit()).also { buf.rewind(); buf.get(it) } }
-            // Polygon is in the plane's local X/Z; move it into world X/Z.
-            val world = FloatArray(poly.size)
-            val local = FloatArray(3); val out = FloatArray(3)
-            for (i in 0 until poly.size / 2) {
-                local[0] = poly[2 * i]; local[1] = 0f; local[2] = poly[2 * i + 1]
-                c.transformPoint(local, 0, out, 0)
-                world[2 * i] = out[0]; world[2 * i + 1] = out[2]
-            }
-            PlaneSnap(c.ty(), world)
-        }
-        val cam = floatArrayOf(pose.tx(), pose.ty(), pose.tz())
-
-        val samples = ArrayList<BoxSamples>()
-        try {
-            MeasurementDepth.acquire(frame).use { depth ->
-                if (depth.timestamp == lastDepthNs) return
+            val depth = MeasurementDepth.acquire(frame)
+            val captured = depth.use {
+                if (depth.timestamp == lastDepthNs) {
+                    workerBusy.set(false)
+                    return
+                }
                 lastDepthNs = depth.timestamp
                 val intr = camera.textureIntrinsics
                 val f = intr.focalLength; val pp = intr.principalPoint; val dim = intr.imageDimensions
                 val projection = DepthProjection.scaled(f[0], f[1], pp[0], pp[1], dim[0], dim[1], depth.width, depth.height)
-                val local = FloatArray(3); val world = FloatArray(3)
-                val focal = maxOf(projection.fx, projection.fy)
-                fun depthAt(u: Int, v: Int): Int =
-                    if (u < 0 || v < 0 || u >= depth.width || v >= depth.height) 0
-                    else depth.at(u, v)
                 val mapping = DepthImageMapping(frame)
-                val outline = traced?.takeIf { frame.timestamp - it.atNs < MAX_TRACE_AGE_NS }
-                for (box in boxes) {
-                    // This box's traced object: same tracking id, or failing that the same place.
-                    val label = outline?.let { t ->
-                        val byId = box.trackingId?.let { id -> t.ids.indexOf(id) }?.takeIf { i -> i >= 0 && (0..3).all { k -> kotlin.math.abs(t.boxes[i][k] - box.sensor[k]) < 0.025f } }
-                        (byId ?: t.boxes.indexOfFirst { b -> (0..3).all { k -> kotlin.math.abs(b[k] - box.sensor[k]) < 0.04f } }.takeIf { it >= 0 })?.plus(1)?.takeIf { it < t.availableLabels.size && t.availableLabels[it] }
-                    }
-                    val masked = ArrayList<Boolean>()
-                    val depthBox = mapping.depthBox(box.sensor)
-                    val w = depthBox[2] - depthBox[0]; val h = depthBox[3] - depthBox[1]
-                    val u0 = ((depthBox[0] + w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
-                    val u1 = ((depthBox[2] - w * SHRINK) * depth.width).toInt().coerceIn(0, depth.width - 1)
-                    val v0 = ((depthBox[1] + h * SHRINK) * depth.height).toInt().coerceIn(0, depth.height - 1)
-                    val v1 = ((depthBox[3] - h * SHRINK) * depth.height).toInt().coerceIn(0, depth.height - 1)
-                    if (u1 <= u0 || v1 <= v0) continue
-                    val step = if ((u1 - u0) * (v1 - v0) > 2400) 2 else 1
-                    val cu0 = u0 + (u1 - u0) * 0.3f; val cu1 = u1 - (u1 - u0) * 0.3f
-                    val cv0 = v0 + (v1 - v0) * 0.3f; val cv1 = v1 - (v1 - v0) * 0.3f
-                    // First pass: the raw depths, to find how far back the middle of the box is.
-                    val raw = ArrayList<Int>(); val rawMm = ArrayList<Int>(); val rawCentral = ArrayList<Boolean>()
-                    var v = v0
-                    while (v <= v1) {
-                        var u = u0
-                        while (u <= u1) {
-                            val mm = depth.at(u, v)
-                            if (mm in MIN_DEPTH_MM..MAX_DEPTH_MM) {
-                                raw += v * depth.width + u
-                                rawMm += mm
-                                rawCentral += u >= cu0 && u <= cu1 && v >= cv0 && v <= cv1
+                val pixels = ArrayList<DepthPixel>()
+                fun at(u: Int, v: Int) = if (u in 0 until depth.width && v in 0 until depth.height) depth.at(u, v) else 0
+                for (v in 0 until depth.height) for (u in 0 until depth.width) {
+                    val mm = at(u, v)
+                    if (mm !in MIN_DEPTH_MM..MAX_DEPTH_MM) continue
+                    val uv = mapping.imagePoint(u.toFloat() / depth.width, v.toFloat() / depth.height)
+                    if (uv[0] !in 0f..1f || uv[1] !in 0f..1f) continue
+                    val world = pose.transformPoint(projection.point(u, v, mm))
+                    if (walls.any { it.contains(world[0], world[1], world[2]) }) continue
+                    pixels += DepthPixel(v * depth.width + u, uv[0], uv[1], mm, world,
+                        DetectionPoints.isEdge(mm, at(u-1,v), at(u+1,v), at(u,v-1), at(u,v+1)))
+                }
+                pixels
+            }
+            image = frame.acquireCameraImage()
+            val focal = camera.imageIntrinsics.focalLength
+            val imageWidth = image.width
+            val imageHeight = image.height
+            val timestamp = frame.timestamp
+            val shouldName = timestamp - lastNamingNs >= NAMING_INTERVAL_NS
+            if (shouldName) lastNamingNs = timestamp
+            val ownedImage = image
+            image = null // detector owns and closes it, including on failure
+            detector.offer(ownedImage, sensorRotationDegrees, timestamp) { detected, detectedImage ->
+                if (worker.isShutdown || detectedImage == null) {
+                    detectedImage?.close()
+                    workerBusy.set(false)
+                } else {
+                    try {
+                        worker.execute {
+                            var capturedPicture: Bitmap? = null
+                            try {
+                                // Conversion and segmentation run off the rendering and main threads.
+                                val picture = yuvToUprightBitmap(detectedImage, 0) ?: error("Camera image conversion failed")
+                                capturedPicture = picture
+                                detectedImage.close()
+                                val boxes = detected.filter { it.frameTimestampNs == timestamp && it.area <= MAX_BOX_AREA }
+                                val samples = samplesForBoxes(captured, picture, boxes, imageWidth, imageHeight, focal)
+                                track(samples, snaps, cam)
+                                _ui.value = _ui.value.copy(scanHint = when {
+                                    detector.failed -> "Object detection couldn't run — reopen the scanner"
+                                    boxes.isEmpty() -> "Show the whole object and leave a little gap between items"
+                                    samples.isEmpty() -> "No usable depth on the object — try another angle"
+                                    else -> _ui.value.scanHint
+                                })
+                                diagnostics.record("matched_frame", "boxes=${boxes.size}, samples=${samples.sumOf { it.pixels.size }}")
+                                if (shouldName && boxes.isNotEmpty()) {
+                                    val upright = Bitmap.createBitmap(picture, 0, 0, picture.width, picture.height,
+                                        android.graphics.Matrix().apply { postRotate(sensorRotationDegrees.toFloat()) }, true)
+                                    // Copy if rotation is zero: this frame is recycled below.
+                                    val namingPicture = if (upright === picture) upright.copy(Bitmap.Config.ARGB_8888, false) else upright
+                                    val identities = tracker.all.map { it.id to it.trackingIds.toSet() }
+                                    scope.launch { try { nameAndCrop(namingPicture, boxes, identities) } finally { namingPicture.recycle() } }
+                                }
+                            } catch (e: Exception) {
+                                Log.e(AR_TAG, "matched frame processing failed", e)
+                            } finally {
+                                detectedImage.close()
+                                capturedPicture?.recycle()
+                                workerBusy.set(false)
                             }
-                            u += step
                         }
-                        v += step
+                    } catch (_: java.util.concurrent.RejectedExecutionException) {
+                        detectedImage.close()
+                        workerBusy.set(false)
                     }
-                    val depths = rawMm.toIntArray(); val centralArr = rawCentral.toBooleanArray()
-                    // Second pass: world points, nothing on a wall. Which depths are the object is the
-                    // engine's call (ScanMath.select), made on the worker thread.
-                    val px = ArrayList<Int>(); val pts = ArrayList<Float>(); val central = ArrayList<Boolean>(); val edge = ArrayList<Boolean>()
-                    val kept = ArrayList<Int>()
-                    for (k in depths.indices) {
-                        val mm = depths[k]
-                        val pix = raw[k]
-                        val pu = pix % depth.width; val pv = pix / depth.width
-                        val p = projection.point(pu, pv, mm)
-                        local[0] = p[0]; local[1] = p[1]; local[2] = p[2]
-                        pose.transformPoint(local, 0, world, 0)
-                        if (walls.any { w -> w.contains(world[0], world[1], world[2]) }) continue
-                        px += pix
-                        pts += world[0]; pts += world[1]; pts += world[2]
-                        central += centralArr[k]
-                        edge += DetectionPoints.isEdge(mm, depthAt(pu - 1, pv), depthAt(pu + 1, pv), depthAt(pu, pv - 1), depthAt(pu, pv + 1))
-                        kept += mm
-                        if (label != null && outline != null) {
-                            // Account for camera-image versus GPU/depth cropping.
-                            val uv = mapping.imagePoint(pu.toFloat() / depth.width, pv.toFloat() / depth.height)
-                            val mx = (uv[0] * outline.width).toInt().coerceIn(0, outline.width - 1)
-                            val my = (uv[1] * outline.height).toInt().coerceIn(0, outline.height - 1)
-                            masked += (outline.labels[my * outline.width + mx].toInt() and 0xff) == label
-                        }
-                    }
-                    if (px.isNotEmpty()) samples += BoxSamples(box, px.toIntArray(), pts.toFloatArray(), central.toBooleanArray(), edge.toBooleanArray(),
-                        kept.toIntArray(), maxOf(u1 - u0, v1 - v0).toFloat(), focal, if (label != null) masked.toBooleanArray() else null)
                 }
             }
         } catch (_: NotYetAvailableException) {
             _ui.value = _ui.value.copy(scanHint = "Waiting for depth — move slowly sideways")
             diagnostics.record("depth_unavailable")
-            return
+            workerBusy.set(false)
+        } catch (e: Exception) {
+            Log.w(AR_TAG, "capture scan frame", e)
+            workerBusy.set(false)
+        } finally {
+            image?.close()
         }
-        if (boxes.isNotEmpty()) _ui.value = _ui.value.copy(scanHint = if (samples.isEmpty()) "No usable depth on the object — try another angle" else null)
-        diagnostics.record("depth_sampled", "boxes=${boxes.size}, samples=${samples.sumOf { it.pixels.size }}")
-        if (samples.isEmpty() && tracker.all.isEmpty()) return
-        workerBusy.set(true)
-        worker.execute {
-            try { track(samples, snaps, cam) } catch (t: Throwable) { Log.e(AR_TAG, "item tracking failed", t) } finally { workerBusy.set(false) }
+    }
+
+    private data class DepthPixel(val index: Int, val u: Float, val v: Float, val mm: Int, val world: FloatArray, val edge: Boolean)
+
+    /** Detector boxes, colour masks and depth now refer to one exposure, even if detection is slow. */
+    private fun samplesForBoxes(pixels: List<DepthPixel>, picture: Bitmap, boxes: List<ScanBox>,
+                                imageWidth: Int, imageHeight: Int, focal: FloatArray): List<BoxSamples> {
+        if (boxes.isEmpty()) return emptyList()
+        val small = Bitmap.createScaledBitmap(picture, TRACE_WIDTH,
+            (picture.height * TRACE_WIDTH / picture.width.toFloat()).toInt().coerceAtLeast(1), true)
+        val labels = try {
+            val argb = IntArray(small.width * small.height)
+            small.getPixels(argb, 0, small.width, 0, 0, small.width, small.height)
+            val rgb = ByteArray(argb.size * 3)
+            for (i in argb.indices) {
+                rgb[3*i] = (argb[i] shr 16).toByte(); rgb[3*i+1] = (argb[i] shr 8).toByte(); rgb[3*i+2] = argb[i].toByte()
+            }
+            PythonEngine.tracer()?.segmentFrame(rgb, small.width, small.height, boxes.map { it.sensor })
+        } catch (e: Exception) {
+            Log.w(AR_TAG, "trace object", e)
+            null
         }
+        val present = BooleanArray(256)
+        labels?.forEach { present[it.toInt() and 0xff] = true }
+        val result = boxes.mapIndexedNotNull { index, box ->
+            val b = box.sensor
+            val w = b[2] - b[0]; val h = b[3] - b[1]
+            val kept = pixels.filter { it.u in (b[0]+w*SHRINK)..(b[2]-w*SHRINK) && it.v in (b[1]+h*SHRINK)..(b[3]-h*SHRINK) }
+            if (kept.isEmpty()) return@mapIndexedNotNull null
+            val widthPx = w * imageWidth; val heightPx = h * imageHeight
+            val useWidth = widthPx / focal[0] >= heightPx / focal[1]
+            BoxSamples(box, kept.map { it.index }.toIntArray(), kept.flatMap { it.world.toList() }.toFloatArray(),
+                BooleanArray(kept.size) { val p = kept[it]; p.u in (b[0]+w*.3f)..(b[2]-w*.3f) && p.v in (b[1]+h*.3f)..(b[3]-h*.3f) },
+                BooleanArray(kept.size) { kept[it].edge }, kept.map { it.mm }.toIntArray(),
+                if (useWidth) widthPx else heightPx, if (useWidth) focal[0] else focal[1],
+                if (labels != null && present[index+1]) BooleanArray(kept.size) {
+                    val p = kept[it]
+                    val x = (p.u * small.width).toInt().coerceIn(0, small.width-1)
+                    val y = (p.v * small.height).toInt().coerceIn(0, small.height-1)
+                    (labels[y * small.width+x].toInt() and 0xff) == index+1
+                } else null)
+        }
+        if (small !== picture) small.recycle()
+        return result
     }
 
     // -- tracking (worker thread) ----------------------------------------------------------------
@@ -560,6 +528,7 @@ class ItemScanController(
         }
         val defaultY = obsPlaneY.firstOrNull() ?: planes.maxOfOrNull { if (it.y < cam[1]) it.y else Float.NEGATIVE_INFINITY } ?: return
         val update = tracker.update(observations, PlaneFrame(0f, defaultY, 0f, ALONG, UP).toPlane(cam[0], cam[1], cam[2]))
+        _ui.value = _ui.value.copy(scanHint = null)
         if (observations.isEmpty() && samples.isNotEmpty()) {
             _ui.value = _ui.value.copy(scanHint = "Object depth isn't clear of its surface — try another angle")
         }
@@ -578,7 +547,7 @@ class ItemScanController(
         val zs = keep.map { bs.world[3 * it + 2] }.sorted()
         val my = ys[ys.size / 2]; val mx = xs[xs.size / 2]; val mz = zs[zs.size / 2]
         val below = planes.filter { it.y < my - 0.005f }
-        return (below.filter { inside(it.polygonXZ, mx, mz) }.maxByOrNull { it.y } ?: below.maxByOrNull { it.y })?.y
+        return below.filter { inside(it.polygonXZ, mx, mz) }.maxByOrNull { it.y }?.y
     }
 
     /** Hands the confirmed [tracks] to the screen and the renderer, each in its steadied state. */
@@ -598,14 +567,8 @@ class ItemScanController(
 
     // -- naming ------------------------------------------------------------------------------------
 
-    private fun needsNaming(): Boolean = drawn.any { !names.containsKey(it.id) || !crops.containsKey(it.id) }
-
     /** Labels each object's own crop on the phone, and keeps the best crop as its photo. */
-    private suspend fun nameAndCrop(picture: Bitmap, boxes: List<ScanBox>) {
-        // The tracker belongs to the worker thread; ask it rather than reading across threads.
-        val tracks = runCatching {
-            worker.submit<List<Pair<Int, Set<Int>>>> { tracker.all.map { it.id to it.trackingIds.toSet() } }.get()
-        }.getOrElse { return }
+    private suspend fun nameAndCrop(picture: Bitmap, boxes: List<ScanBox>, tracks: List<Pair<Int, Set<Int>>>) {
         for ((id, ids) in tracks) {
             val box = boxes.firstOrNull { b -> b.trackingId != null && b.trackingId in ids } ?: continue
             val area = box.area
@@ -614,16 +577,18 @@ class ItemScanController(
                 crops[id] = crop
                 cropArea[id] = area
             }
-            if (names.containsKey(id) || !naming.add(id)) continue
+            if (!naming.add(id)) continue
             try {
-                recogniser.recognise(crop).suggestedName()?.let { names[id] = it }
+                val label = recogniser.scanCategory(crop)
+                val agreed = nameEvidence.getOrPut(id) { com.packabunch.packing.ScanLabelConsensus() }.observe(label)
+                if (agreed == null) names.remove(id) else names[id] = agreed
             } catch (e: Exception) {
                 Log.w(AR_TAG, "naming", e)
             } finally {
                 naming.remove(id)
             }
         }
-        worker.execute { publish(tracker.all.filter { it.isConfirmed }, _ui.value.capReached) }
+        if (!worker.isShutdown) runCatching { worker.execute { publish(tracker.all.filter { it.isConfirmed }, _ui.value.capReached) } }
     }
 
     // -- drawing (GL thread) -----------------------------------------------------------------------
@@ -782,12 +747,9 @@ class ItemScanController(
         val UP = floatArrayOf(0f, 1f, 0f)
         const val PROCESS_INTERVAL_NS = 100_000_000L
         const val NAMING_INTERVAL_NS = 1_000_000_000L
-        const val MAX_BOX_AGE_NS = 400_000_000L
         /** Outlines are traced in the picture this often, on a frame this many pixels wide. */
-        const val TRACE_INTERVAL_NS = 250_000_000L
         const val TRACE_WIDTH = 240
         /** An outline older than this is from a view the phone has moved on from. */
-        const val MAX_TRACE_AGE_NS = 400_000_000L
         const val MIN_DEPTH_MM = 150
         /**
          * Items are scanned at arm's length. Past this the depth is mostly the room behind the
@@ -834,7 +796,7 @@ class ItemScanController(
 
         /** The object's own pixels from the upright picture, with a little margin. */
         fun cropUpright(frame: Bitmap, box: FloatArray): Bitmap? {
-            val m = 0.04f
+            val m = 0.01f
             val x = ((box[0] - m) * frame.width).toInt().coerceIn(0, frame.width - 1)
             val y = ((box[1] - m) * frame.height).toInt().coerceIn(0, frame.height - 1)
             val w = ((box[2] - box[0] + 2 * m) * frame.width).toInt().coerceAtMost(frame.width - x)

@@ -968,6 +968,12 @@ def fit_space(x, y, h, weights=None, cameras=()):
         return float(np.unique(ia * nb + ib).size / (na * nb))
 
     coverage = {f: cover(f) for f in FACES}
+    # A range endpoint is only a provisional bound. A thin observed patch can be
+    # close to several fitted faces at once; that does not mean those walls exist.
+    for face, evidence in (("LEFT", left_s), ("RIGHT", right_s),
+                           ("BACK", back_s), ("FRONT", front_s)):
+        if evidence[1] == 0:
+            coverage[face] = 0.0
 
     opening = None
     if not cam_inside:

@@ -54,17 +54,22 @@ class ItemScanDetector {
     var latest: List<ScanBox> = emptyList()
         private set
 
-    /** Takes ownership of [image] and closes it once ML Kit is done with it. */
-    fun offer(image: Image, rotationDegrees: Int, timestampNs: Long) {
-        if (!busy.compareAndSet(false, true)) { image.close(); return }
+    /** Transfers [image] to [onResult] after detection; the receiver closes it after copying pixels. */
+    fun offer(image: Image, rotationDegrees: Int, timestampNs: Long, onResult: (List<ScanBox>, Image?) -> Unit) {
+        if (!busy.compareAndSet(false, true)) { image.close(); onResult(emptyList(), null); return }
         val sensorW = image.width
         val sensorH = image.height
         val input = runCatching { InputImage.fromMediaImage(image, rotationDegrees) }.getOrNull()
-        if (input == null) { image.close(); busy.set(false); return }
+        if (input == null) { image.close(); busy.set(false); onResult(emptyList(), null); return }
         val swapped = rotationDegrees == 90 || rotationDegrees == 270
         val uprightW = (if (swapped) sensorH else sensorW).toFloat()
         val uprightH = (if (swapped) sensorW else sensorH).toFloat()
-        detector.process(input)
+        val task = try { detector.process(input) } catch (e: Exception) {
+            image.close(); busy.set(false); failed = true; latest = emptyList()
+            onResult(emptyList(), null)
+            return
+        }
+        task
             .addOnSuccessListener { objects ->
                 failed = false
                 latest = objects.map { o ->
@@ -89,8 +94,8 @@ class ItemScanDetector {
                 android.util.Log.w(AR_TAG, "item detect failed", it)
             }
             .addOnCompleteListener {
-                image.close()
                 busy.set(false)
+                try { onResult(latest, image) } catch (e: Exception) { image.close(); throw e }
             }
     }
 

@@ -307,7 +307,12 @@ object SpaceFitter {
             }
             return hit.count { it } / hit.size.toFloat()
         }
-        val coverage = SpaceFace.entries.associateWith { cover(it) }
+        val sides = mapOf(SpaceFace.LEFT to leftSide, SpaceFace.RIGHT to rightSide,
+            SpaceFace.BACK to backSide, SpaceFace.FRONT to frontSide)
+        // A provisional range endpoint is not evidence that a wall was observed.
+        val coverage = SpaceFace.entries.associateWith { face ->
+            if (sides[face]?.count == 0) 0f else cover(face)
+        }
 
         // The opening: the front, when the camera looked in from outside. Its height is what is
         // left above the sill — the highest thing standing along the front edge.
