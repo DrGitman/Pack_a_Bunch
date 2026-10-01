@@ -59,7 +59,7 @@ class AppViewModel(
     val syncState = cloudSync?.state ?: MutableStateFlow(com.packabunch.data.cloud.CloudSyncState()).asStateFlow()
     fun syncNow() { viewModelScope.launch { cloudSync?.sync() } }
 
-    // -- Pack a Bunch Pro ------------------------------------------------------------------------
+    // -- Pack Plus ------------------------------------------------------------------------
 
     private val _plans = MutableStateFlow<List<com.packabunch.billing.PlanOffer>>(emptyList())
     /** Empty until Google Play returns real, localised products. The paywall stays disabled. */

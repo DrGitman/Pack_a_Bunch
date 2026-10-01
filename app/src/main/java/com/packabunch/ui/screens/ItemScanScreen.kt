@@ -259,7 +259,7 @@ fun ItemScanOverlay(
                         continue
                     }
                 }
-                val (text, badge, progress) = tagFor(item.state, name)
+                val (text, badge, progress) = tagFor(item.state, name, item.faceSize)
                 add(AnchoredLabel("t${a.id}", a.x, a.y, AnchorAlign.Above) {
                     ObjectTag(
                         text = text,
@@ -358,16 +358,17 @@ private fun focusedMeasured(items: List<ScanItem>, anchors: List<ScanAnchor>, ta
 
 private data class TagText(val text: String, val badge: ScanBadge, val progress: Float)
 
-private fun tagFor(state: ItemScanState, name: String): TagText = when (state) {
+private fun tagFor(state: ItemScanState, name: String, face: com.packabunch.ar.FaceSize? = null): TagText = when (state) {
     is ItemScanState.Measured -> TagText(name, ScanBadge.Measured, 1f)
     // The size is known long before it is final, so show it as it firms up rather than holding it
     // back until "measured". The "~" says it may still move.
     is ItemScanState.Scanning -> TagText(
-        state.fit?.let { "$name · ${liveSize(it)}" } ?: "$name · scanning",
+        face?.let { "$name · ${faceSizeText(it)}" }
+            ?: state.fit?.let { "$name · ${liveSize(it)}" } ?: "$name · scanning",
         ScanBadge.Working, state.progress,
     )
     is ItemScanState.NeedsAngle -> TagText(
-        "$name · ${liveSize(state.fit)} · " + when (state.hint) {
+        "$name · ${face?.let(::faceSizeText) ?: liveSize(state.fit)} · " + when (state.hint) {
             AngleHint.TILT_DOWN -> "tilt down"
             AngleHint.STEP_AROUND -> "step around"
             AngleHint.STEP_BACK -> "step back"
@@ -647,4 +648,10 @@ private fun DrawScope.drawPreviewObject(fit: FittedObject, solid: Float, shown: 
 private fun liveSize(fit: com.packabunch.packing.FittedObject): String {
     fun cm(mm: Float) = "%.0f".format(mm / 10f)
     return "~${cm(fit.widthMm)} × ${cm(fit.depthMm)} × ${cm(fit.heightMm)} cm"
+}
+
+/** HarshdeepJ's w·d/f size: W and H from the front, D after a side view ("?" until then). */
+private fun faceSizeText(f: com.packabunch.ar.FaceSize): String {
+    fun cm(mm: Float) = "%.0f".format(mm / 10f)
+    return "~${cm(f.widthMm)} × ${f.depthMm?.let(::cm) ?: "?"} × ${cm(f.heightMm)} cm"
 }

@@ -18,7 +18,10 @@ import com.google.ar.core.exceptions.NotYetAvailableException
 import com.google.ar.core.exceptions.UnavailableException
 import com.packabunch.packing.StandingObjects
 import com.packabunch.packing.SensorBox
+import com.packabunch.packing.DepthEdgeObjects
+import com.packabunch.packing.TwoViewSize
 import com.packabunch.packing.SupportPlane
+import com.packabunch.packing.YoloxDecode
 import com.packabunch.packing.Axis
 import com.packabunch.packing.BoxDepth
 import com.packabunch.packing.DetectionPoints
@@ -57,7 +60,11 @@ data class ScanItem(
     val thumbnail: Bitmap?,
     /** The current fit, in the shared plan frame — what the live 3D preview draws. */
     val fit: FittedObject? = null,
+    /** HarshdeepJ's front-and-side size: W and H from the front, D once a side has been seen. */
+    val faceSize: FaceSize? = null,
 )
+
+data class FaceSize(val widthMm: Float, val depthMm: Float?, val heightMm: Float)
 
 /**
  * Where an object's labels go, in 0..1 of the view, refreshed every frame: the tag above it,
@@ -170,6 +177,13 @@ class ItemScanController(
     private val naming = java.util.Collections.newSetFromMap(ConcurrentHashMap<Int, Boolean>())
     private val recogniser by lazy { com.packabunch.data.catalogue.ItemRecogniser() }
 
+    /** YOLOX-Tiny, bundled, for names. Created on first use: loading takes a moment. */
+    @Volatile private var yolo: YoloxDetector? = null
+    private val yoloBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** Each object's box in this frame's upright picture, for naming and its photo. */
+    @Volatile private var frameBoxes: Map<Int, FloatArray> = emptyMap()
+
     private var viewportW = 1
     private var viewportH = 1
     private var displayRotation = 0
@@ -235,6 +249,7 @@ class ItemScanController(
         scope.cancel()
         worker.shutdownNow()
         detector.close()
+        yolo?.close(); yolo = null
         session?.close()
         session = null
     }
@@ -415,10 +430,14 @@ class ItemScanController(
             val standingY = inView?.y ?: snaps.firstOrNull()?.y
             // Objects from geometry, independent of the detector: whatever stands on that surface.
             val standing = standingY?.let { StandingObjects.find(world, uvs, it) }.orEmpty()
+            // HarshdeepJ's method, primary: objects from edges in the dense depth image, sized by w·d/f.
+            val faces = depthEdgeObjects(frame, standingY)
+            val yaw = camera.pose.zAxis.let { z -> Math.toDegrees(kotlin.math.atan2(-z[0], -z[2]).toDouble()).toFloat() }
             if (support.isNotEmpty() && !_ui.value.surfaceFound) {
                 _ui.value = _ui.value.copy(surfaceFound = true)
             }
-            diagnostics.record("support", "arcore=${snaps.size} used=${support.size} depth=${captured.size} standing=${standing.size}")
+            diagnostics.record("support", "arcore=${snaps.size} used=${support.size} depth=${captured.size} standing=${standing.size} " +
+                "faces=" + faces.joinToString { (_, o) -> "%.0fx%.0fmm@%dmm".format(o.widthMm, o.heightMm, o.depthMm) })
             image = frame.acquireCameraImage()
             val focal = camera.imageIntrinsics.focalLength
             val imageWidth = image.width
@@ -441,17 +460,27 @@ class ItemScanController(
                                 val picture = yuvToUprightBitmap(detectedImage, 0) ?: error("Camera image conversion failed")
                                 capturedPicture = picture
                                 detectedImage.close()
+                                // ML Kit's boxes, each carrying the HarshdeepJ size of the depth object it covers.
                                 val named = detected.filter { it.frameTimestampNs == timestamp && it.area <= MAX_BOX_AREA }
+                                    .map { b ->
+                                        val face = faces.maxByOrNull { StandingObjects.overlap(b.sensor, it.first) }
+                                            ?.takeIf { StandingObjects.overlap(b.sensor, it.first) > DEPTH_BOX_MATCH }?.second
+                                        if (face == null) b else ScanBox(b.trackingId, b.sensor, b.upright, b.frameTimestampNs,
+                                            floatArrayOf(face.widthMm, face.heightMm))
+                                    }
                                 // The detector goes blind in dim light while depth does not, so it
-                                // must never be the only way an object gets measured. Anything
-                                // standing on the table that it missed is added unnamed.
-                                val fromDepth = standing
-                                    .filter { s -> named.none { StandingObjects.overlap(it.sensor, s.box) > DEPTH_BOX_MATCH } }
-                                    .map { ScanBox(null, it.box, SensorBox.sensorToUpright(it.box, sensorRotationDegrees), timestamp) }
+                                // must never be the only way an object gets measured. Depth-edge
+                                // objects first; the standing-on-the-table finder only if those
+                                // found nothing, as HarshdeepJ falls back stage by stage.
+                                val fromFaces: List<Pair<FloatArray, FloatArray?>> = faces.map { (box, o) -> box to floatArrayOf(o.widthMm, o.heightMm) }
+                                val fromStanding: List<Pair<FloatArray, FloatArray?>> = standing.map { it.box to null }
+                                val fromDepth = fromFaces.ifEmpty { fromStanding }
+                                    .filter { (box, _) -> named.none { StandingObjects.overlap(it.sensor, box) > DEPTH_BOX_MATCH } }
+                                    .map { (box, face) -> ScanBox(null, box, SensorBox.sensorToUpright(box, sensorRotationDegrees), timestamp, face) }
                                     .filter { it.area <= MAX_BOX_AREA }
                                 val boxes = named + fromDepth
                                 val samples = samplesForBoxes(captured, picture, boxes, imageWidth, imageHeight, focal)
-                                track(samples, support, cam)
+                                track(samples, support, cam, yaw)
                                 _ui.value = _ui.value.copy(scanHint = when {
                                     detector.failed -> "Object detection couldn't run — reopen the scanner"
                                     boxes.isEmpty() -> "Show the whole object and leave a little gap between items"
@@ -459,13 +488,13 @@ class ItemScanController(
                                     else -> _ui.value.scanHint
                                 })
                                 diagnostics.record("matched_frame", "boxes=${boxes.size}, samples=${samples.sumOf { it.pixels.size }}")
-                                if (shouldName && boxes.isNotEmpty()) {
+                                if (shouldName && frameBoxes.isNotEmpty() && !yoloBusy.get()) {
                                     val upright = Bitmap.createBitmap(picture, 0, 0, picture.width, picture.height,
                                         android.graphics.Matrix().apply { postRotate(sensorRotationDegrees.toFloat()) }, true)
                                     // Copy if rotation is zero: this frame is recycled below.
                                     val namingPicture = if (upright === picture) upright.copy(Bitmap.Config.ARGB_8888, false) else upright
-                                    val identities = tracker.all.map { it.id to it.trackingIds.toSet() }
-                                    scope.launch { try { nameAndCrop(namingPicture, boxes, identities) } finally { namingPicture.recycle() } }
+                                    val tracksNow = frameBoxes
+                                    scope.launch { try { nameAndCrop(namingPicture, tracksNow) } finally { namingPicture.recycle() } }
                                 }
                             } catch (e: Exception) {
                                 Log.e(AR_TAG, "matched frame processing failed", e)
@@ -539,9 +568,10 @@ class ItemScanController(
 
     // -- tracking (worker thread) ----------------------------------------------------------------
 
-    private fun track(samples: List<BoxSamples>, planes: List<PlaneSnap>, cam: FloatArray) {
+    private fun track(samples: List<BoxSamples>, planes: List<PlaneSnap>, cam: FloatArray, yaw: Float) {
         val claimed = HashSet<Int>()
         val observations = ArrayList<ItemTracker.Observation>()
+        val observedBoxes = ArrayList<ScanBox>()
         val obsPlaneY = ArrayList<Float>()
         // Smallest boxes first: a mug in front of a carton keeps its own pixels.
         for (bs in samples.sortedBy { it.box.area }) {
@@ -559,6 +589,7 @@ class ItemScanController(
             val b = bs.box.sensor
             val whole = b[0] > EDGE_OF_PICTURE && b[1] > EDGE_OF_PICTURE && b[2] < 1 - EDGE_OF_PICTURE && b[3] < 1 - EDGE_OF_PICTURE
             observations += ItemTracker.Observation(bs.box.trackingId, picked.map { list[it].point }, frame.toPlane(cam[0], cam[1], cam[2]), whole)
+            observedBoxes += bs.box
             obsPlaneY += planeY
         }
         val defaultY = obsPlaneY.firstOrNull() ?: planes.maxOfOrNull { if (it.y < cam[1]) it.y else Float.NEGATIVE_INFINITY } ?: return
@@ -567,11 +598,14 @@ class ItemScanController(
         if (observations.isEmpty() && samples.isNotEmpty()) {
             _ui.value = _ui.value.copy(scanHint = "Object depth isn't clear of its surface — try another angle")
         }
-        diagnostics.record("selected", "sampleBoxes=${samples.size}, observations=${observations.size}, tracks=${update.visible.size}")
+        diagnostics.record("selected", "sampleBoxes=${samples.size}, observations=${observations.size}, tracks=" +
+            update.visible.joinToString { t -> "${t.id}:${t.measurement.state::class.simpleName}" })
         for ((obsIndex, trackId) in update.assigned) {
             val y = obsPlaneY[obsIndex]
             planeHeights[trackId] = planeHeights[trackId]?.let { it * 0.8f + y * 0.2f } ?: y
+            observedBoxes[obsIndex].faceMm?.let { f -> faceViews.getOrPut(trackId) { TwoViewSize() }.add(yaw, f[0], f[1]) }
         }
+        frameBoxes = update.assigned.entries.associate { (obsIndex, trackId) -> trackId to observedBoxes[obsIndex].upright }
         publish(update.visible, update.capReached)
     }
 
@@ -586,6 +620,46 @@ class ItemScanController(
     }
 
     /** Hands the confirmed [tracks] to the screen and the renderer, each in its steadied state. */
+    /** Per track, every view's HarshdeepJ face size, fused front-and-side. */
+    private val faceViews = java.util.concurrent.ConcurrentHashMap<Int, TwoViewSize>()
+
+    /**
+     * HarshdeepJ's detector on ARCore's dense depth image — the smoothed, hole-free depth, the
+     * phone's equivalent of their MiDaS map, and already in millimetres so no reference card.
+     * Returns each object's box in 0..1 sensor space with its measurement.
+     */
+    private fun depthEdgeObjects(frame: Frame, supportY: Float?): List<Pair<FloatArray, DepthEdgeObjects.Found>> {
+        val image = try { frame.acquireDepthImage16Bits() } catch (e: Exception) { return emptyList() }
+        image.use {
+            val w = image.width; val h = image.height
+            val plane = image.planes[0]
+            val buf = plane.buffer.duplicate().order(java.nio.ByteOrder.LITTLE_ENDIAN)
+            val depth = IntArray(w * h) { i -> buf.getShort((i / w) * plane.rowStride + (i % w) * plane.pixelStride).toInt() and 0xFFFF }
+            val camera = frame.camera
+            val intr = camera.textureIntrinsics
+            val f = intr.focalLength; val pp = intr.principalPoint; val dim = intr.imageDimensions
+            val projection = DepthProjection.scaled(f[0], f[1], pp[0], pp[1], dim[0], dim[1], w, h)
+            val pose = camera.pose
+            // The table closes each object's open bottom edge: anything at its height is background.
+            val background = supportY?.let { sy ->
+                BooleanArray(w * h) { i ->
+                    val d = depth[i]
+                    d > 0 && pose.transformPoint(projection.point(i % w, i / w, d))[1] - sy < StandingObjects.MIN_HEIGHT_M
+                }
+            }
+            val mapping = DepthImageMapping(frame)
+            return DepthEdgeObjects.find(depth, w, h, projection.fx, projection.fy, background).map { o ->
+                var l = 1f; var t = 1f; var r = 0f; var b = 0f
+                for (u in floatArrayOf(o.left.toFloat() / w, o.right.toFloat() / w))
+                    for (v in floatArrayOf(o.top.toFloat() / h, o.bottom.toFloat() / h)) {
+                        val q = mapping.imagePoint(u, v)
+                        l = minOf(l, q[0]); r = maxOf(r, q[0]); t = minOf(t, q[1]); b = maxOf(b, q[1])
+                    }
+                floatArrayOf(l.coerceIn(0f, 1f), t.coerceIn(0f, 1f), r.coerceIn(0f, 1f), b.coerceIn(0f, 1f)) to o
+            }
+        }
+    }
+
     private fun publish(tracks: List<ItemTracker.Track>, capReached: Boolean) {
         val now = System.currentTimeMillis()
         smoother.retain(tracks.map { it.id }.toSet())
@@ -595,33 +669,48 @@ class ItemScanController(
             val y = planeHeights[t.id] ?: return@mapNotNull null
             TrackSnapshot(t.id, shown.getValue(t.id), t.fit, y, measuredAt[t.id])
         }
-        val items = tracks.map { t -> ScanItem(t.id, names[t.id], shown.getValue(t.id), t.fit?.shape, crops[t.id], t.fit) }
+        val items = tracks.map { t ->
+            val face = faceViews[t.id]?.let { v ->
+                val w = v.widthMm; val h = v.heightMm
+                if (w != null && h != null) FaceSize(w, v.depthMm, h) else null
+            }
+            ScanItem(t.id, names[t.id], shown.getValue(t.id), t.fit?.shape, crops[t.id], t.fit, face)
+        }
         val u = _ui.value
         _ui.value = u.copy(items = items, capReached = capReached || (u.capReached && tracks.size >= u.maxItems))
     }
 
     // -- naming ------------------------------------------------------------------------------------
 
-    /** Labels each object's own crop on the phone, and keeps the best crop as its photo. */
-    private suspend fun nameAndCrop(picture: Bitmap, boxes: List<ScanBox>, tracks: List<Pair<Int, Set<Int>>>) {
-        for ((id, ids) in tracks) {
-            val box = boxes.firstOrNull { b -> b.trackingId != null && b.trackingId in ids } ?: continue
-            val area = box.area
-            val crop = cropUpright(picture, box.upright) ?: continue
-            if (area > (cropArea[id] ?: 0f)) {
-                crops[id] = crop
-                cropArea[id] = area
-            }
-            if (!naming.add(id)) continue
-            try {
-                val label = recogniser.scanCategory(crop)
-                val agreed = nameEvidence.getOrPut(id) { com.packabunch.packing.ScanLabelConsensus() }.observe(label)
-                if (agreed == null) names.remove(id) else names[id] = agreed
+    /**
+     * Names every tracked object with YOLOX and keeps its best crop as its photo.
+     *
+     * One detection pass over the whole picture, then each object takes the name of the YOLOX box
+     * that overlaps it. A name must win 3 of the last 5 looks before it shows, and once earned it
+     * only changes if a different name wins — a missed frame never wipes it.
+     */
+    private suspend fun nameAndCrop(picture: Bitmap, tracks: Map<Int, FloatArray>) {
+        if (!yoloBusy.compareAndSet(false, true)) return
+        try {
+            val detections = try {
+                (yolo ?: YoloxDetector(context).also { yolo = it }).detect(picture)
             } catch (e: Exception) {
-                Log.w(AR_TAG, "naming", e)
-            } finally {
-                naming.remove(id)
+                Log.w(AR_TAG, "yolox", e); emptyList()
             }
+            diagnostics.record("yolox", detections.joinToString { "${it.label}:%.2f".format(it.score) })
+            for ((id, box) in tracks) {
+                val area = (box[2] - box[0]) * (box[3] - box[1])
+                cropUpright(picture, box)?.let { crop ->
+                    if (area > (cropArea[id] ?: 0f)) { crops[id] = crop; cropArea[id] = area }
+                }
+                val match = detections.maxByOrNull { StandingObjects.overlap(it.box, box) }
+                    ?.takeIf { StandingObjects.overlap(it.box, box) > NAME_MATCH }
+                val agreed = nameEvidence.getOrPut(id) { com.packabunch.packing.ScanLabelConsensus() }
+                    .observe(match?.let { YoloxDecode.itemName(it.label) })
+                if (agreed != null) names[id] = agreed
+            }
+        } finally {
+            yoloBusy.set(false)
         }
         if (!worker.isShutdown) runCatching { worker.execute { publish(tracker.all.filter { it.isConfirmed }, _ui.value.capReached) } }
     }
@@ -783,6 +872,8 @@ class ItemScanController(
         const val PROCESS_INTERVAL_NS = 100_000_000L
         /** A depth-found object overlapping a detector box this much is the same object. */
         const val DEPTH_BOX_MATCH = 0.3f
+        /** A YOLOX box overlapping an object this much names it. */
+        const val NAME_MATCH = 0.3f
         const val NAMING_INTERVAL_NS = 1_000_000_000L
         /** Outlines are traced in the picture this often, on a frame this many pixels wide. */
         const val TRACE_WIDTH = 240

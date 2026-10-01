@@ -1,0 +1,4 @@
+yolox_tiny.onnx — YOLOX-Tiny object detector, trained on COCO (80 classes).
+Copyright (c) Megvii Inc. Licensed under the Apache License, Version 2.0.
+Source: https://github.com/Megvii-BaseDetection/YOLOX (release 0.1.1rc0)
+License: https://www.apache.org/licenses/LICENSE-2.0

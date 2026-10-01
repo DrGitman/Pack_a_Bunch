@@ -67,6 +67,18 @@ class StandingObjectsTest {
     }
 
     @Test
+    fun `the table edge running out of shot is not an item`() {
+        // A long low ridge crossing the whole picture, like the front edge of the table on the phone.
+        val found = Scene().apply {
+            surface()
+            item(0f, 0.30f, 1.2f, 0.04f, 0.05f, n = 800)
+            item(-0.12f, 0f, 0.08f, 0.08f, 0.12f)           // the cup, fully in view
+        }.find()
+
+        assertEquals(1, found.size, "only the cup; the ridge touches the frame border")
+    }
+
+    @Test
     fun `a few stray points above the table are not an object`() {
         val scene = Scene().apply {
             surface()

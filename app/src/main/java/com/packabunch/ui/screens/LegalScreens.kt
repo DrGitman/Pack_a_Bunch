@@ -120,7 +120,7 @@ private val privacySections = listOf(
         listOf(
             "Supabase stores your account and your packs for us. They hold the data on their " +
                 "servers so that your packs are still there if you lose your phone.",
-            "Google Play and RevenueCat handle payment if you buy Pack a Bunch Pro. They tell us " +
+            "Google Play and RevenueCat handle payment if you buy Pack Plus. They tell us " +
                 "only whether your subscription is active. We never see your card details.",
             "If you choose to sign in with Google, Google confirms who you are. We receive your " +
                 "email address and nothing more.",
@@ -190,12 +190,12 @@ private val termsSections = listOf(
         ),
     ),
     Section(
-        "Pack a Bunch Pro",
+        "Pack Plus",
         listOf(
             "The free plan keeps up to five saved packs, with up to 20 pieces each. Pack a Bunch " +
-                "Pro lifts those caps.",
+                "Pack Plus lifts those caps.",
             "If you subscribe, Google Play takes the payment and renews it each month until you " +
-                "cancel. You can cancel at any time in Google Play, and you keep Pro until the " +
+                "cancel. You can cancel at any time in Google Play, and you keep Pack Plus until the " +
                 "month you paid for runs out.",
             "Refunds are handled by Google Play under their rules, not by us.",
             "If the price changes, Google Play will tell you before you are charged the new one.",

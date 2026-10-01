@@ -32,6 +32,12 @@ object StandingObjects {
     /** A little margin around the found box, since depth thins out at an object's edges. */
     private const val PAD = 0.01f
 
+    /** Within this of the picture's edge, an object has run out of shot. */
+    const val BORDER = 0.01f
+
+    /** A box covering more of the picture than this is the scene, not an item. */
+    const val MAX_FRAME_SHARE = 0.5f
+
     /** A found object: its box in the same 0..1 image space as [uv], and how much depth backs it. */
     class Found(val box: FloatArray, val points: Int)
 
@@ -77,6 +83,12 @@ object StandingObjects {
                 val u = uv[2 * i]; val v = uv[2 * i + 1]
                 l = minOf(l, u); r = maxOf(r, u); t = minOf(t, v); b = maxOf(b, v)
             }
+            // Intel's object-size-detector rejects anything touching the frame border, and
+            // HarshdeepJ's drops boxes filling the frame: both are the table edge or the wall,
+            // never an item. On the phone this was a "78 × 11 × 18 cm" item that was the table's
+            // front edge running out of shot.
+            if (l <= BORDER || t <= BORDER || r >= 1f - BORDER || b >= 1f - BORDER) continue
+            if ((r - l) * (b - t) > MAX_FRAME_SHARE) continue
             found += Found(
                 floatArrayOf(
                     (l - PAD).coerceIn(0f, 1f), (t - PAD).coerceIn(0f, 1f),

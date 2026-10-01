@@ -20,6 +20,8 @@ class ScanBox(
     val upright: FloatArray,
     /** The camera frame the box was found in, so a stale box can be recognised. */
     val frameTimestampNs: Long,
+    /** Width and height of the face seen from here, `w·d/f` (see DepthEdgeObjects), if known. */
+    val faceMm: FloatArray? = null,
 ) {
     val area: Float get() = (sensor[2] - sensor[0]) * (sensor[3] - sensor[1])
 }

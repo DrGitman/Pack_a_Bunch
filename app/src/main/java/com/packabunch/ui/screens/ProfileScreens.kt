@@ -168,7 +168,7 @@ fun ProfileScreen(
                         Row(Modifier.background(BrandTint, RoundedCornerShape(99.dp)).padding(horizontal = 11.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Icon(PackIcons.Cube, null, Modifier.size(13.dp), tint = com.packabunch.ui.theme.PrimaryDark)
-                            Text(if (tier == Tier.PLUS) "PACK-A-BUNCH PRO" else "FREE PLAN", color = com.packabunch.ui.theme.PrimaryDark,
+                            Text(if (tier == Tier.PLUS) "PACK PLUS" else "FREE PLAN", color = com.packabunch.ui.theme.PrimaryDark,
                                 fontFamily = UiFamily, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = .5.sp)
                         }
                     }
@@ -216,7 +216,7 @@ fun ProfileScreen(
                 AccountRow("Change password", onChangePassword)
                 RowDivider()
                 AccountRow(
-                    title = if (tier == Tier.PLUS) "Manage Pack a Bunch Pro" else "Get Pack a Bunch Pro",
+                    title = if (tier == Tier.PLUS) "Manage Pack Plus" else "Get Pack Plus",
                     onClick = onManageSubscription,
                     subtitle = if (tier == Tier.PLUS) "Billed in Google Play" else "Up to 5 saved packs on the free plan",
                     trailing = PackIcons.External,

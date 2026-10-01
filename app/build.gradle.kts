@@ -132,6 +132,7 @@ dependencies {
     implementation(libs.mlkit.image.labeling)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.barcode)
+    implementation(libs.onnxruntime.android)
     implementation(libs.mlkit.objects)
 
     testImplementation(libs.junit)

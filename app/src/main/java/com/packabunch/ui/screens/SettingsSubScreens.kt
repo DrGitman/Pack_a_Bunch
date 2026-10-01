@@ -163,7 +163,7 @@ fun RestorePurchasesScreen(
         PackCard(shape = RoundedCornerShape(18.dp)) {
             Column {
                 Text(
-                    text = "If you have bought Pack a Bunch Pro before, restoring brings it back " +
+                    text = "If you have bought Pack Plus before, restoring brings it back " +
                         "on this phone. It uses the Google account signed in on this device.",
                     color = TextSecondary,
                     fontFamily = UiFamily,
@@ -179,7 +179,7 @@ fun RestorePurchasesScreen(
                         outcome = null
                         onRestore { restored ->
                             working = false
-                            outcome = if (restored) "Pack a Bunch Pro is back on this phone."
+                            outcome = if (restored) "Pack Plus is back on this phone."
                             else "There is nothing to restore on this Google account."
                         }
                     },

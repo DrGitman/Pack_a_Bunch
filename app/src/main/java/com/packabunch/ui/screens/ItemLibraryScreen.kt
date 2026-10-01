@@ -243,7 +243,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LockedLibrary(
         )
         Spacer(Modifier.height(10.dp))
         Text(
-            text = "Pack a Bunch Pro keeps every item you measure, so the toolbox you sized in " +
+            text = "Pack Plus keeps every item you measure, so the toolbox you sized in " +
                 "March drops straight into the pack you're planning now.",
             color = TextSecondary,
             fontFamily = UiFamily,
@@ -281,7 +281,7 @@ private fun androidx.compose.foundation.layout.ColumnScope.LockedLibrary(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         PrimaryButton(
-            text = price?.let { "Get Pack a Bunch Pro, $it" } ?: "See Pack a Bunch Pro",
+            text = price?.let { "Get Pack Plus, $it" } ?: "See Pack Plus",
             onClick = onUpgrade,
         )
         SecondaryButton(text = "Not now", onClick = onBack)
