@@ -100,7 +100,7 @@ class WallPlane(
     halfU: Float,
     halfV: Float,
 ) {
-    // ARCore only knows the part of a wall it has seen; the wall carries on past that.
+    // The scan only knows the part of a wall it has seen; the wall carries on past that.
     private val reachU = halfU + MARGIN_M
     private val reachV = halfV + MARGIN_M
 
@@ -126,11 +126,11 @@ class WallPlane(
     }
 }
 
-/** The floor ARCore found under a space, as its outline in world X / Z (metres). */
+/** The floor found under a space, as its outline in world X / Z (metres). */
 object FloorOutline {
 
     /**
-     * How far past the outline a wall may stand, in metres. ARCore's floor rarely reaches the
+     * How far past the outline a wall may stand, in metres. The found floor rarely reaches the
      * walls — less so the bigger the floor: a boot's reaches its trim, a room's stops short of
      * the skirting by a hand's width or more, and a room's walls were being left out.
      */

@@ -12,7 +12,7 @@ enum class MeasurementSource {
     /** The user typed it, from a tape measure or a label. The strongest thing we have. */
     TYPED_IN,
 
-    /** Derived from an AR hit test the user then confirmed. Never a guess, never scored. */
+    /** Measured with the camera and then confirmed by the user. Never a guess, never scored. */
     CAMERA_ESTIMATE,
 
     /**

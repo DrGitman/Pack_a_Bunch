@@ -154,7 +154,7 @@ object DetectionPoints {
  * Detector boxes between the orientation ML Kit reports them in and the camera sensor's.
  *
  * ML Kit is given the sensor image plus a rotation and answers in *upright* pixels — the
- * rotated image's, whose width and height are swapped for 90° and 270°. ARCore's depth image
+ * rotated image's, whose width and height are swapped for 90° and 270°. The depth image
  * and `IMAGE_NORMALIZED` coordinates are in the *sensor's* orientation. The old code
  * normalised upright pixels by the sensor's width and height and skipped the rotation, which
  * put every box in the wrong place on a phone held upright.

@@ -15,9 +15,9 @@ import kotlin.random.Random
 /**
  * A phone's depth camera pointed at a made-up scene, for testing the scans end to end.
  *
- * Scenes are signed distance functions in world metres, Y up as in ARCore, each returning the
+ * Scenes are signed distance functions in world metres, Y up, each returning the
  * distance to the nearest surface and an id for what that surface is. Depth images come out
- * the way ARCore's do: z-depth in millimetres, a percent or so of smooth correlated error, a
+ * the way a phone's do: z-depth in millimetres, a percent or so of smooth correlated error, a
  * few millimetres of per-pixel noise, holes where it has no confidence, nothing past its
  * range, and silhouettes smeared between the near surface and the far one.
  */

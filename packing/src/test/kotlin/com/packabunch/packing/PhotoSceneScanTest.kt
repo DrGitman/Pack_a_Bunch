@@ -23,7 +23,7 @@ import kotlin.test.assertTrue
  * black puck, a flat charger, a book and a big glass doughnut vase, on a wooden top against a
  * plaster wall. The layout, sizes and camera are lined up with a photograph of that desk.
  *
- * Each frame a depth image is ray-marched from the phone's pose — with ARCore's kind of error:
+ * Each frame a depth image is ray-marched from the phone's pose — with a phone depth map's kind of error:
  * a percent or so of smooth, correlated depth error, pixels with no depth, and silhouettes
  * smeared between the object and what is behind it. Detector boxes are made the way ML Kit
  * makes them: loose rectangles around each object, at most five a frame, tracking ids that
@@ -293,7 +293,7 @@ class PhotoSceneScanTest {
 
     @Test fun `the desk in the photo, with the wall found`() = check(scan(seed = 11, wallFound = true))
 
-    @Test fun `the desk in the photo, when ARCore never finds the wall`() = check(scan(seed = 12, wallFound = false))
+    @Test fun `the desk in the photo, when the wall is never found`() = check(scan(seed = 12, wallFound = false))
 
     // The same desk, the same frames, measured by the Python engine the app runs (packscan.py).
     // Skipped, with a note, where python3 with NumPy and OpenCV is not installed.
@@ -302,7 +302,7 @@ class PhotoSceneScanTest {
         py.use { check(scan(seed = 11, wallFound = true, math = it)) }
     }
 
-    @Test fun `the desk in the photo, Python engine, when ARCore never finds the wall`() {
+    @Test fun `the desk in the photo, Python engine, when the wall is never found`() {
         val py = PythonScanMath.start() ?: return println("SKIPPED: python3 with numpy and opencv not found")
         py.use { check(scan(seed = 12, wallFound = false, math = it)) }
     }
@@ -340,7 +340,7 @@ class PhotoSceneScanTest {
     private companion object {
         const val TABLE = -1
         const val WALL = -2
-        /** ARCore's depth image on this kind of phone, landscape like the photo. */
+        /** A phone depth image, landscape like the photo. */
         const val DW = 160
         const val DH = 90
         /** The photo's focal length, 640 px at 739 wide, scaled to the depth image. */

@@ -551,7 +551,7 @@ class AnchoredLabel(
 )
 
 /**
- * Places labels on the points the AR renderer projected for them. One layout for all of them,
+ * Places labels on the points the scan projected for them. One layout for all of them,
  * so a frame's worth of moving tags is a single placement pass rather than a recomposition per
  * tag.
  *

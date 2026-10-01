@@ -1,0 +1,3 @@
+midas_small.onnx — MiDaS v2.1 small (256), monocular relative depth.
+Copyright (c) 2019 Intel ISL (Intel Intelligent Systems Lab). Licensed under the MIT License.
+Source: https://github.com/isl-org/MiDaS (release v2_1). Used in HarshdeepJ's Object_Volume_Detector method.

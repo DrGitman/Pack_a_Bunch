@@ -1,4 +1,4 @@
-package com.packabunch.ar
+package com.packabunch.scan
 
 import android.content.Context
 import android.util.Log
@@ -21,13 +21,13 @@ import org.json.JSONObject
 /**
  * The measuring engine the scans run: `app/src/main/python/packscan.py` (NumPy and OpenCV) on the
  * phone's own Python, through Chaquopy. It traces each object's body from the depth points and
- * measures it; ARCore still supplies the scale (every depth pixel in millimetres) and where the
- * phone is.
+ * measures it; the scene engine supplies the scale (every depth pixel in millimetres, from the
+ * card in view) and where the phone is.
  *
  * If Python cannot start or a call fails, that call falls back to [KotlinScanMath] — a scan
  * never stops because of the engine.
  */
-class PythonEngine private constructor(private val module: PyObject) : ScanMath {
+class PythonEngine private constructor(internal val module: PyObject) : ScanMath {
 
     override fun select(samples: List<DetectionPoints.Sample>, depthsMm: IntArray?, boxSpanPx: Float, focalPx: Float, inMask: BooleanArray?): List<Int> =
         runCatching {
@@ -43,7 +43,7 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
             val keep = JSONObject(module.callAttr("select_json", p.toString()).toString()).getJSONArray("keep")
             List(keep.length()) { keep.getInt(it) }
         }.getOrElse {
-            Log.w(AR_TAG, "python select failed, using Kotlin", it)
+            Log.w(SCAN_TAG, "python select failed, using Kotlin", it)
             KotlinScanMath.select(samples, depthsMm, boxSpanPx, focalPx, inMask)
         }
 
@@ -74,7 +74,7 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
                 pointCount = f.getInt("pointCount"),
             )
         }.getOrElse {
-            Log.w(AR_TAG, "python fit failed, using Kotlin", it)
+            Log.w(SCAN_TAG, "python fit failed, using Kotlin", it)
             KotlinScanMath.fit(points, cameras, voxelMm, weights)
         }
 
@@ -88,7 +88,7 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
         val keep = JSONObject(module.callAttr("select_space_json", p.toString()).toString()).getJSONArray("keep")
         List(keep.length()) { keep.getInt(it) }
     }.getOrElse {
-        Log.w(AR_TAG, "python space select failed, using Kotlin", it)
+        Log.w(SCAN_TAG, "python space select failed, using Kotlin", it)
         KotlinScanMath.selectSpace(samples, maxHeightMm)
     }
 
@@ -113,7 +113,7 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
             pointCount = f.getInt("pointCount"),
         )
     }.getOrElse {
-        Log.w(AR_TAG, "python space fit failed, using Kotlin", it)
+        Log.w(SCAN_TAG, "python space fit failed, using Kotlin", it)
         KotlinScanMath.fitSpace(points, cameras, weights)
     }
 
@@ -124,7 +124,7 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
     fun segmentFrame(rgb: ByteArray, width: Int, height: Int, boxes: List<FloatArray>): ByteArray? = runCatching {
         val json = JSONArray(boxes.map { b -> JSONArray(b.map { it.toDouble() }) }).toString()
         module.callAttr("segment_frame", rgb, width, height, json).toJava(ByteArray::class.java)
-    }.onFailure { Log.w(AR_TAG, "python segmentation failed", it) }.getOrNull()
+    }.onFailure { Log.w(SCAN_TAG, "python segmentation failed", it) }.getOrNull()
 
     companion object {
         @Volatile private var engine: ScanMath? = null
@@ -148,6 +148,44 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
             }
         }
 
+        /**
+         * Proves on the phone that Python is really doing the measuring: which Python, NumPy and
+         * OpenCV it has, and what it measures a known 100 × 60 × 40 mm box as, next to the Kotlin
+         * engine's answer. One log line each, at start-up.
+         */
+        private fun selfTest(engine: PythonEngine) {
+            try {
+                val py = Python.getInstance()
+                val version = py.getModule("sys").get("version").toString().substringBefore(" ")
+                val numpy = py.getModule("numpy").get("__version__").toString()
+                val cv = engine.module.get("cv2")?.toString()
+                Log.i(SCAN_TAG, "python started: python=$version numpy=$numpy opencv=${if (cv == null || cv == "None") "absent" else "present"}")
+                val points = ArrayList<PlanePoint>()
+                val rnd = java.util.Random(1)
+                repeat(3000) {
+                    // Points on the top and the four sides of a 100 × 60 × 40 mm box.
+                    val face = rnd.nextInt(5); val a = rnd.nextFloat(); val b = rnd.nextFloat()
+                    points += when (face) {
+                        0 -> PlanePoint(-50 + 100 * a, -30 + 60 * b, 40f)
+                        1 -> PlanePoint(-50 + 100 * a, -30f, 40 * b)
+                        2 -> PlanePoint(-50 + 100 * a, 30f, 40 * b)
+                        3 -> PlanePoint(-50f, -30 + 60 * a, 40 * b)
+                        else -> PlanePoint(50f, -30 + 60 * a, 40 * b)
+                    }
+                }
+                val cameras = listOf(PlanePoint(0f, -400f, 300f), PlanePoint(400f, 0f, 300f), PlanePoint(0f, 400f, 300f), PlanePoint(-400f, 0f, 300f))
+                fun describe(f: FittedObject?) = f?.let { "%.0f x %.0f x %.0f mm %s".format(it.widthMm, it.depthMm, it.heightMm, it.shape) } ?: "no fit"
+                val t0 = android.os.SystemClock.elapsedRealtime()
+                val p = engine.fit(points, cameras, 5f, null)
+                val t1 = android.os.SystemClock.elapsedRealtime()
+                val k = KotlinScanMath.fit(points, cameras, 5f, null)
+                val t2 = android.os.SystemClock.elapsedRealtime()
+                Log.i(SCAN_TAG, "python self-test, true 100 x 60 x 40 mm BOX: python ${describe(p)} in ${t1 - t0} ms; kotlin ${describe(k)} in ${t2 - t1} ms")
+            } catch (t: Throwable) {
+                Log.e(SCAN_TAG, "python self-test failed", t)
+            }
+        }
+
         /** Starts Python in the background, so the first scan does not wait for it. */
         fun warmUp(context: Context) {
             val app = context.applicationContext
@@ -158,9 +196,9 @@ class PythonEngine private constructor(private val module: PyObject) : ScanMath 
         fun get(context: Context): ScanMath = engine ?: synchronized(this) {
             engine ?: runCatching {
                 if (!Python.isStarted()) Python.start(AndroidPlatform(context.applicationContext))
-                PythonEngine(Python.getInstance().getModule("packscan"))
+                PythonEngine(Python.getInstance().getModule("packscan")).also { selfTest(it) }
             }.getOrElse {
-                Log.e(AR_TAG, "Python engine did not start; measuring with Kotlin", it)
+                Log.e(SCAN_TAG, "Python engine did not start; measuring with Kotlin", it)
                 KotlinScanMath
             }.also { engine = it }
         }

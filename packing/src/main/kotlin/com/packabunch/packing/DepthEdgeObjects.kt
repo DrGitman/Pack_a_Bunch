@@ -14,7 +14,7 @@ import kotlin.math.sqrt
  *  5. `W = w_px · d / f`, `H = h_px · d / f` — the pinhole relation `h = a·d/f`.
  *
  * Two changes, both because the input is better, not different: their depth is MiDaS output,
- * which is only relative and needs an ID card in shot to scale it; ARCore's is already in
+ * which is only relative and needs an ID card in shot to scale it; ours arrives already in
  * millimetres, so `d` is used directly and no reference object is needed. And a region touching
  * the edge of the picture is dropped (their `>95% of image` filter, tightened the way Intel's
  * object-size-detector does it), since on a phone that is always the table or the wall.
@@ -62,16 +62,21 @@ object DepthEdgeObjects {
      *   why this is needed: depth edges trace an object's sides and top, but where it stands on
      *   the table there is no depth jump, so the bottom of the outline stays open and the object
      *   leaks into the table. Marking the table itself as edge closes it.
+     * @param heightAboveMm each pixel's height above that surface. Their `H = h·d/f` assumes the
+     *   camera is level with the object (their paper says so); a phone looks down at a table, so
+     *   the top face gets counted as height — a 70 mm container read as 125 mm in the simulation.
+     *   When given, height is taken from the scene instead: the region's tallest point.
      */
     fun find(
         depth: IntArray, width: Int, height: Int, fx: Float, fy: Float,
         background: BooleanArray? = null,
+        heightAboveMm: IntArray? = null,
     ): List<Found> {
         val n = width * height
         require(depth.size == n)
         if (n == 0) return emptyList()
 
-        // 1. Normalise to 0..255 over the valid range. Unlike MiDaS, ARCore leaves holes; fill each
+        // 1. Normalise to 0..255 over the valid range. Real depth can have holes; fill each
         //    from its row so a hole is not mistaken for an object's edge.
         var lo = Int.MAX_VALUE; var hi = Int.MIN_VALUE
         for (d in depth) if (d > 0) { lo = minOf(lo, d); hi = maxOf(hi, d) }
@@ -131,11 +136,13 @@ object DepthEdgeObjects {
             queue[tail++] = start; label[start] = next
             var l = width; var t = height; var r = -1; var b = -1
             val readings = ArrayList<Int>()
+            val heights = ArrayList<Int>()
             while (head < tail) {
                 val i = queue[head++]
                 val x = i % width; val y = i / width
                 l = minOf(l, x); r = maxOf(r, x); t = minOf(t, y); b = maxOf(b, y)
                 if (depth[i] > 0) readings += depth[i]
+                heightAboveMm?.let { heights += it[i] }
                 for (dy in -1..1) for (dx in -1..1) {
                     val nx = x + dx; val ny = y + dy
                     if (nx !in 0 until width || ny !in 0 until height) continue
@@ -165,6 +172,7 @@ object DepthEdgeObjects {
                     if (label[j] >= 0 || depth[j] <= 0 || background?.get(j) == true) continue
                     if (kotlin.math.abs(depth[j] - d) > tolerance) continue
                     label[j] = next; queue[tail++] = j
+                    heightAboveMm?.let { heights += it[j] }
                     l = minOf(l, nx); r = maxOf(r, nx); t = minOf(t, ny); b = maxOf(b, ny)
                 }
             }
@@ -181,7 +189,10 @@ object DepthEdgeObjects {
             found += Found(
                 pl, pt, pr, pb, d,
                 widthMm = (r - l + 1) * d / fx,
-                heightMm = (b - t + 1) * d / fy,
+                heightMm = if (heights.isNotEmpty()) {
+                    // The tallest point, less the top 2% so one noisy pixel cannot raise it.
+                    heights.sort(); heights[(heights.size * 0.98f).toInt().coerceAtMost(heights.size - 1)].toFloat()
+                } else (b - t + 1) * d / fy,
             )
         }
         // Nearest first, as theirs.

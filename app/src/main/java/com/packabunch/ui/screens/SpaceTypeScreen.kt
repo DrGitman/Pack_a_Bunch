@@ -57,15 +57,14 @@ enum class SpaceKind { BOX_SHAPED, ANY_SHAPE }
  * The fork between three typed numbers and a full sweep. Both are real products: box-shaped
  * is exact and works on every phone, and it is genuinely the right answer for a crate.
  *
- * The caveats on "any shape" are stated before the choice, not discovered after it: it
- * needs a phone that can sense depth and about a minute of sweeping. Letting somebody pick
- * it and only then find out their phone cannot do it would waste the one minute they were
- * willing to give us.
+ * The caveats on "any shape" are stated before the choice, not discovered after it: it needs
+ * about a minute of sweeping, with a sheet of A4 or a bank card lying on the floor of the space
+ * for scale. Saying so up front is cheaper than somebody finding out at the kerb.
  */
 @Composable
 fun SpaceTypeScreen(
     selected: SpaceKind,
-    depthCapable: Boolean,
+    cameraCapable: Boolean,
     limits: TierLimits,
     onSelect: (SpaceKind) -> Unit,
     onContinue: () -> Unit,
@@ -100,7 +99,7 @@ fun SpaceTypeScreen(
             KindCard(
                 icon = PackIcons.Camera,
                 title = "Any shape",
-                badge = if (depthCapable) "DEPTH AVAILABLE" else "CHECK SUPPORT",
+                badge = if (cameraCapable) "USES YOUR CAMERA" else "NEEDS A CAMERA",
                 body = "A car boot, a cupboard with shelves, an awkward corner. Sweep the " +
                     "camera round it and we map what's actually there.",
                 tags = listOf("Wheel arches", "Sloping backs", "Shelves"),
@@ -113,17 +112,17 @@ fun SpaceTypeScreen(
         Spacer(Modifier.height(Spacing.base))
 
         Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            if (!depthCapable) {
+            if (!cameraCapable) {
                 Note(
-                    text = "We'll check depth support after camera permission and AR services " +
-                        "are ready. Typed measurements remain available if scanning isn't supported.",
+                    text = "Camera measuring is off, or this device has no camera. Typed " +
+                        "measurements give you the same plan.",
                     tone = NoteTone.Caution,
                     icon = PackIcons.Info,
                 )
             } else {
                 Text(
-                    text = "Any shape needs a phone that can sense depth, and about a minute " +
-                        "of sweeping. Box-shaped works on every phone.",
+                    text = "Any shape takes about a minute of sweeping, with a sheet of A4 or a " +
+                        "bank card lying on the floor of the space. Box-shaped is the quickest.",
                     color = TextTertiary,
                     fontFamily = UiFamily,
                     fontSize = 12.5f.sp,

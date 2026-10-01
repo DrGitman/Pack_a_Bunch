@@ -1,8 +1,8 @@
 """
 Pack a Bunch — the measuring engine, in Python with OpenCV and NumPy.
 
-The app's camera screens stay in Kotlin: ARCore supplies what only it can (the real-world
-scale — every depth pixel in millimetres — and where the phone is), ML Kit says roughly where
+The app's camera screens stay in Kotlin: the scene engine supplies the real-world scale (every
+depth pixel in millimetres, from the card in view) and where the phone is, ML Kit says roughly where
 each thing is and what it is called, and the screens draw the result. Everything in between is
 here:
 
@@ -643,7 +643,7 @@ def segment(image, box, depth_mask=None, exclude=None, iterations=5):
     background-colour subtraction. Neither method guarantees an exact semantic mask.
     A missing mask is reported rather than replaced with the detector rectangle.
 
-    [depth_mask] (0/1, the image's size) marks pixels ARCore's depth says stand up off the
+    [depth_mask] (0/1, the image's size) marks pixels the depth says stand up off the
     surface. Depth is coarse and a pixel or two off at edges, so it is only trusted where it is
     certain: well inside a raised region is the thing, well outside any is table or wall. The
     exact edge is left to the picture. [exclude] marks pixels already given to another object,

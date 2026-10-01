@@ -1,6 +1,5 @@
 package com.packabunch.ui.screens
 
-import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -38,11 +37,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.ar.core.TrackingFailureReason
-import com.packabunch.ar.SpaceAnchors
-import com.packabunch.ar.SpaceScanController
-import com.packabunch.ar.SpaceScanUi
-import com.packabunch.ar.TrackingStatus
+import androidx.camera.view.PreviewView
+import androidx.compose.ui.layout.onSizeChanged
+import com.packabunch.scan.OutlineLayer
+import com.packabunch.scan.Reference
+import com.packabunch.scan.ScanProblem
+import com.packabunch.scan.SpaceAnchors
+import com.packabunch.scan.SpaceScanController
+import com.packabunch.scan.SpaceScanUi
+import com.packabunch.scan.TrackingStatus
 import com.packabunch.packing.ScannedSpace
 import com.packabunch.packing.SpaceBox
 import com.packabunch.packing.SpaceFace
@@ -84,7 +87,7 @@ import kotlinx.coroutines.withContext
  * height sit on the edges they measure; "72 % mapped" is the share of its sides actually
  * seen, not a timer.
  *
- * "Use this space" unlocks at the same bar the space scan always had ([com.packabunch.ar.SCAN_DONE_THRESHOLD]):
+ * "Use this space" unlocks at the same bar the space scan always had ([com.packabunch.scan.SCAN_DONE_THRESHOLD]):
  * below it too much of the space would be guesswork. A typed path (the pencil) is always there.
  */
 @Composable
@@ -97,41 +100,35 @@ fun SpaceScanScreen(
     spaceName: String? = null,
     unit: LengthUnit = LengthUnit.CENTIMETRES,
 ) {
-    DepthCaptureGate(onTypeInstead, onBack) {
+    CameraCaptureGate(onTypeInstead, onBack) {
         val context = LocalContext.current
         val density = LocalDensity.current.density
         val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
         val controller = remember { SpaceScanController(context, density) }
         val ui by controller.ui.collectAsStateWithLifecycle()
         val anchors by controller.anchors.collectAsStateWithLifecycle()
+        val outlines by controller.outlines.collectAsStateWithLifecycle()
         val scope = rememberCoroutineScope()
-        var error by remember { mutableStateOf<String?>(null) }
         var finishing by remember { mutableStateOf(false) }
-        val view = remember {
-            GLSurfaceView(context).apply {
-                preserveEGLContextOnPause = true
-                setEGLContextClientVersion(2)
-                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                setRenderer(controller)
-                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        val preview = remember {
+            PreviewView(context).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             }
         }
         DisposableEffect(owner) {
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
-                    Lifecycle.Event.ON_RESUME -> {
-                        error = controller.resume(view.display?.rotation ?: 0, view.width.coerceAtLeast(1), view.height.coerceAtLeast(1))
-                        if (error == null) view.onResume()
-                    }
-                    Lifecycle.Event.ON_PAUSE -> { view.onPause(); controller.pause() }
+                    Lifecycle.Event.ON_RESUME -> controller.start(owner, preview)
+                    Lifecycle.Event.ON_PAUSE -> controller.stop()
                     else -> Unit
                 }
             }
             owner.lifecycle.addObserver(observer)
-            onDispose { owner.lifecycle.removeObserver(observer); view.onPause(); controller.release() }
+            onDispose { owner.lifecycle.removeObserver(observer); controller.release() }
         }
 
-        val fatal = error ?: ui.fatalError
+        val fatal = ui.fatalError
         if (fatal != null) {
             ScreenScaffold {
                 PackAppBar(title = "Scan the space", onBack = onBack)
@@ -158,7 +155,12 @@ fun SpaceScanScreen(
                     }
                 },
                 modifier = modifier,
-                cameraPreview = { AndroidView(factory = { view }, modifier = Modifier.fillMaxSize()) },
+                cameraPreview = {
+                    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize().onSizeChanged { controller.setViewSize(it.width, it.height) }) {
+                        AndroidView(factory = { preview }, modifier = Modifier.fillMaxSize())
+                        OutlineLayer(outlines, density)
+                    }
+                },
             )
         }
     }
@@ -255,7 +257,7 @@ fun SpaceScanOverlay(
         if (lostShowing) {
             LostTrackPopup(
                 what = spaceNoun(spaceName, standingInside = box?.cameraInside == true),
-                reason = ui.failureReason,
+                reason = ui.problem,
                 saved = box?.dimensions?.let { d ->
                     savedLengths(listOf(
                         "width" to formatLengthWithUnit(d.widthMm, unit),
@@ -278,13 +280,18 @@ fun SpaceScanOverlay(
  * move — "Sweep right", not "right side 34 %".
  */
 private fun spaceGuidance(ui: SpaceScanUi): Pair<String, Boolean> {
-    if (ui.status != TrackingStatus.TRACKING) {
-        return when (ui.failureReason) {
-            TrackingFailureReason.INSUFFICIENT_LIGHT -> "Too dark to see inside — try the torch" to true
-            TrackingFailureReason.EXCESSIVE_MOTION -> "A little slower — the camera lost its place" to true
-            TrackingFailureReason.INSUFFICIENT_FEATURES -> "Include the floor and door edges; move slowly sideways" to true
-            else -> "Move the phone slowly to get started" to true
-        }
+    when (ui.problem) {
+        ScanProblem.TOO_DARK -> return "Too dark to see inside — try the torch" to true
+        ScanProblem.TOO_FAST -> return "A little slower — the picture is blurred" to true
+        ScanProblem.REFERENCE_NOT_FLAT -> return "Lay the card or sheet flat on the floor of the space" to true
+        ScanProblem.NO_REFERENCE -> return (if (ui.status == TrackingStatus.LOST) "Keep the card or sheet in view while you sweep"
+            else "Lay a sheet of A4 (or a bank card) flat on the floor of the space, and point at it") to true
+        null -> Unit
+    }
+    // A card at the back of a boot is a handful of pixels; a sheet of A4 is three and a half
+    // times its area and holds the scale much better at that distance.
+    if (ui.reference == Reference.CARD && (ui.box?.depthMm ?: 0f) > 700f) {
+        return "For a space this size, a sheet of A4 keeps the sizes more accurate" to true
     }
     if (!ui.floorFound) return "Point at the floor of the space and hold for a moment" to true
     ui.scanHint?.let { return it to true }

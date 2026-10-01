@@ -3,8 +3,8 @@ package com.packabunch.packing
 /**
  * The surface the items are standing on, worked out from depth alone.
  *
- * ARCore reports a Plane only where it can triangulate visual features, so a dark, glossy or
- * plain table gives it nothing and `getAllTrackables(Plane)` stays empty. Measuring was gated on
+ * Finding a plane from tracked visual features fails where there are none, so a dark, glossy or
+ * plain table gives it nothing and no plane is reported. Measuring was gated on
  * that list, so on those surfaces the scan sat at "0 measured" forever while depth was arriving
  * perfectly well the whole time.
  *

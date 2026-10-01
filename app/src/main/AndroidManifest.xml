@@ -9,7 +9,7 @@
 
     <!--
       Used only for catalogue lookups, which are entirely optional: every measurement route
-      that matters — typing, AR measuring, depth scanning — works with no connection at all.
+      that matters — typing, camera measuring, scanning — works with no connection at all.
       No pack, photo or measurement is ever uploaded.
     -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -19,17 +19,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
-      AR Optional, and both halves of that matter.
-
-      `required="false"` keeps the app installable on phones with no ARCore support at all,
-      which is a large share of Android. The `optional` meta-data stops the Play Store
-      installing ARCore automatically as a dependency.
-
-      Together they mean AR can be missing at runtime, so every entry point into it has to
-      check availability first and fall back to typing. There is no screen in this app that
-      only works with a camera.
+      Camera measuring needs only the camera, and the camera is optional: the app installs on a
+      device without one, and every camera screen offers typing instead. There is no screen in
+      this app that only works with a camera.
     -->
-    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <application
@@ -69,7 +62,6 @@
             </intent-filter>
         </activity>
 
-        <meta-data android:name="com.google.ar.core" android:value="optional" />
     </application>
 
 </manifest>

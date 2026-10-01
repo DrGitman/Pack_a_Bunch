@@ -118,7 +118,6 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
     implementation(libs.datastore.preferences)
-    implementation(libs.arcore)
     implementation(libs.revenuecat)
     implementation(libs.okhttp)
     implementation(libs.play.review)

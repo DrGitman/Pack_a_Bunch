@@ -9,7 +9,7 @@ package com.packabunch.packing
  *
  * Every length is an integer count of millimetres. That is a calculation convention so
  * the geometry is exact and reproducible; it is not a claim that anybody measured to the
- * millimetre. Renderers and ARCore use their own conventions (often Y-up, in metres), so
+ * millimetre. Renderers and the camera use their own conventions (often Y-up, in metres), so
  * the conversion has to be written out explicitly at that boundary rather than assumed.
  */
 

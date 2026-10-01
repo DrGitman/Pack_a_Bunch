@@ -28,7 +28,7 @@ class SpaceScanSimTest {
         val name: String,
         val scene: (Float, Float, Float) -> Pair<Float, Int>,
         val floorY: Float,
-        /** ARCore's floor outline, world X / Z, metres. */
+        /** The found floor outline, world X / Z, metres. */
         val floorOutline: FloatArray,
         val cameras: (Random) -> List<SceneSim.Camera>,
         val holes: Float = 0.08f,

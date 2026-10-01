@@ -2,218 +2,246 @@
 
 **Know what fits. See where it goes.**
 
-An Android app for packing things into a space. You measure the space, add your items, and
-the app works out an arrangement and walks you through placing it one piece at a time.
+An Android app for packing things into a space. You measure the space, add your items, and the
+app works out where everything goes. Then it walks you through packing it, one piece at a time.
 
-Status: **the app runs end to end on a phone.** Onboarding, accounts, the packing engine,
-the plan and the packing guide all work, and packs sync to the account. What is left before
-a Play release is listed at the bottom.
+All you need is your phone's camera. Or type the sizes in. Both give you the same plan.
 
 ---
 
 ## What it does
 
-1. **Get a space** — scan it, or type the inside dimensions. The typed path is always
-   available and never hidden. Scanned spaces can be irregular: a car boot with wheel
-   arches, a cupboard with a shelf.
-2. **Add items** — name, photo, width/depth/height, quantity, and whether the item may
-   be rotated or have something stacked on it.
-3. **Get an arrangement** — a deterministic heuristic places what it can and tells you
-   plainly what it couldn't place, and why.
-4. **Follow the pack** — numbered steps, one highlighted item at a time, bottom-up.
+1. **Get a space.** Scan it with the camera, or type its inside sizes. Typing is always there.
+   A scanned space can have an odd shape, like a car boot with wheel arches or a cupboard
+   with a shelf.
+2. **Add items.** Scan them, take a photo, or type them in. Each one has a name, a photo,
+   its width, depth and height, how many there are, and whether it can be turned or have
+   things stacked on it.
+3. **Get a plan.** The app places what it can. If something does not fit, it says so plainly
+   and says why.
+4. **Pack it.** Numbered steps, one item at a time, from the bottom up.
 
-Packs are stored on the phone and backed up to the signed-in account. Photos stay on the
-phone and are never uploaded.
+Packs are kept on the phone and backed up to your account. Photos stay on the phone. They are
+never uploaded.
 
-## What it deliberately does not do
+## What it will not do
 
-These are product decisions, not gaps to fill in later without a conversation:
+These are choices, not things we forgot:
 
-- It does not claim exact measurements. Every stored dimension carries its
-  provenance — *camera estimate* or *typed in* — and shows it wherever it appears.
-- It does not guess at what the scan never saw. Unseen space is counted, reported as
-  named patches with volumes, and treated as solid until somebody looks.
-- It does not model soft bags, clothing, deformation, nesting, or weight. Items are
-  rigid cuboids or conservative cuboid envelopes.
-- It does not say an arrangement is *impossible*. A heuristic failing to place an item
-  is not a proof, and the copy says "no arrangement found for these items".
-- It does not infer dimensions from an object label or a single unscaled photo.
-- It does not report an "optimisation percentage". The metric is **modelled fill**,
-  with a stated basis.
+* It never claims a size is exact. Every size says where it came from: the camera, or typed in.
+* It never guesses at what the camera did not see. Unseen space counts as full until someone
+  looks.
+* It does not handle soft bags, clothes or weight. Items are treated as solid boxes, or as
+  the smallest box they fit in.
+* It never says something is impossible to pack. It says "no arrangement found", because the
+  planner not finding one is not proof there is none.
+* It never takes a size from a name or from one photo with nothing in it for scale.
+* It shows how full the space is, not a made up "optimisation score".
 
-## Stack
+## How the camera measures
 
-| Layer | Choice |
+You lay **a bank card** (or, for a big space, **a sheet of A4 paper**) flat beside the things
+you are measuring. Every bank card in the world is the same size, 85.6 by 54 mm, and A4 is
+210 by 297 mm. That is all the app needs to turn the picture into real sizes.
+
+Each moment, the app:
+
+1. **Finds the card.** It looks for edges in the picture and picks the shape with four corners
+   that fits a card exactly. It places each edge to a fraction of a pixel, because every size
+   the app gives depends on the card.
+2. **Works out where the phone is.** From the card's four corners and the camera's focal length,
+   it knows exactly where the phone is and which way it points. The card stays still, so as you
+   walk around the items, every view joins up into one picture of the table.
+3. **Checks the card is lying flat**, using the phone's gravity sensor. A card leaning on a wall
+   would tilt every size.
+4. **Sees depth.** A small depth model (MiDaS) guesses how far away every part of the picture is.
+   Its guess has no units, so the app fixes it to the table: it knows the true distance to every
+   point on the table from where the card is.
+5. **Finds each object.** Anything standing up off the table is an object. It is found from
+   sudden changes in depth, the same way as the reference project this is built on
+   (Object Volume Detector by HarshdeepJ).
+6. **Measures it.** Width and height come from the formula `size = pixels × distance ÷ focal
+   length`. Depth comes from looking at it again from the side. A size is only "measured" once
+   it has stayed steady across many views.
+7. **Names it.** A small object detector (YOLOX Tiny) recognises things like cups, bottles,
+   books and bowls. A name only shows once it has been seen the same way three times out of
+   five.
+
+If the picture is too dark, blurred, or the card is missing or not flat, the app says so and
+asks you to fix it. It does not guess. Something it cannot measure, like glass or a mirror, gets
+no size, and you are asked to type it.
+
+Everything runs on the phone. The depth model and the object detector are inside the app, so
+nothing is downloaded and nothing is sent anywhere. It works with no internet connection.
+
+### What camera measuring is good and not so good at
+
+* **Good:** boxes, cups, tins and other solid things on a table, with the card in view.
+* **Fine:** cupboards and car boots, especially with a sheet of A4 on the floor.
+* **Hardest:** a whole room. The card is small that far away. The app asks for A4 there, and
+  typing a room's size is often quicker.
+
+The models used are free to use in an app like this: MiDaS small (MIT licence) and YOLOX Tiny
+(Apache 2.0 licence). Their notices are in `app/src/main/assets`.
+
+## What it is built with
+
+| Part | Choice |
 |---|---|
-| UI | Kotlin, Jetpack Compose, Material 3, Navigation Compose |
+| Screens | Kotlin, Jetpack Compose, Material 3, Navigation Compose |
 | State | ViewModel, StateFlow, coroutines |
-| Storage | Room for packs, SharedPreferences for settings, app-private files for photos |
-| Accounts and sync | Supabase auth and Postgres, with row level security |
-| Camera | CameraX for photos; ARCore (AR Optional) for measurement and scanning |
-| 3D | Compose Canvas isometric renderer, driven by real solver output |
-| Motion | Lottie for the designer's exported animations, Compose for everything else |
-| Packing engine | Pure Kotlin, no Android dependencies, unit-testable off-device |
-| Billing | Google Play Billing via RevenueCat |
+| Storage | Room for packs, SharedPreferences for settings, private app files for photos |
+| Accounts and sync | Supabase sign in and Postgres, with row level security |
+| Camera | CameraX |
+| Measuring | Card finding and pose (Kotlin), MiDaS depth and YOLOX names (ONNX Runtime), ML Kit, a Python engine through Chaquopy |
+| 3D | A Compose drawing of the plan, made from the planner's real output |
+| Motion | Lottie for the designer's animations, Compose for the rest |
+| Planner | Plain Kotlin with no Android parts, so it can be tested on a computer |
+| Payments | Google Play Billing through RevenueCat |
 
-The packing engine stays free of Android imports so it can be tested without a device —
-that is a module boundary, so the compiler enforces it. Solver axes are X left→right,
-Y front→back, Z up; lengths are integer millimetres and are converted only at the UI
-boundary.
+The planner has no Android code in it, and the build makes sure it stays that way. Its axes are
+X left to right, Y front to back and Z up. All lengths are whole millimetres, and they are only
+turned into centimetres or inches on screen.
 
-## Layout
+## Folders
 
 ```
 Pack_a_bunch_App/
-├── packing/                    ← the engine. Pure Kotlin, no Android
-├── app/                        ← Compose UI, theme, components, renderer
-│   └── src/main/res/raw/       ← the designer's Lottie animations
-├── animations/                 ← Lottie sources and previews as exported from Figma
+├── packing/                    the planner and the measuring maths, plain Kotlin
+├── app/                        the screens, the camera and the scan
+│   ├── src/main/assets/        the depth model and the object detector
+│   ├── src/main/python/        the Python measuring engine
+│   └── src/main/res/raw/       the designer's Lottie animations
+├── animations/                 Lottie files and previews from Figma
 ├── supabase/
-│   ├── CLOUD-SETUP.md          ← what is deployed, and how to apply a migration
-│   └── migrations/             ← SQL, applied through the Supabase SQL editor
+│   ├── CLOUD-SETUP.md          what is set up online, and how to add a database change
+│   └── migrations/             database changes, run in the Supabase SQL editor
 ├── docs/
-│   ├── UX.md                   ← screen map, acceptance notes, copy rules
-│   ├── design-tokens.json      ← colour, type, spacing — source of truth
-│   └── PLAN.md                 ← the build and Play launch plan
-├── design/artboards/           ← mockups, one .dc.html per screen
-└── logos/                      ← official app mark and wordmark
+│   ├── UX.md                   every screen, and the rules for the wording
+│   ├── design-tokens.json      colours, text sizes and spacing
+│   └── PLAN.md                 the build and launch plan
+├── design/artboards/           designs, one file per screen
+└── logos/                      the app's logo files
 ```
-
 
 ## Plans
 
 | | Free | Pack Plus |
 |---|---|---|
-| Pieces per pack | 20 | unlimited |
-| Saved packs | 5 | unlimited |
-| Scans per day | 3 | unlimited |
+| Pieces per pack | 20 | no limit |
+| Saved packs | 5 | no limit |
+| Scans per day | 3 | no limit |
 | Size of space you can scan | 120 L | any |
-| Item library | — | ✓ |
+| Item library | no | yes |
 
-"Unlimited" means no *product* limit. The engine can only search about 400 pieces, and
-that ceiling applies to everyone — it must never be left out when describing Pro.
+"No limit" means the app sets no limit. The planner itself can only handle about 400 pieces,
+for everyone. That must always be said when describing Pack Plus.
 
-Tier limits live in `TierLimits`, deliberately outside the solver: the engine produces the
-same arrangement whatever anyone paid, and there is a test asserting it.
+The limits live in `TierLimits`, away from the planner. The planner gives the same arrangement
+whatever someone paid, and a test checks that.
 
-**Prices by country.** Pack Plus is sold weekly and monthly (and yearly, if one is set up), and
-the app never states a price of its own: it shows the one Google Play returns for the buyer's
-Play account, in their currency — N$ in Namibia, € in Germany. Set each subscription's base
-price once in the Play Console (Monetize → Subscriptions → the plan → Set prices) and let Play
-convert it for every other country at current rates, so the prices differ on screen but are
-the same once converted. No location permission is needed; Play already knows the country.
-The offering itself (which of weekly, monthly and yearly exist) is set in RevenueCat.
+**Prices by country.** Pack Plus is sold weekly and monthly, and yearly if that is set up. The
+app never shows a price of its own. It shows the one Google Play gives for the buyer's account,
+in their money: N$ in Namibia, € in Germany. Set each subscription's price once in the Play
+Console (Monetize, then Subscriptions, then the plan, then Set prices) and let Play work out
+every other country. Which of weekly, monthly and yearly exist is set in RevenueCat.
 
-## The measuring engine (Python)
+## The Python measuring engine
 
-Item scans are measured by `app/src/main/python/packscan.py` — NumPy and OpenCV, run on the phone
-through [Chaquopy](https://chaquo.com/chaquopy/). ARCore supplies the scale (every depth pixel in
-millimetres) and where the phone is; ML Kit boxes each thing and names it; the Python engine does
-the rest:
+`app/src/main/python/packscan.py` runs on the phone through
+[Chaquopy](https://chaquo.com/chaquopy/), with NumPy. For each object it:
 
-1. **Outline** — about once a second each box's object is traced in the camera picture (OpenCV
-   GrabCut, prompted by the box the way SAM is), neighbours kept apart.
-2. **Body** — depth points outside that outline are dropped; the rest are sliced into a height
-   map and labelled with connected components, and the piece that owns the middle of the box is
-   the object.
-3. **Size** — the points' footprint gets OpenCV's minimum-area rotated rectangle (the object's
-   turn, as PCA gives it), faces are placed at the median of the points on them, and round things
-   are fitted slice by slice as circles (cylinder, tapered or ball).
+1. **Traces its outline** in the camera picture, keeping neighbours apart.
+2. **Keeps its body.** Depth points outside the outline are dropped. The rest are cut into
+   layers by height, and the piece that owns the middle of the object is kept.
+3. **Measures it.** The smallest turned rectangle that fits its footprint gives width and
+   depth. Round things are fitted as circles, layer by layer, so a cup, a tin or a ball gets
+   its true shape.
 
-If Python cannot start, the original Kotlin engine (`packing/…/ScanMath.kt`) measures instead.
-Building needs Python 3.11 on the computer (see `local.properties.example`). The JVM tests run the
-same `packscan.py` through `python3` when it has NumPy and OpenCV (`pip install numpy
-opencv-python`), and skip those two tests when it does not.
+If Python cannot start, the same steps run in Kotlin instead, so a scan never stops. Building
+needs Python 3.11 on the computer (see `local.properties.example`).
 
 ## Getting started
 
 ```bash
 export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr"
 
-./gradlew :packing:test          # engine tests, no device needed
+./gradlew :packing:test          # planner and measuring tests, no phone needed
 ./gradlew :app:installDebug      # debug build: RevenueCat test purchases work here
-./gradlew :app:installStaging    # optimised build: judge animations and speed here
+./gradlew :app:installStaging    # fast build: judge animations and speed here
 ```
 
-**Use `staging` to judge how the app feels.** Debug builds of Compose drop frames on older
-phones, which makes good motion look broken. Staging is the release build signed with the
-debug key, so it installs directly.
+**Use `staging` to judge how the app feels.** Debug builds drop frames on older phones, which
+makes good animation look broken. Staging is the release build signed with the debug key, so it
+installs straight onto a phone.
 
-Configuration lives in `local.properties`, which is never committed. See
-`local.properties.example` for the keys: the Supabase URL and publishable key, the Google
-web client id, and the RevenueCat key. A `test_` RevenueCat key works only in debug builds;
-RevenueCat shuts the app down if one reaches a release build.
+Settings live in `local.properties`, which is never committed. See `local.properties.example`
+for what goes in it: the Supabase address and key, the Google web client id, and the RevenueCat
+key. A `test_` RevenueCat key only works in debug builds. RevenueCat closes the app if one gets
+into a release build.
 
 ### The database
 
 Every file in `supabase/migrations/` is run once, in name order, in the Supabase SQL editor
-(Dashboard → SQL Editor → New query → paste the file → Run). A file that says a table or
-constraint "already exists" has been run before; skip it. Never run `supabase/tests/` there —
-those are for a throwaway local database only.
+(Dashboard, then SQL Editor, then New query, paste the file, Run). If a file says something
+"already exists", it has been run before, so skip it. Never run `supabase/tests/` there. Those
+are for a throwaway database on your own computer only.
 
-Three dashboard settings go with the migrations:
+Settings in the dashboard that go with them:
 
-- **Authentication → Hooks → Before User Created** → `hook_block_disposable_email`
-  (from `202609270003`), so throwaway inboxes cannot sign up.
-- **Integrations → Cron** switched on *before* running `202609270004_account_deletion_grace.sql`,
-  so the nightly sweep that deletes accounts 30 days after they asked is scheduled. If Cron
-  was off when it ran, switch it on and run the last block of that file again.
-- `202609270005_fit_reports.sql` keeps the "It doesn't fit" reports: the reason picked and the
-  sizes, never names. Read them in Table Editor → `fit_reports`; the app cannot read them back.
-- `202609280001_app_feedback.sql` keeps the "How are we doing?" card: the stars, the words
-  if any, packs finished and the app version. Read them in Table Editor → `app_feedback`; the
-  app cannot read them back.
-- **Authentication → URL Configuration → Redirect URLs** → add `packabunch://reset-password`.
-  The password-reset email sends people back into the app with it; without it the link opens
-  the Site URL instead and the reset cannot be finished on the phone.
+* **Authentication, Hooks, Before User Created:** `hook_block_disposable_email` (from
+  `202609270003`), so throwaway inboxes cannot sign up.
+* **Integrations, Cron:** switched on *before* running `202609270004_account_deletion_grace.sql`,
+  so accounts are deleted 30 days after someone asks. If Cron was off when it ran, switch it on
+  and run the last part of that file again.
+* `202609270005_fit_reports.sql` keeps the "It doesn't fit" reports: the reason picked and the
+  sizes, never names. Read them in Table Editor, `fit_reports`. The app cannot read them back.
+* `202609280001_app_feedback.sql` keeps the "How are we doing?" answers: the stars, any words,
+  packs finished and the app version. Read them in Table Editor, `app_feedback`.
+* **Authentication, URL Configuration, Redirect URLs:** add `packabunch://reset-password`.
+  The password reset email sends people back into the app with it. Without it the link opens
+  the website instead, and the reset cannot be finished on the phone.
 
 ### Running it on your phone from VS Code (Windows PowerShell)
 
-No Android Studio needed: VS Code's terminal (**Terminal → New Terminal**) and the Gradle
-wrapper in this repo build and install the app.
+You do not need Android Studio. VS Code's terminal (**Terminal, New Terminal**) and the Gradle
+files in this folder build and install the app.
 
-**Once, on the phone:** Settings → About phone → Software information → tap **Build number**
-seven times; then Settings → **Developer options** → turn on **USB debugging**. Plug the phone
+**Once, on the phone:** Settings, About phone, Software information, then tap **Build number**
+seven times. Then Settings, **Developer options**, and turn on **USB debugging**. Plug the phone
 in and tap **Allow** when it asks.
 
-**Once per terminal window:** tell PowerShell where Java and `adb` are. The paths below are
-the defaults; if yours differ, `Get-Content local.properties` shows the SDK folder on its
+**Once per terminal window:** tell PowerShell where Java and `adb` are. These are the usual
+places. If yours are different, `Get-Content local.properties` shows the SDK folder on the
 `sdk.dir=` line.
 
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"
 $env:Path += ";$env:LOCALAPPDATA\Android\Sdk\platform-tools"
-adb devices                      # should list the phone, followed by "device"
+adb devices                      # should list the phone, then "device"
 ```
 
 **Every time, to update the app on the phone:**
 
 ```powershell
-git pull                         # fetch the latest changes
+git pull                         # get the latest changes
 .\gradlew.bat installStaging     # build and install the staging app
 adb shell monkey -p com.packabunch.staging -c android.intent.category.LAUNCHER 1   # open it
 ```
 
-The staging app (`com.packabunch.staging`) installs beside any debug copy and keeps your packs
+The staging app (`com.packabunch.staging`) installs next to any debug copy and keeps your packs
 between updates. `.\gradlew.bat installDebug` installs the debug build instead, for testing
-purchases.
+payments.
 
 If something goes wrong:
 
-- **`adb` is not recognised** — the `platform-tools` line above was not run in this window, or
-  the SDK is elsewhere: use the folder from `sdk.dir` in `local.properties`.
-- **SDK location not found** — `local.properties` needs a line like
+* **`adb` is not recognised:** the `platform-tools` line above was not run in this window, or
+  the SDK is somewhere else. Use the folder from `sdk.dir` in `local.properties`.
+* **SDK location not found:** `local.properties` needs a line like
   `sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk`.
-- **JAVA_HOME is not set** — run the `$env:JAVA_HOME` line; it must point at a JDK 17 or newer.
-- **The phone is listed as `unauthorized`** — unlock it and accept the USB debugging prompt.
+* **JAVA_HOME is not set:** run the `$env:JAVA_HOME` line. It must point at JDK 17 or newer.
+* **The phone shows as `unauthorized`:** unlock it and accept the USB debugging question.
 
 ## Before a Play release
 
-- **A privacy policy and terms at a public URL.** Both exist in the app
-  (`ui/screens/LegalScreens.kt`) but Play needs a web address as well.
-- **Account deletion.** In the app it is done: the account is deleted 30 days after it is
-  asked for, and signing in again within them stops it. Play also wants a web page where
-  someone without the app can ask for the same.
-- **Your own email sender.** Supabase's built-in mail sends about two messages an hour,
-  which will not survive real sign-ups. Set SMTP in the Supabase dashboard.
-- **The application id** `com.packabunch` is permanent once uploaded. Confirm it first.
+* **The app id** `com.packabunch` can never change once it is uploaded. Confirm it first.

@@ -119,7 +119,7 @@ fun SettingsScreen(
                     Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             SettingsLabel("Camera measuring")
-                            Text(if (settings.cameraMeasuring) "Checks support when opened" else "Typed measurements only",
+                            Text(if (settings.cameraMeasuring) "With a bank card for scale" else "Typed measurements only",
                                 color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp)
                         }
                         com.packabunch.ui.components.PackSwitch(settings.cameraMeasuring, onCameraMeasuringChange)

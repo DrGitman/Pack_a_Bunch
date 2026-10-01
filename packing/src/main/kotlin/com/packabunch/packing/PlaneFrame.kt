@@ -18,10 +18,10 @@ data class PlanePoint(val xMm: Float, val yMm: Float, val hMm: Float)
  *
  * Built from any point on the surface plus two directions in world space: one lying along
  * the surface ([alongAxis]) and its upward normal ([upAxis]). They need not be exactly
- * perpendicular or unit length — ARCore's are close but not exact after a pose update — so
+ * perpendicular or unit length — a camera pose's are close but not exact — so
  * the frame re-orthonormalises them rather than trusting them.
  *
- * World units are metres (ARCore's); plane units are millimetres (everything downstream).
+ * World units are metres; plane units are millimetres (everything downstream).
  */
 class PlaneFrame(
     originXM: Float,

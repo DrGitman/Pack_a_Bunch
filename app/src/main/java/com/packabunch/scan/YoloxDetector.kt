@@ -1,4 +1,4 @@
-package com.packabunch.ar
+package com.packabunch.scan
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment

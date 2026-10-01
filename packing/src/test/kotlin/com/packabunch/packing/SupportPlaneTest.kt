@@ -9,7 +9,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Finding the table without ARCore's help.
+ * Finding the table from depth alone.
  *
  * The scenes here are the ones that defeated plane detection on the phone: a dark table with a
  * wall behind it, and a couple of objects standing on top.

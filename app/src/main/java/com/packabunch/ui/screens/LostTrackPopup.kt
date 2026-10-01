@@ -11,7 +11,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
-import com.google.ar.core.TrackingFailureReason
+import com.packabunch.scan.ScanProblem
 import com.packabunch.ui.components.PackIcons
 import com.packabunch.ui.components.PackPopup
 import com.packabunch.ui.theme.BrandTint
@@ -20,7 +20,7 @@ import com.packabunch.ui.theme.Primary
 import com.packabunch.ui.theme.Success
 
 /**
- * "Lost track of the room" — shown over a camera screen when ARCore has lost its place for
+ * "Lost track of the room" — shown over a camera screen when the card has been out of view for
  * long enough that the one-line advice is not going to be read. It names what was being
  * measured, says what is already kept, and offers the retry and the typed route side by side.
  *
@@ -29,7 +29,7 @@ import com.packabunch.ui.theme.Success
 @Composable
 fun LostTrackPopup(
     what: String,
-    reason: TrackingFailureReason?,
+    reason: ScanProblem?,
     /** What is kept — "Width 58.4 cm and depth 39.6 cm are saved." — or null when nothing is yet. */
     saved: AnnotatedString?,
     retry: String,
@@ -40,10 +40,10 @@ fun LostTrackPopup(
     modifier: Modifier = Modifier,
 ) {
     val why = when (reason) {
-        TrackingFailureReason.INSUFFICIENT_LIGHT -> "It got too dark to hold on to. Turn the torch on, point it back at $what and move slowly."
-        TrackingFailureReason.INSUFFICIENT_FEATURES -> "There wasn't enough detail to hold on to. Point it back at $what, somewhere with some texture, and move slowly."
-        TrackingFailureReason.CAMERA_UNAVAILABLE -> "Another app took the camera for a moment. Point it back at $what and move slowly."
-        else -> "The camera moved too fast, or there wasn't enough detail to hold on to. Point it back at $what and move slowly."
+        ScanProblem.TOO_DARK -> "It got too dark to see the card. Turn the torch on, point it back at $what and move slowly."
+        ScanProblem.TOO_FAST -> "The picture blurred. Point it back at $what, with the card in view, and move slowly."
+        ScanProblem.REFERENCE_NOT_FLAT -> "The card needs to lie flat. Lay it on the surface by $what and point back at both."
+        ScanProblem.NO_REFERENCE, null -> "The card went out of view. Point back at $what with the card in the picture."
     }
     PackPopup(
         icon = PackIcons.Rotate,

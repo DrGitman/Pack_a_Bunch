@@ -17,7 +17,6 @@ coroutines = "1.10.2"
 room = "2.8.4"
 datastore = "1.1.7"
 
-arcore = "1.56.0"
 camerax = "1.6.2"
 revenuecat = "10.22.1"
 lottie = "6.6.10"
@@ -58,8 +57,7 @@ room-ktx = { module = "androidx.room:room-ktx", version.ref = "room" }
 room-compiler = { module = "androidx.room:room-compiler", version.ref = "room" }
 datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 
-# AR Optional: the app stays installable, and every AR path has a typed path beside it.
-arcore = { module = "com.google.ar:core", version.ref = "arcore" }
+# Camera measuring is optional: the app stays installable, and every camera path has a typed path beside it.
 
 camerax-core = { module = "androidx.camera:camera-core", version.ref = "camerax" }
 camerax-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camerax" }

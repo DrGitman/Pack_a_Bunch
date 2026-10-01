@@ -48,14 +48,14 @@ import com.packabunch.ui.theme.UiFamily
 /**
  * Review measurements — `design/artboards/MeasureReview.dc.html`.
  *
- * The screen the AR path is not allowed to skip. Three things it guarantees:
+ * The screen the camera path is not allowed to skip. Three things it guarantees:
  *
  *  - **Every value is editable.** A camera estimate that cannot be corrected is a camera
  *    estimate the user is forced to trust, and they should not have to.
  *  - **Every value carries where it came from**, and editing one flips its badge to "typed
  *    in" the moment it changes — because it is then a typed value, whatever produced the
  *    first draft.
- *  - **No confidence score.** ARCore's tracking state is not calibrated accuracy, so there
+ *  - **No confidence score.** The camera has no calibrated accuracy figure to give, so there
  *    is no percentage here and no colour-coding pretending to be one.
  */
 @Composable

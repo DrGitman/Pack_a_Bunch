@@ -1,6 +1,5 @@
 package com.packabunch.ui.screens
 
-import android.opengl.GLSurfaceView
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -43,13 +42,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.google.ar.core.TrackingFailureReason
-import com.packabunch.ar.ItemScanController
-import com.packabunch.ar.ItemScanUi
-import com.packabunch.ar.ScanAnchor
-import com.packabunch.ar.ScanItem
-import com.packabunch.ar.ScannedItemResult
-import com.packabunch.ar.TrackingStatus
+import androidx.camera.view.PreviewView
+import com.packabunch.scan.ItemScanController
+import com.packabunch.scan.ItemScanUi
+import com.packabunch.scan.OutlineLayer
+import com.packabunch.scan.ScanAnchor
+import com.packabunch.scan.ScanItem
+import com.packabunch.scan.ScanProblem
+import com.packabunch.scan.ScannedItemResult
+import com.packabunch.scan.TrackingStatus
 import com.packabunch.packing.AngleHint
 import com.packabunch.packing.CannotMeasureReason
 import com.packabunch.packing.FittedObject
@@ -93,7 +94,7 @@ import kotlin.math.sin
  * `MultiScan · New` (three or more) and `ItemScan · Outline states`.
  *
  * The camera fills the screen. Controls are small glass pills that leave the picture alone;
- * the outlines themselves are drawn by the AR renderer ([com.packabunch.ar.GlowOutlineRenderer])
+ * the outlines themselves are drawn in the camera's own frame ([com.packabunch.scan.OutlineLayer])
  * so they stay attached to the objects as the phone moves. This screen only places the words.
  *
  * A typed path sits beside the camera at equal prominence (the pencil), as every camera path
@@ -112,40 +113,35 @@ fun ItemScanScreen(
     onManual: () -> Unit,
     onBack: () -> Unit,
 ) {
-    DepthCaptureGate(onManual, onBack) {
+    CameraCaptureGate(onManual, onBack) {
         val context = LocalContext.current
         val density = LocalDensity.current.density
         val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
         val controller = remember { ItemScanController(context, density, maxItems.coerceAtLeast(0)) }
         val ui by controller.ui.collectAsStateWithLifecycle()
         val anchors by controller.anchors.collectAsStateWithLifecycle()
+        val outlines by controller.outlines.collectAsStateWithLifecycle()
         val scope = rememberCoroutineScope()
-        var error by remember { mutableStateOf<String?>(null) }
         var finishing by remember { mutableStateOf(false) }
-        val view = remember {
-            GLSurfaceView(context).apply {
-                preserveEGLContextOnPause = true
-                setEGLContextClientVersion(2)
-                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                setRenderer(controller)
+        val preview = remember {
+            PreviewView(context).apply {
+                scaleType = PreviewView.ScaleType.FILL_CENTER
+                implementationMode = PreviewView.ImplementationMode.COMPATIBLE
             }
         }
         DisposableEffect(owner) {
             val observer = LifecycleEventObserver { _, event ->
                 when (event) {
-                    Lifecycle.Event.ON_RESUME -> {
-                        error = controller.resume(view.display?.rotation ?: 0, view.width.coerceAtLeast(1), view.height.coerceAtLeast(1))
-                        if (error == null) view.onResume()
-                    }
-                    Lifecycle.Event.ON_PAUSE -> { view.onPause(); controller.pause() }
+                    Lifecycle.Event.ON_RESUME -> controller.start(owner, preview)
+                    Lifecycle.Event.ON_PAUSE -> controller.stop()
                     else -> Unit
                 }
             }
             owner.lifecycle.addObserver(observer)
-            onDispose { owner.lifecycle.removeObserver(observer); view.onPause(); controller.release() }
+            onDispose { owner.lifecycle.removeObserver(observer); controller.release() }
         }
 
-        val fatal = error ?: ui.fatalError
+        val fatal = ui.fatalError
         if (fatal != null) {
             ScreenScaffold {
                 PackAppBar(title = "Scan items", onBack = onBack)
@@ -173,7 +169,12 @@ fun ItemScanScreen(
                         }
                     }
                 },
-                cameraPreview = { AndroidView(factory = { view }, modifier = Modifier.fillMaxSize()) },
+                cameraPreview = {
+                    Box(Modifier.fillMaxSize().onSizeChanged { controller.setViewSize(it.width, it.height) }) {
+                        AndroidView(factory = { preview }, modifier = Modifier.fillMaxSize())
+                        OutlineLayer(outlines, density)
+                    }
+                },
             )
         }
     }
@@ -235,15 +236,15 @@ fun ItemScanOverlay(
                 val item = byId[a.id] ?: continue
                 val index = items.indexOf(item)
                 val name = item.name ?: "Item ${index + 1}"
-                if (a.id == pillsFor) {
-                    val m = item.state as ItemScanState.Measured
-                    val d = m.dimensions.asDimensions()
+                val sizes = sizesOf(item)
+                if (a.id == pillsFor && sizes != null) {
+                    val (sw, sd, sh) = sizes
                     val round = item.shape == ShapeFamily.CYLINDER || item.shape == ShapeFamily.TAPERED || item.shape == ShapeFamily.SPHERE
-                    a.depth?.let { (x, y) ->
-                        add(AnchoredLabel("d${a.id}", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("D", formatLengthWithUnit(d.depthMm, unit), appearDelayMillis = 90) })
+                    if (sd != null) a.depth?.let { (x, y) ->
+                        add(AnchoredLabel("d${a.id}", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("D", formatLengthWithUnit(sd, unit), appearDelayMillis = 90) })
                     }
                     a.height?.let { (x, y) ->
-                        add(AnchoredLabel("h${a.id}", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("H", formatLengthWithUnit(d.heightMm, unit), highlight = true, appearDelayMillis = 180) })
+                        add(AnchoredLabel("h${a.id}", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("H", formatLengthWithUnit(sh, unit), highlight = true, appearDelayMillis = 180) })
                     }
                     val w = a.width
                     if (w != null) {
@@ -251,15 +252,16 @@ fun ItemScanOverlay(
                         add(AnchoredLabel("w${a.id}", w.first, w.second, AnchorAlign.Below, movable = false) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Spacer(Modifier.height(4.fd))
-                                DimensionPill(if (round) "Ø" else "W", formatLengthWithUnit(d.widthMm, unit))
+                                DimensionPill(if (round) "Ø" else "W", formatLengthWithUnit(sw, unit))
                                 Spacer(Modifier.height(4.fd))
-                                ObjectTag(name, ScanBadge.Measured, 1f, compact = multi, onClick = { focused = null }, onLongClick = { onRemove(a.id) })
+                                val (_, badge, progress) = tagFor(item.state, name)
+                                ObjectTag(name, badge, progress, compact = multi, onClick = { focused = null }, onLongClick = { onRemove(a.id) })
                             }
                         })
                         continue
                     }
                 }
-                val (text, badge, progress) = tagFor(item.state, name, item.faceSize)
+                val (text, badge, progress) = tagFor(item.state, name)
                 add(AnchoredLabel("t${a.id}", a.x, a.y, AnchorAlign.Above) {
                     ObjectTag(
                         text = text,
@@ -348,9 +350,22 @@ fun ItemScanOverlay(
     }
 }
 
-/** The measured object whose W / D / H pills are showing: the tapped one, else the biggest in view. */
+/**
+ * W, D, H in millimetres for the pills: the measured sizes once measured, the sizes so far before
+ * that (D is null until a side has been seen). Null when there is nothing to show yet.
+ */
+private fun sizesOf(item: ScanItem): Triple<Int, Int?, Int>? {
+    (item.state as? ItemScanState.Measured)?.let { m ->
+        val d = m.dimensions.asDimensions(); return Triple(d.widthMm, d.depthMm, d.heightMm)
+    }
+    item.faceSize?.let { f -> return Triple(f.widthMm.toInt(), f.depthMm?.toInt(), f.heightMm.toInt()) }
+    item.fit?.let { f -> return Triple(f.widthMm.toInt(), f.depthMm.toInt(), f.heightMm.toInt()) }
+    return null
+}
+
+/** The object whose W / D / H pills are showing: the tapped one, else the biggest in view with sizes. */
 private fun focusedMeasured(items: List<ScanItem>, anchors: List<ScanAnchor>, tapped: Int?): Int? {
-    val measured = items.filter { it.state is ItemScanState.Measured }.map { it.id }.toSet()
+    val measured = items.filter { sizesOf(it) != null && it.state !is ItemScanState.CannotMeasure }.map { it.id }.toSet()
     if (tapped != null && tapped in measured && anchors.any { it.id == tapped }) return tapped
     // Pills only fit on something that fills a decent share of the view.
     return anchors.filter { it.id in measured && it.span >= 0.22f }.maxByOrNull { it.span }?.id
@@ -358,23 +373,12 @@ private fun focusedMeasured(items: List<ScanItem>, anchors: List<ScanAnchor>, ta
 
 private data class TagText(val text: String, val badge: ScanBadge, val progress: Float)
 
-private fun tagFor(state: ItemScanState, name: String, face: com.packabunch.ar.FaceSize? = null): TagText = when (state) {
+// The tag is the object's name and nothing else; its sizes are on the W / D / H pills, and what
+// to do next is in the guidance at the top.
+private fun tagFor(state: ItemScanState, name: String): TagText = when (state) {
     is ItemScanState.Measured -> TagText(name, ScanBadge.Measured, 1f)
-    // The size is known long before it is final, so show it as it firms up rather than holding it
-    // back until "measured". The "~" says it may still move.
-    is ItemScanState.Scanning -> TagText(
-        face?.let { "$name · ${faceSizeText(it)}" }
-            ?: state.fit?.let { "$name · ${liveSize(it)}" } ?: "$name · scanning",
-        ScanBadge.Working, state.progress,
-    )
-    is ItemScanState.NeedsAngle -> TagText(
-        "$name · ${face?.let(::faceSizeText) ?: liveSize(state.fit)} · " + when (state.hint) {
-            AngleHint.TILT_DOWN -> "tilt down"
-            AngleHint.STEP_AROUND -> "step around"
-            AngleHint.STEP_BACK -> "step back"
-        },
-        ScanBadge.Working, state.progress,
-    )
+    is ItemScanState.Scanning -> TagText(name, ScanBadge.Working, state.progress)
+    is ItemScanState.NeedsAngle -> TagText(name, ScanBadge.Working, state.progress)
     is ItemScanState.CannotMeasure -> TagText(
         when (state.reason) {
             CannotMeasureReason.NO_DEPTH -> "No depth here — type it"
@@ -391,15 +395,15 @@ private fun tagFor(state: ItemScanState, name: String, face: com.packabunch.ar.F
  * what the old screen's "0 measured, 1 still going" could never tell anyone.
  */
 private fun guidance(ui: ItemScanUi): Pair<String, Boolean> {
-    if (ui.status != TrackingStatus.TRACKING) {
-        return when (ui.failureReason) {
-            TrackingFailureReason.INSUFFICIENT_LIGHT -> "Too dark to see — try the torch" to true
-            TrackingFailureReason.EXCESSIVE_MOTION -> "A little slower — the camera lost its place" to true
-            TrackingFailureReason.INSUFFICIENT_FEATURES -> "Point at the table, not a blank wall" to true
-            else -> "Move the phone slowly to get started" to true
-        }
+    when (ui.problem) {
+        ScanProblem.TOO_DARK -> return "Too dark to see — try the torch" to true
+        ScanProblem.TOO_FAST -> return "A little slower — the picture is blurred" to true
+        ScanProblem.REFERENCE_NOT_FLAT -> return "Lay the card flat on the table, beside the items" to true
+        ScanProblem.NO_REFERENCE -> return (if (ui.status == TrackingStatus.LOST) "Keep the card in view while you scan"
+            else "Put a bank card flat next to the items, and point at both") to true
+        null -> Unit
     }
-    if (!ui.surfaceFound) return "Point at the table or floor they're standing on" to true
+    if (!ui.surfaceFound) return "Put a bank card flat next to the items, and point at both" to true
     val items = ui.items
     if (ui.capReached) return "That's ${ui.maxItems} — the free plan stops there" to true
     if (items.isEmpty()) return (ui.scanHint ?: "Point at your things — leave a little gap between them") to true
@@ -642,16 +646,4 @@ private fun DrawScope.drawPreviewObject(fit: FittedObject, solid: Float, shown: 
             drawPath(topFace, line, style = stroke)
         }
     }
-}
-
-/** W × D × H in centimetres, marked as provisional. */
-private fun liveSize(fit: com.packabunch.packing.FittedObject): String {
-    fun cm(mm: Float) = "%.0f".format(mm / 10f)
-    return "~${cm(fit.widthMm)} × ${cm(fit.depthMm)} × ${cm(fit.heightMm)} cm"
-}
-
-/** HarshdeepJ's w·d/f size: W and H from the front, D after a side view ("?" until then). */
-private fun faceSizeText(f: com.packabunch.ar.FaceSize): String {
-    fun cm(mm: Float) = "%.0f".format(mm / 10f)
-    return "~${cm(f.widthMm)} × ${f.depthMm?.let(::cm) ?: "?"} × ${cm(f.heightMm)} cm"
 }

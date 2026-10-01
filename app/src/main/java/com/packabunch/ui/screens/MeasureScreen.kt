@@ -3,7 +3,6 @@ package com.packabunch.ui.screens
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
-import android.opengl.GLSurfaceView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -51,12 +50,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.packabunch.ar.findActivity
-import com.packabunch.ar.ArAvailability
-import com.packabunch.ar.ArMeasureController
-import com.packabunch.ar.ArSupport
-import com.packabunch.ar.EdgeStage
-import com.packabunch.ar.TrackingStatus
+import androidx.camera.view.PreviewView
+import androidx.compose.ui.layout.onSizeChanged
+import com.packabunch.scan.EdgeStage
+import com.packabunch.scan.MeasureController
+import com.packabunch.scan.MeasureState
+import com.packabunch.scan.ScanProblem
+import com.packabunch.scan.TrackingStatus
 import com.packabunch.packing.Dimensions
 import com.packabunch.packing.MeasurementSource
 import com.packabunch.ui.components.Note
@@ -78,15 +78,13 @@ import com.packabunch.ui.theme.UiFamily
 
 /**
  * Measure with the camera — `Measure.dc.html`, `MeasureStart.dc.html`, and the recovery
- * states `CameraDenied`, `ArUnavailable`, `ArServicesInstall`, `TrackingLost`.
+ * states `CameraDenied`, `TrackingLost`.
  *
- * Three edges, measured one at a time, each from two real hit tests against tracked
- * geometry. Nothing here is derived from pixel distance, and nothing is stored without
- * passing through the review screen first.
+ * Three edges, measured one at a time, each from two points on real surfaces, placed by the
+ * card in view. Nothing is stored without passing through the review screen first.
  *
- * "Type it instead" is on screen at every single moment, including while tracking is lost
- * and including when AR is not available at all. That is not a courtesy — it is the reason
- * this screen is allowed to exist.
+ * "Type it instead" is on screen at every single moment, including while the card is out of
+ * view. That is not a courtesy — it is the reason this screen is allowed to exist.
  */
 @Composable
 fun MeasureScreen(
@@ -98,60 +96,8 @@ fun MeasureScreen(
     /** The space's own name, for "Lost track of the cake box". */
     spaceName: String? = null,
 ) {
-    val context = LocalContext.current
-    val activity = context.findActivity()
-
-    var hasCameraPermission by remember {
-        mutableStateOf(
-            context.checkSelfPermission(Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED,
-        )
-    }
-    var support by remember { mutableStateOf<ArSupport>(ArSupport.Checking) }
-    var installRequested by remember { mutableStateOf(false) }
-
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted -> hasCameraPermission = granted }
-
-    // ARCore can answer "still checking" for a moment, so this re-asks rather than
-    // treating an indeterminate answer as a no.
-    LaunchedEffect(support, hasCameraPermission) {
-        if (support is ArSupport.Checking) {
-            kotlinx.coroutines.delay(200)
-            support = ArAvailability.check(context)
-        }
-    }
-
-    when {
-        !hasCameraPermission -> CameraDenied(
-            onAllow = { permissionLauncher.launch(Manifest.permission.CAMERA) },
-            onTypeInstead = onTypeInstead,
-            onBack = onBack,
-            modifier = modifier,
-        )
-
-        support is ArSupport.NotSupported || support is ArSupport.Unknown -> ArUnavailable(
-            detail = (support as? ArSupport.Unknown)?.reason,
-            onTypeInstead = onTypeInstead,
-            onBack = onBack,
-            modifier = modifier,
-        )
-
-        support is ArSupport.NeedsInstall -> ArNeedsInstall(
-            onInstall = {
-                activity?.let {
-                    ArAvailability.getArCore(it)
-                    installRequested = true
-                    support = ArSupport.Checking
-                }
-            },
-            onTypeInstead = onTypeInstead,
-            onBack = onBack,
-            modifier = modifier,
-        )
-
-        support is ArSupport.Ready -> ArMeasureSurface(
+    CameraCaptureGate(onTypeInstead, onBack) {
+        MeasureSurface(
             unit = unit,
             spaceName = spaceName,
             onMeasured = onMeasured,
@@ -159,13 +105,11 @@ fun MeasureScreen(
             onBack = onBack,
             modifier = modifier,
         )
-
-        else -> Box(modifier.fillMaxSize().background(Color.Black))
     }
 }
 
 @Composable
-private fun ArMeasureSurface(
+private fun MeasureSurface(
     unit: LengthUnit,
     spaceName: String?,
     onMeasured: (Dimensions, MeasurementSource) -> Unit,
@@ -175,35 +119,23 @@ private fun ArMeasureSurface(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val controller = remember { ArMeasureController(context) }
+    val controller = remember { MeasureController(context) }
     val state by controller.state.collectAsStateWithLifecycle()
-    var startError by remember { mutableStateOf<String?>(null) }
 
-    val glView = remember {
-        GLSurfaceView(context).apply {
-            preserveEGLContextOnPause = true
-            setEGLContextClientVersion(2)
-            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-            setRenderer(controller)
-            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-            setWillNotDraw(false)
+    val preview = remember {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
     }
 
-    // The session owns the camera, so it must follow the lifecycle exactly. Holding it open
-    // in the background would keep the camera from anything else on the phone.
+    // The camera must follow the lifecycle exactly. Holding it open in the background would keep
+    // it from anything else on the phone.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    val rotation = glView.display?.rotation ?: 0
-                    startError = controller.resume(rotation, glView.width.coerceAtLeast(1), glView.height.coerceAtLeast(1))
-                    if (startError == null) glView.onResume()
-                }
-                Lifecycle.Event.ON_PAUSE -> {
-                    glView.onPause()
-                    controller.pause()
-                }
+                Lifecycle.Event.ON_RESUME -> controller.start(lifecycleOwner, preview)
+                Lifecycle.Event.ON_PAUSE -> controller.stop()
                 else -> Unit
             }
         }
@@ -223,7 +155,7 @@ private fun ArMeasureSurface(
         }
     }
 
-    val fatal = state.fatalError ?: startError
+    val fatal = state.fatalError
     if (fatal != null) {
         ScreenScaffold(modifier) {
             PackAppBar(title = "Measure the space", onBack = onBack)
@@ -239,7 +171,7 @@ private fun ArMeasureSurface(
     // The same camera screen as the any-shape scan (`SpaceScan · New`): the picture fills the
     // screen, and every control is a small glass pill that leaves it alone.
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        AndroidView(factory = { glView }, modifier = Modifier.fillMaxSize())
+        AndroidView(factory = { preview }, modifier = Modifier.fillMaxSize().onSizeChanged { controller.setViewSize(it.width, it.height) })
 
         MeasurementOverlay(state = state)
 
@@ -288,8 +220,8 @@ private fun ArMeasureSurface(
             Spacer(Modifier.height(7.fd))
             com.packabunch.ui.components.ScanGuidancePill(
                 text = when {
-                    state.status == TrackingStatus.INITIALISING -> "Move the phone slowly so it can find the surface"
-                    state.status == TrackingStatus.LOST -> trackingLostAdvice(state.failureReason)
+                    state.problem != null -> trackingLostAdvice(state.problem, lost = state.status == TrackingStatus.LOST)
+                    state.status == TrackingStatus.INITIALISING -> "Put a bank card flat on the surface and point at it"
                     !state.reticleHasSurface && state.capturedScreen.size < 2 -> "Point at a surface — there's nothing to measure from here"
                     state.capturedScreen.isEmpty() -> state.stage.instruction
                     state.capturedScreen.size == 1 -> "Now tap the other end"
@@ -347,9 +279,9 @@ private fun ArMeasureSurface(
             LostTrackPopup(
                 // Measured edge by edge, so it is a box-shaped thing: a crate unless it has a name.
                 what = if (spaceName.isNullOrBlank()) "the crate" else spaceNoun(spaceName, standingInside = false),
-                reason = state.failureReason,
+                reason = state.problem,
                 saved = savedLengths(
-                    com.packabunch.ar.EdgeStage.entries.mapNotNull { e ->
+                    EdgeStage.entries.mapNotNull { e ->
                         state.measured[e]?.let { e.label to formatLengthWithUnit(it, unit) }
                     },
                 ),
@@ -368,7 +300,7 @@ private fun ArMeasureSurface(
  * confirmed, the one being measured in amber, the rest waiting.
  */
 @Composable
-private fun MeasuredCard(state: com.packabunch.ar.ArMeasureState, unit: LengthUnit) {
+private fun MeasuredCard(state: MeasureState, unit: LengthUnit) {
     Column(
         Modifier
             .background(com.packabunch.ui.theme.ScanGlass, RoundedCornerShape(16.fd))
@@ -403,7 +335,7 @@ private fun MeasuredCard(state: com.packabunch.ar.ArMeasureState, unit: LengthUn
 
 /** Points, the line between them, and the reticle — drawn over the camera feed. */
 @Composable
-private fun MeasurementOverlay(state: com.packabunch.ar.ArMeasureState) {
+private fun MeasurementOverlay(state: MeasureState) {
     Canvas(Modifier.fillMaxSize()) {
         val points = state.capturedScreen.map { Offset(it.first, it.second) }
 
@@ -446,121 +378,11 @@ private fun MeasurementOverlay(state: com.packabunch.ar.ArMeasureState) {
     }
 }
 
-private fun trackingLostAdvice(reason: com.google.ar.core.TrackingFailureReason?): String =
-    when (reason) {
-        com.google.ar.core.TrackingFailureReason.EXCESSIVE_MOTION ->
-            "Slow down, it lost track of the room."
-        com.google.ar.core.TrackingFailureReason.INSUFFICIENT_LIGHT ->
-            "Too dark to see the surface. More light, or type it instead."
-        com.google.ar.core.TrackingFailureReason.INSUFFICIENT_FEATURES ->
-            "This surface is too plain to track. Aim at an edge or something with texture."
-        com.google.ar.core.TrackingFailureReason.CAMERA_UNAVAILABLE ->
-            "Something else is using the camera."
-        else -> "Lost track. Move the phone slowly until it picks the room up again."
+private fun trackingLostAdvice(problem: ScanProblem?, lost: Boolean): String =
+    when (problem) {
+        ScanProblem.TOO_FAST -> "Slow down — the picture is blurred."
+        ScanProblem.TOO_DARK -> "Too dark to see the surface. Try the torch, or type it instead."
+        ScanProblem.REFERENCE_NOT_FLAT -> "Lay the card flat on the surface you're measuring."
+        ScanProblem.NO_REFERENCE, null -> if (lost) "Keep the card in view while you measure."
+            else "Put a bank card flat on the surface and point at it."
     }
-
-// -- recovery states -------------------------------------------------------------------------
-
-@Composable
-private fun CameraDenied(
-    onAllow: () -> Unit,
-    onTypeInstead: () -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) = RecoveryState(
-    modifier = modifier,
-    title = "Camera access is off",
-    body = "Measuring with the camera needs it. Everything else in the app works without it, " +
-        "and typing measurements always works.",
-    primary = "Allow the camera" to onAllow,
-    secondary = "Type the measurements" to onTypeInstead,
-    onBack = onBack,
-)
-
-@Composable
-private fun ArUnavailable(
-    detail: String?,
-    onTypeInstead: () -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) = RecoveryState(
-    modifier = modifier,
-    title = "This phone can't measure with the camera",
-    body = "Camera measuring needs AR support this phone doesn't have. Nothing else changes " +
-        "typed measurements work exactly the same, and so does the rest of the app." +
-        (detail?.let { "\n\n($it)" } ?: ""),
-    primary = "Type the measurements" to onTypeInstead,
-    secondary = null,
-    onBack = onBack,
-)
-
-@Composable
-private fun ArNeedsInstall(
-    onInstall: () -> Unit,
-    onTypeInstead: () -> Unit,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) = RecoveryState(
-    modifier = modifier,
-    title = "One thing to install first",
-    body = "Camera measuring uses Google Play Services for AR. Your phone supports it, it " +
-        "just isn't installed or is out of date.",
-    primary = "Install it" to onInstall,
-    secondary = "Type the measurements" to onTypeInstead,
-    onBack = onBack,
-)
-
-@Composable
-private fun RecoveryState(
-    title: String,
-    body: String,
-    primary: Pair<String, () -> Unit>,
-    secondary: Pair<String, () -> Unit>?,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    ScreenScaffold(modifier) {
-        com.packabunch.ui.components.PackAppBar(title = "Measure", onBack = onBack)
-
-        Spacer(Modifier.height(Spacing.xl))
-
-        Column(Modifier.padding(horizontal = Spacing.gutter)) {
-            com.packabunch.ui.components.IconTile(
-                icon = PackIcons.Camera,
-                tint = Color(0xFF7C4223),
-                background = Color(0xFFF5E4D6),
-                size = 56.dp,
-                iconSize = 26.dp,
-            )
-            Spacer(Modifier.height(Spacing.base))
-            Text(
-                text = title,
-                color = TextPrimary,
-                fontFamily = UiFamily,
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 25.sp,
-                lineHeight = 32.sp,
-                letterSpacing = (-0.6).sp,
-            )
-            Spacer(Modifier.height(10.dp))
-            Text(
-                text = body,
-                color = TextSecondary,
-                fontFamily = UiFamily,
-                fontSize = 15.sp,
-                lineHeight = 23.sp,
-            )
-        }
-
-        Spacer(Modifier.size(0.dp))
-        Column(
-            Modifier
-                .padding(horizontal = Spacing.gutter)
-                .padding(top = Spacing.xl),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            PrimaryButton(text = primary.first, onClick = primary.second)
-            secondary?.let { SecondaryButton(text = it.first, onClick = it.second) }
-        }
-    }
-}

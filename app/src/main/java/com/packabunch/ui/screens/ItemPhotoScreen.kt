@@ -73,8 +73,8 @@ import java.util.concurrent.Executors
  *
  * ### Camera ownership
  *
- * This uses CameraX, and the AR screens use ARCore. Both want exclusive access to the
- * camera, and holding one open while the other starts is a reliable way to get a black
+ * This screen and the scan screens each bind CameraX for themselves. Both want exclusive access
+ * to the camera, and holding one open while the other starts is a reliable way to get a black
  * preview or a hard failure on some devices. Two rules keep them apart:
  *
  *  - This screen binds on entry and unbinds in `onDispose`, so leaving it releases the
@@ -145,7 +145,7 @@ fun ItemPhotoScreen(
         }, ContextCompat.getMainExecutor(context))
 
         onDispose {
-            // Released here, not on a later screen. ARCore cannot start while CameraX holds
+            // Released here, not on a later screen. A scan cannot start while this screen holds
             // the camera, and the measure screen is one back-press away.
             provider?.unbindAll()
             executor.shutdown()

@@ -75,6 +75,8 @@ import com.packabunch.ui.screens.WelcomeScreen
  */
 object Routes {
     const val SWEEP_ITEMS = "sweepItems"
+    const val PHOTO_ITEMS = "photoItems"            // ItemPhoto · Take / Finding sizes / Done / Check item
+    const val PHOTO_SPACE = "photoSpace"            // SpacePhoto · Take / Finding sizes / Done / Check the space
     const val WELCOME = "welcome"          // Main.dc.html
     const val PROJECTS = "projects"        // Projects.dc.html
     const val CREATE_SPACE = "createSpace" // CreateSpace.dc.html
@@ -397,6 +399,18 @@ fun PackNavHost(
             onOtherWay = typed,
         )
     }
+    fun noScansLeft(typed: () -> Unit) {
+        limitHit = LimitHit(
+            title = "No scans left today",
+            body = "Free includes ${viewModel.limits.maxScansPerDay} photo scans a day, and they come back tomorrow. Type the sizes in for now, or try Pack Plus to scan as often as you like.",
+            otherWay = "Type the sizes in",
+            onOtherWay = typed,
+        )
+    }
+    // A photo spends a scan when it is taken, not when the camera opens: looking is free.
+    fun photoOrType(route: String, typed: () -> Unit) {
+        if (viewModel.canScan()) navController.navigate(route) else noScansLeft(typed)
+    }
     fun home() = navController.navigate(Routes.PROJECTS) {
         popUpTo(navController.graph.id) { inclusive = true }
         launchSingleTop = true
@@ -705,31 +719,23 @@ fun PackNavHost(
         }
 
         composable(Routes.SPACE_TYPE) {
-            // Asked here rather than at launch: it costs a short-lived ARCore session, and
-            // this is the first moment the answer changes anything on screen.
             val context = androidx.compose.ui.platform.LocalContext.current
             androidx.compose.runtime.LaunchedEffect(Unit) {
-                viewModel.updateDepthCapable(
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        com.packabunch.ar.ArAvailability.supportsDepth(context)
-                    },
+                viewModel.updateCameraCapable(
+                    context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_CAMERA_ANY),
                 )
             }
 
             SpaceTypeScreen(
                 selected = editor.spaceKind,
-                // Not every ARCore phone can sense depth, and mapping needs it. Checked
-                // here so the choice is honest before it is made, not after.
-                depthCapable = viewModel.depthCapable && settings.cameraMeasuring,
+                cameraCapable = viewModel.cameraCapable && settings.cameraMeasuring,
                 limits = viewModel.limits,
                 onSelect = viewModel::setSpaceKind,
                 onContinue = {
                     if (!settings.cameraMeasuring) {
                         navController.navigate(Routes.CREATE_SPACE)
-                    } else if (editor.spaceKind == SpaceKind.ANY_SHAPE) {
-                        scanOrType(Routes.SPACE_SCAN) { navController.navigate(Routes.CREATE_SPACE) }
                     } else {
-                        navController.navigate(Routes.MEASURE)
+                        photoOrType(Routes.PHOTO_SPACE) { navController.navigate(Routes.CREATE_SPACE) }
                     }
                 },
                 onBack = { navController.popBackStack() },
@@ -815,7 +821,7 @@ fun PackNavHost(
                 onNext = { toPackPage(Routes.ITEMS) },
                 onBack = { navController.popBackStack() },
                 onMeasureWithCamera = {
-                    if (settings.cameraMeasuring) navController.navigate(Routes.MEASURE)
+                    if (settings.cameraMeasuring) photoOrType(Routes.PHOTO_SPACE) { }
                     else notice = "Camera measuring is turned off in Settings."
                 },
             )
@@ -860,9 +866,50 @@ fun PackNavHost(
                 onEditConsumed = { editItemId = null },
                 onLibrary = { navController.navigate(Routes.ITEM_LIBRARY) },
                 onScan = {
-                    if (settings.cameraMeasuring) scanOrType(Routes.SWEEP_ITEMS) { }
+                    if (settings.cameraMeasuring) photoOrType(Routes.PHOTO_ITEMS) { }
                     else notice = "Camera measuring is turned off in Settings. You can still add items by typing their dimensions."
                 },
+            )
+        }
+
+        composable(Routes.PHOTO_ITEMS) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            val planLimit = viewModel.limits.maxPiecesPerPack
+            com.packabunch.ui.screens.PhotoItemsFlow(
+                unit = settings.unit,
+                onUnitChange = viewModel::setUnit,
+                maxItems = minOf(20, (planLimit ?: com.packabunch.packing.PackingEngine.MAX_INSTANCE_COUNT).minus(editor.pieceCount)).coerceAtLeast(1),
+                takeScan = { viewModel.tryStartScan().also { if (!it) noScansLeft { navController.popBackStack() } } },
+                onSave = { checked ->
+                    scope.launch {
+                        val withIds = checked.map { java.util.UUID.randomUUID().toString() to it }
+                        for ((id, c) in withIds) c.photo?.let { com.packabunch.data.ItemPhotos.store(context, id, it) }
+                        if (viewModel.importCheckedItems(withIds)) navController.popBackStack()
+                        else notice = "These items exceed this pack's piece limit. Review the current items first."
+                    }
+                },
+                onTypeInstead = { navController.popBackStack() },
+                onBack = { navController.popBackStack() },
+            )
+        }
+
+        composable(Routes.PHOTO_SPACE) {
+            com.packabunch.ui.screens.PhotoSpaceFlow(
+                spaceName = editor.space?.name?.takeIf { it.isNotBlank() },
+                unit = settings.unit,
+                onUnitChange = viewModel::setUnit,
+                edgeGapMm = editor.space?.edgeGapMm ?: 5,
+                takeScan = { viewModel.tryStartScan().also { if (!it) noScansLeft { navController.navigate(Routes.CREATE_SPACE) } } },
+                onSave = { name, dimensions, typed, gap ->
+                    viewModel.setSpaceName(name)
+                    viewModel.setSpaceDimensions(dimensions,
+                        if (typed) com.packabunch.packing.MeasurementSource.TYPED_IN else com.packabunch.packing.MeasurementSource.CAMERA_ESTIMATE)
+                    viewModel.setEdgeGap(gap)
+                    items()
+                },
+                onTypeInstead = { navController.navigate(Routes.CREATE_SPACE) },
+                onBack = { navController.popBackStack() },
             )
         }
 
@@ -912,7 +959,7 @@ fun PackNavHost(
                         viewModel.setEdgeGap(gap)
                         items()
                     },
-                    onMeasureAgain = { navController.navigate(if (settings.cameraMeasuring) Routes.MEASURE else Routes.CREATE_SPACE) },
+                    onMeasureAgain = { navController.navigate(if (settings.cameraMeasuring) Routes.PHOTO_SPACE else Routes.CREATE_SPACE) },
                     onBack = { navController.popBackStack() },
                 )
             }

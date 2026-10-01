@@ -481,16 +481,16 @@ class AppViewModel(
     val limits: TierLimits get() = TierLimits.forTier(_settings.value.tier)
 
     /**
-     * Whether this phone can sense depth, which mapping an irregular space needs.
+     * Whether this device has a camera, which is all camera measuring needs.
      *
-     * Set once from the AR availability check. Defaults to false, so the "any shape" route
-     * is offered only when it has been confirmed — never assumed and then failed at.
+     * Defaults to true: every phone has one, and the camera gate still says so plainly on the
+     * rare tablet that does not.
      */
-    var depthCapable: Boolean by androidx.compose.runtime.mutableStateOf(false)
+    var cameraCapable: Boolean by androidx.compose.runtime.mutableStateOf(true)
         private set
 
-    fun updateDepthCapable(capable: Boolean) {
-        depthCapable = capable
+    fun updateCameraCapable(capable: Boolean) {
+        cameraCapable = capable
     }
 
     // -- settings -------------------------------------------------------------------------
@@ -580,6 +580,13 @@ class AppViewModel(
      * [TierLimits.maxScansPerDay] a day — mapping a space or scanning items; typing sizes is
      * never limited. Counted on this phone, per calendar day.
      */
+    /** Whether a scan is left today, without spending it. A photo spends one when it is taken. */
+    fun canScan(): Boolean {
+        val today = java.time.LocalDate.now().toString()
+        val sofar = if (preferences.getString("scanDay", null) == today) preferences.getInt("scanCount", 0) else 0
+        return limits.allowsAnotherScanToday(sofar)
+    }
+
     fun tryStartScan(): Boolean {
         val today = java.time.LocalDate.now().toString()
         val sofar = if (preferences.getString("scanDay", null) == today) preferences.getInt("scanCount", 0) else 0
@@ -845,7 +852,7 @@ class AppViewModel(
      * and firm. A box measured on every side has a flat top by definition, so it may carry
      * things, the same default a typed-in item gets.
      */
-    fun importScannedItems(scanned: List<Pair<String, com.packabunch.ar.ScannedItemResult>>): Boolean {
+    fun importScannedItems(scanned: List<Pair<String, com.packabunch.scan.ScannedItemResult>>): Boolean {
         if (scanned.isEmpty()) return true
         if (!limits.allowsPieces(_editor.value.pieceCount + scanned.size)) return false
         val initialCount = _editor.value.items.size
@@ -857,6 +864,28 @@ class AppViewModel(
                 measurementSource = MeasurementSource.CAMERA_ESTIMATE,
                 maySupportItems = result.shape == com.packabunch.packing.ShapeFamily.BOX,
                 form = com.packabunch.packing.ItemForm.fromFit(result.fit),
+            )
+        }
+        _editor.update { it.copy(items = it.items + additions, plan = null) }
+        autosave()
+        return true
+    }
+
+    /** Items checked after a photo scan. False when they would take the pack past its piece limit. */
+    fun importCheckedItems(checked: List<Pair<String, com.packabunch.ui.screens.CheckedItem>>): Boolean {
+        if (checked.isEmpty()) return true
+        if (!limits.allowsPieces(_editor.value.pieceCount + checked.sumOf { it.second.quantity })) return false
+        val additions = checked.map { (id, c) ->
+            ItemSpec(
+                id = id,
+                name = c.name,
+                dimensions = c.dimensions,
+                quantity = c.quantity,
+                keepUpright = c.keepUpright,
+                maySupportItems = !c.nothingOnTop,
+                // Typed over all three: typed. Otherwise the sizes are the photo's estimate.
+                measurementSource = if (c.typed.size == 3) MeasurementSource.TYPED_IN else MeasurementSource.CAMERA_ESTIMATE,
+                form = c.form,
             )
         }
         _editor.update { it.copy(items = it.items + additions, plan = null) }
