@@ -18,9 +18,9 @@ export default function TermsOfUse({ onNavigate }) {
         <p>We are not responsible for damage caused by packing something the way a plan suggested. You are the one looking at the real objects.</p>
       </Section>
 
-      <Section heading="Pack a Bunch Pro">
-        <p>The free plan keeps up to five saved packs, with up to 20 pieces each. Pack a Bunch Pro lifts those caps.</p>
-        <p>If you subscribe, Google Play takes the payment and renews it each month until you cancel. You can cancel at any time in Google Play, and you keep Pro until the month you paid for runs out.</p>
+      <Section heading="Pack Plus">
+        <p>The free plan keeps up to five saved packs, with up to 20 pieces each. Pack Plus lifts those caps.</p>
+        <p>If you subscribe, Google Play takes the payment and renews it each month until you cancel. You can cancel at any time in Google Play, and you keep Pack Plus until the month you paid for runs out.</p>
         <p>Refunds are handled by Google Play under their rules, not by us.</p>
         <p>If the price changes, Google Play will tell you before you are charged the new one.</p>
       </Section>

@@ -23,7 +23,7 @@ export default function PrivacyPolicy({ onNavigate }) {
 
       <Section heading="Who else is involved">
         <p>Supabase stores your account and your packs for us. They hold the data on their servers so that your packs are still there if you lose your phone.</p>
-        <p>Google Play and RevenueCat handle payment if you buy Pack a Bunch Pro. They tell us only whether your subscription is active. We never see your card details.</p>
+        <p>Google Play and RevenueCat handle payment if you buy Pack Plus. They tell us only whether your subscription is active. We never see your card details.</p>
         <p>If you choose to sign in with Google, Google confirms who you are. We receive your email address and nothing more.</p>
       </Section>
 
