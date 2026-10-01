@@ -69,7 +69,6 @@ class PhotoGeometryTest {
         val geo = geometry()
         // Measure the box as if the camera were 1 m up, then call it a "cup" 80 mm tall.
         val hs = (0 until g * g).filter { scene.second[it] }.mapNotNull { geo.pointAt(it % g, it / g, 1.0)?.hMm }.sorted()
-        PhotoScale.PRIORS["cup"] // the table exists
         val h1 = hs[(hs.size * 0.97).toInt()]
         val est = 80.0 / h1
         assertTrue(abs(est - camH) < 0.05, "camera height $est")
@@ -86,12 +85,27 @@ class PhotoGeometryTest {
     }
 
     @Test
+    fun `a gallery photo's tilt comes back from where the table's depth runs out`() {
+        val rel = FloatArray(g * g) { i -> val hit = cast((i % g + 0.5) * w / g, (i / g + 0.5) * h / g); if (hit == null) 0f else (300.0 / hit.first).toFloat() }
+        val pitch = assertNotNull(PhotoGeometry.estimatePitch(k, rel, g, h) { gx, gy -> !scene.second[gy * g + gx] })
+        assertTrue(abs(pitch - 40.0) < 4.0, "pitch $pitch")
+    }
+
+    @Test
     fun `the median of several references ignores one odd one`() {
         val h = PhotoScale.fromPriors(listOf(
-            Triple("cup", 190f, 0f),      // says 0.5 m
-            Triple("mouse", 0f, 220f),    // says 0.5 m
-            Triple("bottle", 160f, 0f),   // says 1.5 m — a short bottle
+            "cup" to 200f,         // says 0.5 m
+            "mouse" to 224f,       // says 0.5 m
+            "cell phone" to 100f,  // says 1.5 m — an odd one
         ))
         assertTrue(abs(h!! - 0.5) < 0.01, "$h")
+    }
+
+    @Test
+    fun `a bottle is never a reference, and a short one is a can`() {
+        // The scan that came out four times too big: a can lying down, taken for a bottle.
+        assertTrue(PhotoScale.fromPriors(listOf("bottle" to 66f)) == null)
+        assertTrue(PhotoScale.nameFor("bottle", 150) == "Can")
+        assertTrue(PhotoScale.nameFor("bottle", 300) == "Bottle")
     }
 }

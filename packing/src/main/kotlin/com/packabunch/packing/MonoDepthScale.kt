@@ -32,6 +32,7 @@ class MonoDepthScale private constructor(val a: Float, val b: Float) {
         const val MIN_REFERENCES = 8
         private const val MAX_MM = 10_000f
         private const val TRIM = 0.25f
+        private const val ROUNDS = 3
 
         /**
          * @param r MiDaS values at the references.
@@ -43,10 +44,14 @@ class MonoDepthScale private constructor(val a: Float, val b: Float) {
             var idx = r.indices.filter { zMm[it] > 0f && r[it].isFinite() }
             if (idx.size < MIN_REFERENCES) return null
             var fit = leastSquares(idx, r, zMm) ?: return null
-            // Drop the worst-fitting quarter and refit.
-            val keep = (idx.size * (1 - TRIM)).toInt().coerceAtLeast(MIN_REFERENCES)
-            idx = idx.sortedBy { i -> kotlin.math.abs(fit.first * r[i] + fit.second - 1f / zMm[i]) }.take(keep)
-            fit = leastSquares(idx, r, zMm) ?: return null
+            // Drop the worst-fitting quarter and refit, three times: in a photo up to half the
+            // "surface" can be a wall behind it, more than one trim can shed.
+            repeat(ROUNDS) {
+                val keep = (idx.size * (1 - TRIM)).toInt().coerceAtLeast(MIN_REFERENCES)
+                val f = fit
+                idx = idx.sortedBy { i -> kotlin.math.abs(f.first * r[i] + f.second - 1f / zMm[i]) }.take(keep)
+                fit = leastSquares(idx, r, zMm) ?: return null
+            }
             // MiDaS: larger means nearer, so 1/z must rise with r.
             if (fit.first <= 0f) return null
             return MonoDepthScale(fit.first, fit.second)

@@ -11,10 +11,10 @@ All you need is your phone's camera. Or type the sizes in. Both give you the sam
 
 ## What it does
 
-1. **Get a space.** Scan it with the camera, or type its inside sizes. Typing is always there.
-   A scanned space can have an odd shape, like a car boot with wheel arches or a cupboard
+1. **Get a space.** Take one photo of it, or type its inside sizes. Typing is always there.
+   A measured space can have an odd shape, like a car boot with wheel arches or a cupboard
    with a shelf.
-2. **Add items.** Scan them, take a photo, or type them in. Each one has a name, a photo,
+2. **Add items.** Take one photo of them, or type them in. Each one has a name, a photo,
    its width, depth and height, how many there are, and whether it can be turned or have
    things stacked on it.
 3. **Get a plan.** The app places what it can. If something does not fit, it says so plainly
@@ -35,51 +35,70 @@ These are choices, not things we forgot:
   the smallest box they fit in.
 * It never says something is impossible to pack. It says "no arrangement found", because the
   planner not finding one is not proof there is none.
-* It never takes a size from a name or from one photo with nothing in it for scale.
+* It never hides how good a size is. A size from a photo is an estimate, and you check each one
+  before it is saved.
 * It shows how full the space is, not a made up "optimisation score".
 
 ## How the camera measures
 
-You lay **a bank card** (or, for a big space, **a sheet of A4 paper**) flat beside the things
-you are measuring. Every bank card in the world is the same size, 85.6 by 54 mm, and A4 is
-210 by 297 mm. That is all the app needs to turn the picture into real sizes.
+You take **one photo**. That is a scan. Nothing else is needed: no special phone and no card.
+A bank card or a sheet of A4 in the photo makes the sizes better, but it is never required.
 
-Each moment, the app:
+While you line up the photo, the app checks the light, how steady the phone is and how it is
+tilted, and tells you in plain words if something needs fixing.
 
-1. **Finds the card.** It looks for edges in the picture and picks the shape with four corners
-   that fits a card exactly. It places each edge to a fraction of a pixel, because every size
-   the app gives depends on the card.
-2. **Works out where the phone is.** From the card's four corners and the camera's focal length,
-   it knows exactly where the phone is and which way it points. The card stays still, so as you
-   walk around the items, every view joins up into one picture of the table.
-3. **Checks the card is lying flat**, using the phone's gravity sensor. A card leaning on a wall
-   would tilt every size.
-4. **Sees depth.** A small depth model (MiDaS) guesses how far away every part of the picture is.
-   Its guess has no units, so the app fixes it to the table: it knows the true distance to every
-   point on the table from where the card is.
-5. **Finds each object.** Anything standing up off the table is an object. It is found from
-   sudden changes in depth, the same way as the reference project this is built on
-   (Object Volume Detector by HarshdeepJ).
-6. **Measures it.** Width and height come from the formula `size = pixels × distance ÷ focal
-   length`. Depth comes from looking at it again from the side. A size is only "measured" once
-   it has stayed steady across many views.
-7. **Names it.** A small object detector (YOLOX Tiny) recognises things like cups, bottles,
-   books and bowls. A name only shows once it has been seen the same way three times out of
-   five.
+For items, the app then:
 
-If the picture is too dark, blurred, or the card is missing or not flat, the app says so and
-asks you to fix it. It does not guess. Something it cannot measure, like glass or a mirror, gets
-no size, and you are asked to type it.
+1. **Finds the things in the photo.** Two object finders look at it: YOLOX Tiny, which knows
+   80 everyday things like cups, bottles, mice and books, and ML Kit, which finds objects it
+   cannot name. A depth step also finds anything standing up off the table that both missed,
+   the way the reference project does it (Object Volume Detector by HarshdeepJ). A thing found
+   only by depth must also stand out by colour or by its edge, so a wall or a bright patch is
+   not counted as an item.
+2. **Traces each one's outline.** This follows the OpenCV steps from the tutorials, written in
+   Kotlin because there is no OpenCV on the phone:
+   * the thing is told apart from the table by colour, compared with the colours just around
+     it, so the threshold suits each object;
+   * the colour guess is refined twice, the way GrabCut does it, so shadows go back to the table;
+   * if the colours are too alike (a white cup on a white table), its edges are used instead
+     (Canny edge detection);
+   * small specks are removed and small gaps closed;
+   * the edge is traced pixel by pixel round the outside (like `findContours`) and cut down to
+     the corners that matter (like `approxPolyDP`), so a mug keeps its handle.
+3. **Works out the table.** The phone's gravity sensor says which way is up. A small depth
+   model (MiDaS) says which parts are nearer. Together they place the table and everything on
+   it in 3D. A photo picked from the gallery has no gravity reading, so the tilt is worked out
+   from how the table's depth changes down the picture.
+4. **Sets the scale.** One number is still missing: how high the phone was above the table.
+   The app takes it from the best thing in the photo:
+   * a bank card or A4 sheet, lying flat or standing up;
+   * otherwise something it recognises whose size hardly changes, like a computer mouse
+     (about 11 cm long) or a phone, measured by its longest side so it works however it lies.
+     Things that come in many sizes, like bottles and bowls, are never used for this;
+   * otherwise a typical height for that kind of photo.
+5. **Measures each thing.** A 3D box is fitted to its points. The few stray points at the edges
+   are dropped first, and each thing is set down on the table, since nothing floats. A fit that
+   comes out wider than the thing's own points is thrown away.
+6. **Names it.** YOLOX's name is used. It knows no "can", so a short "bottle" is called a can.
+   Anything YOLOX could not name gets a name from ML Kit's labeller.
 
-Everything runs on the phone. The depth model and the object detector are inside the app, so
-nothing is downloaded and nothing is sent anywhere. It works with no internet connection.
+Spaces work the same way. The floor is found first, then the walls and the opening, then the
+inside size.
 
-### What camera measuring is good and not so good at
+Every scanned item and space gets an outline that is drawn in piece by piece, whatever its
+shape. You then check each size, and change any that look wrong, before anything is saved.
 
-* **Good:** boxes, cups, tins and other solid things on a table, with the card in view.
-* **Fine:** cupboards and car boots, especially with a sheet of A4 on the floor.
-* **Hardest:** a whole room. The card is small that far away. The app asks for A4 there, and
-  typing a room's size is often quicker.
+Everything runs on the phone. The models are inside the app, so nothing is downloaded and
+nothing is sent anywhere. Photos never leave the phone. It works with no internet connection.
+
+### What photo measuring is good and not so good at
+
+* **Good:** solid things on a table, with a card, or something like a mouse or phone, in the
+  photo.
+* **Fine:** cupboards and car boots.
+* **Rough:** a photo with nothing in it to set the scale. The shapes come out right, but every
+  size can be too big or too small by the same amount. Check those sizes carefully.
+* **Hardest:** a whole room. Typing a room's size is often quicker.
 
 The models used are free to use in an app like this: MiDaS small (MIT licence) and YOLOX Tiny
 (Apache 2.0 licence). Their notices are in `app/src/main/assets`.
@@ -93,7 +112,7 @@ The models used are free to use in an app like this: MiDaS small (MIT licence) a
 | Storage | Room for packs, SharedPreferences for settings, private app files for photos |
 | Accounts and sync | Supabase sign in and Postgres, with row level security |
 | Camera | CameraX |
-| Measuring | Card finding and pose (Kotlin), MiDaS depth and YOLOX names (ONNX Runtime), ML Kit, a Python engine through Chaquopy |
+| Measuring | Outline tracing, card finding and photo geometry (Kotlin), MiDaS depth and YOLOX names (ONNX Runtime), ML Kit, a Python engine through Chaquopy |
 | 3D | A Compose drawing of the plan, made from the planner's real output |
 | Motion | Lottie for the designer's animations, Compose for the rest |
 | Planner | Plain Kotlin with no Android parts, so it can be tested on a computer |
@@ -241,6 +260,24 @@ If something goes wrong:
   `sdk.dir=C\:\\Users\\<you>\\AppData\\Local\\Android\\Sdk`.
 * **JAVA_HOME is not set:** run the `$env:JAVA_HOME` line. It must point at JDK 17 or newer.
 * **The phone shows as `unauthorized`:** unlock it and accept the USB debugging question.
+
+### Checking the photo engine with test pictures
+
+The debug build has a hidden test screen that runs the app's own photo engine on pictures you
+give it. It draws what it found onto each one: outlines in green, with the name and sizes. Use
+it to see how a change does on real photos.
+
+```powershell
+.\gradlew.bat installDebug
+adb push my_photo.jpg /sdcard/Android/data/com.packabunch.debug/files/probe-in/
+adb shell am start -n com.packabunch.debug/com.packabunch.debug.PhotoProbeActivity
+adb pull /sdcard/Android/data/com.packabunch.debug/files/probe-out/ .
+```
+
+Add `--es kind space --es name "Car boot"` to the `am start` line to measure a space instead.
+`adb logcat -s PhotoProbe PackScan` shows each result and why it came out that way: what each
+finder saw, where the scale came from, and the tilt. The test screen is only in debug builds.
+It is never in the app people download.
 
 ## Before a Play release
 

@@ -35,11 +35,13 @@ class ScanBox(
  * from the depth, which is sensor-oriented. Boxes without a tracking id are kept: the item
  * tracker matches them by position.
  */
-class ItemScanDetector {
+class ItemScanDetector(stream: Boolean = true) {
 
+    // Live video uses stream mode; a single photo uses single-image mode, which looks harder and
+    // reports every object it can, not only the steadiest one.
     private val detector = ObjectDetection.getClient(
         ObjectDetectorOptions.Builder()
-            .setDetectorMode(ObjectDetectorOptions.STREAM_MODE)
+            .setDetectorMode(if (stream) ObjectDetectorOptions.STREAM_MODE else ObjectDetectorOptions.SINGLE_IMAGE_MODE)
             .enableMultipleObjects()
             .build(),
     )

@@ -30,7 +30,7 @@ class YoloxDetector(context: Context) : Closeable {
 
     /** Detections on an upright picture, boxes in 0..1 of it. */
     @Synchronized
-    fun detect(picture: Bitmap): List<YoloxDecode.Detection> {
+    fun detect(picture: Bitmap, minScore: Float = YoloxDecode.MIN_SCORE): List<YoloxDecode.Detection> {
         val size = YoloxDecode.INPUT
         val r = YoloxDecode.ratio(picture.width, picture.height)
         // YOLOX's own preprocessing: scale to fit, top-left aligned, pad with grey 114.
@@ -62,7 +62,7 @@ class YoloxDetector(context: Context) : Closeable {
                 val out = (result[0].value as Array<Array<FloatArray>>)[0]
                 val flat = FloatArray(out.size * out[0].size)
                 for ((i, row) in out.withIndex()) row.copyInto(flat, i * row.size)
-                return YoloxDecode.decode(flat, picture.width, picture.height)
+                return YoloxDecode.decode(flat, picture.width, picture.height, minScore)
             }
         }
     }

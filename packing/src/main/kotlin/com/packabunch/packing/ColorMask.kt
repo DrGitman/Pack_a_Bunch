@@ -1,6 +1,8 @@
 package com.packabunch.packing
 
+import kotlin.math.abs
 import kotlin.math.cbrt
+import kotlin.math.hypot
 import kotlin.math.sqrt
 
 /**
@@ -50,15 +52,114 @@ object ColorMask {
         val spread = samples.indices.map { i -> samples.indices.filter { it != i }.minOf { j -> dist(samples[i], samples[j]) } }.sorted()
         val threshold = maxOf(MIN_DELTA, spread[(spread.size * 0.9).toInt().coerceAtMost(spread.size - 1)] * 2.5)
 
-        var fg = BooleanArray(bw * bh) { i ->
-            val c = lab(argb[(y0 + i / bw) * w + x0 + i % bw])
-            samples.none { dist(it, c) < threshold }
+        val labs = Array(bw * bh) { i -> lab(argb[(y0 + i / bw) * w + x0 + i % bw]) }
+        var fg = BooleanArray(bw * bh) { i -> samples.none { dist(it, labs[i]) < threshold } }
+        // GrabCut's loop, without the graph cut: from the first guess, learn the object's own
+        // colours and the background's (the ring plus whatever in the box is not the object), and
+        // give each pixel to the closer of the two; twice. Shadows and the far side of the
+        // object, unlike the ring but like the table, go back to the background.
+        repeat(REFINE) {
+            val share = fg.count { it }.toDouble() / fg.size
+            if (share < MIN_SHARE || share > MAX_SHARE) return@repeat
+            val fgModel = spread(labs.filterIndexed { i, _ -> fg[i] })
+            val bgModel = samples + spread(labs.filterIndexed { i, _ -> !fg[i] })
+            fg = BooleanArray(bw * bh) { i -> val c = labs[i]; fgModel.minOf { dist(it, c) } < bgModel.minOf { dist(it, c) } }
         }
         // Remove specks, then grow back (open), then bridge small gaps (close).
         fg = dilate(erode(fg, bw, bh), bw, bh)
         fg = erode(dilate(fg, bw, bh), bw, bh)
+        return keepMiddle(fg, bw, bh)?.let { place(it, x0, y0, bw, w, h) }
+            ?: byEdges(argb, w, h, (x0 - rx).coerceAtLeast(0), (y0 - ry).coerceAtLeast(0), (x1 + rx).coerceAtMost(w), (y1 + ry).coerceAtMost(h))
+    }
 
-        // The piece that owns the middle of the box.
+    /**
+     * When colour cannot tell them apart — a white cup on a white table — the object's edge often
+     * still shows, as a line of shading. Canny finds it (blur, Sobel gradients, thinning to the
+     * ridge, strong edges plus the weak ones joined to them, thresholds set from the picture's own
+     * gradients instead of a slider); the edges are thickened to close small gaps, as before
+     * findContours, and whatever they enclose round the middle is the object.
+     */
+    private fun byEdges(argb: IntArray, w: Int, h: Int, x0: Int, y0: Int, x1: Int, y1: Int): BooleanArray? {
+        val bw = x1 - x0; val bh = y1 - y0
+        if (bw < 8 || bh < 8) return null
+        val edge = canny(FloatArray(bw * bh) { i -> luma(argb[(y0 + i / bw) * w + x0 + i % bw]) }, bw, bh) ?: return null
+        var closedEdge = dilate(dilate(edge, bw, bh), bw, bh)
+        // Inside = not reachable from the border without crossing an edge.
+        val outside = BooleanArray(bw * bh); val queue = IntArray(bw * bh); var head = 0; var tail = 0
+        for (i in 0 until bw * bh) {
+            val x = i % bw; val y = i / bw
+            if ((x == 0 || y == 0 || x == bw - 1 || y == bh - 1) && !closedEdge[i]) { outside[i] = true; queue[tail++] = i }
+        }
+        while (head < tail) {
+            val i = queue[head++]; val x = i % bw; val y = i / bw
+            for ((dx, dy) in NEIGHBOURS) {
+                val nx = x + dx; val ny = y + dy
+                if (nx !in 0 until bw || ny !in 0 until bh) continue
+                val j = ny * bw + nx
+                if (!outside[j] && !closedEdge[j]) { outside[j] = true; queue[tail++] = j }
+            }
+        }
+        closedEdge = erode(erode(BooleanArray(bw * bh) { !outside[it] }, bw, bh), bw, bh) // undo the thickening
+        return keepMiddle(closedEdge, bw, bh)?.let { place(it, x0, y0, bw, w, h) }
+    }
+
+    /** Canny edges of a [w] × [h] luma patch; null when nothing in it is a clear edge. */
+    internal fun canny(gray: FloatArray, w: Int, h: Int): BooleanArray? {
+        // 1. Smooth: 3 × 3 binomial (Gaussian) blur.
+        val k = floatArrayOf(1f, 2f, 1f)
+        val s = FloatArray(w * h)
+        for (y in 0 until h) for (x in 0 until w) {
+            var sum = 0f
+            for (dy in -1..1) for (dx in -1..1) sum += k[dx + 1] * k[dy + 1] * gray[(y + dy).coerceIn(0, h - 1) * w + (x + dx).coerceIn(0, w - 1)]
+            s[y * w + x] = sum / 16f
+        }
+        // 2. Sobel gradients.
+        val mag = FloatArray(w * h); val dir = IntArray(w * h)
+        for (y in 1 until h - 1) for (x in 1 until w - 1) {
+            fun p(dx: Int, dy: Int) = s[(y + dy) * w + x + dx]
+            val gx = p(1, -1) + 2 * p(1, 0) + p(1, 1) - p(-1, -1) - 2 * p(-1, 0) - p(-1, 1)
+            val gy = p(-1, 1) + 2 * p(0, 1) + p(1, 1) - p(-1, -1) - 2 * p(0, -1) - p(1, -1)
+            mag[y * w + x] = hypot(gx, gy)
+            val a = (Math.toDegrees(kotlin.math.atan2(gy, gx).toDouble()) + 180.0) % 180.0
+            dir[y * w + x] = when { a < 22.5 || a >= 157.5 -> 0; a < 67.5 -> 1; a < 112.5 -> 2; else -> 3 }
+        }
+        // 3. Thin to the ridge: keep only local maxima across the edge.
+        val thin = FloatArray(w * h)
+        for (y in 1 until h - 1) for (x in 1 until w - 1) {
+            val i = y * w + x; val m = mag[i]
+            val (a, b) = when (dir[i]) { 0 -> mag[i - 1] to mag[i + 1]; 1 -> mag[i - w - 1] to mag[i + w + 1]; 2 -> mag[i - w] to mag[i + w]; else -> mag[i - w + 1] to mag[i + w - 1] }
+            if (m >= a && m >= b) thin[i] = m
+        }
+        // 4. Double threshold from the patch's own gradients, never below what noise makes.
+        val ridge = thin.filter { it > 0f }.sorted()
+        if (ridge.isEmpty()) return null
+        val high = maxOf(EDGE_MIN, ridge[(ridge.size * 0.85).toInt().coerceAtMost(ridge.size - 1)])
+        val low = high * 0.4f
+        val out = BooleanArray(w * h); val queue = IntArray(w * h); var head = 0; var tail = 0
+        for (i in thin.indices) if (thin[i] >= high) { out[i] = true; queue[tail++] = i }
+        if (tail == 0) return null
+        while (head < tail) { // weak edges count when joined to strong ones
+            val i = queue[head++]; val x = i % w; val y = i / w
+            for (dy in -1..1) for (dx in -1..1) {
+                val nx = x + dx; val ny = y + dy
+                if (nx !in 0 until w || ny !in 0 until h) continue
+                val j = ny * w + nx
+                if (!out[j] && thin[j] >= low) { out[j] = true; queue[tail++] = j }
+            }
+        }
+        return out
+    }
+
+    private fun luma(argb: Int) = 0.299f * ((argb shr 16) and 0xFF) + 0.587f * ((argb shr 8) and 0xFF) + 0.114f * (argb and 0xFF)
+
+    private fun place(inBox: BooleanArray, x0: Int, y0: Int, bw: Int, w: Int, h: Int): BooleanArray {
+        val out = BooleanArray(w * h)
+        for (i in inBox.indices) if (inBox[i]) out[(y0 + i / bw) * w + x0 + i % bw] = true
+        return out
+    }
+
+    /** The piece that owns the middle of the box, its holes filled; null if none or implausibly sized. */
+    private fun keepMiddle(fg: BooleanArray, bw: Int, bh: Int): BooleanArray? {
         val label = IntArray(bw * bh) { -1 }
         var best = -1; var bestCentral = 0; var next = 0
         val cx0 = bw * 0.3; val cx1 = bw * 0.7; val cy0 = bh * 0.3; val cy1 = bh * 0.7
@@ -99,9 +200,7 @@ object ColorMask {
         val inBox = BooleanArray(bw * bh) { !outside[it] }
         val area = inBox.count { it }
         if (area < bw * bh * MIN_SHARE || area > bw * bh * MAX_SHARE) return null
-        val out = BooleanArray(w * h)
-        for (i in inBox.indices) if (inBox[i]) out[(y0 + i / bw) * w + x0 + i % bw] = true
-        return out
+        return inBox
     }
 
     /**
@@ -129,7 +228,78 @@ object ColorMask {
         return FloatArray(hull.size * 2) { if (it % 2 == 0) hull[it / 2].first else hull[it / 2].second }
     }
 
+    /**
+     * The mask's true outline, dents and all — OpenCV's findContours then approxPolyDP: the edge
+     * traced pixel by pixel round the outside (Moore neighbours), then thinned to the corners that
+     * matter (Douglas–Peucker, tolerance a share of the perimeter). A mug keeps its handle and a
+     * mouse its waist, where [hull] would wrap them in a smooth shell. x, y pairs in 0..1 of the
+     * picture; null for an empty or one-pixel mask.
+     */
+    fun contour(mask: BooleanArray, w: Int, h: Int, tolerance: Double = 0.008): FloatArray? {
+        val start = mask.indexOfFirst { it }
+        if (start < 0) return null
+        fun on(x: Int, y: Int) = x in 0 until w && y in 0 until h && mask[y * w + x]
+        val sx = start % w; val sy = start / w
+        val xs = ArrayList<Int>(); val ys = ArrayList<Int>()
+        var x = sx; var y = sy; var from = 0 // the first pixel in reading order has nothing to its west
+        var first = -1
+        for (step in 0 until 4 * w * h) {
+            var d = -1
+            for (k in 0 until 8) { val c = (from + k) % 8; if (on(x + DX[c], y + DY[c])) { d = c; break } }
+            if (d < 0) return null
+            if (x == sx && y == sy) { if (first == d) break; if (first < 0) first = d }
+            xs += x; ys += y
+            x += DX[d]; y += DY[d]
+            from = if (d % 2 == 0) (d + 6) % 8 else (d + 5) % 8 // the empty pixel checked last, seen from here
+        }
+        if (xs.size < 3) return null
+        var perimeter = 0.0
+        for (i in xs.indices) { val j = (i + 1) % xs.size; perimeter += hypot((xs[j] - xs[i]).toDouble(), (ys[j] - ys[i]).toDouble()) }
+        // Closed shape: split at the point farthest from the start, simplify each half.
+        val far = xs.indices.maxBy { (xs[it] - sx) * (xs[it] - sx) + (ys[it] - sy) * (ys[it] - sy) }
+        val eps = (tolerance * perimeter).coerceAtLeast(1.0)
+        val keep = BooleanArray(xs.size + 1); keep[0] = true; keep[far] = true; keep[xs.size] = true
+        fun at(i: Int) = i % xs.size
+        fun simplify(a: Int, b: Int) {
+            var worst = -1; var worstD = eps
+            val ax = xs[at(a)].toDouble(); val ay = ys[at(a)].toDouble(); val bx = xs[at(b)].toDouble(); val by = ys[at(b)].toDouble()
+            val len = hypot(bx - ax, by - ay)
+            for (i in a + 1 until b) {
+                val px = xs[at(i)].toDouble(); val py = ys[at(i)].toDouble()
+                val dist = if (len < 1e-9) hypot(px - ax, py - ay) else abs((bx - ax) * (ay - py) - (ax - px) * (by - ay)) / len
+                if (dist > worstD) { worstD = dist; worst = i }
+            }
+            if (worst < 0) return
+            keep[worst] = true; simplify(a, worst); simplify(worst, b)
+        }
+        simplify(0, far); simplify(far, xs.size)
+        val idx = (0 until xs.size).filter { keep[it] }
+        if (idx.size < 3) return null
+        return FloatArray(idx.size * 2) { k -> val i = idx[k / 2]; if (k % 2 == 0) (xs[i] + 0.5f) / w else (ys[i] + 0.5f) / h }
+    }
+
+    /** The mask's centre of mass (image moments m10/m00, m01/m00), 0..1 of the picture; null if empty. */
+    fun centroid(mask: BooleanArray, w: Int, h: Int): Pair<Float, Float>? {
+        var m00 = 0L; var m10 = 0L; var m01 = 0L
+        for (i in mask.indices) if (mask[i]) { m00++; m10 += i % w; m01 += i / w }
+        if (m00 == 0L) return null
+        return (m10.toFloat() / m00 + 0.5f) / w to (m01.toFloat() / m00 + 0.5f) / h
+    }
+
+    /** Eight neighbours, clockwise on screen from west. */
+    private val DX = intArrayOf(-1, -1, 0, 1, 1, 1, 0, -1)
+    private val DY = intArrayOf(0, -1, -1, -1, 0, 1, 1, 1)
+
     private val NEIGHBOURS = arrayOf(1 to 0, -1 to 0, 0 to 1, 0 to -1)
+
+    private const val REFINE = 2
+
+    /** Weakest gradient (Sobel, on 0..255 luma) that counts as a strong edge: above sensor noise. */
+    private const val EDGE_MIN = 40f
+
+    /** Up to [RING_SAMPLES] colours spread evenly through [all]: a colour model, as GrabCut's mixtures are. */
+    private fun spread(all: List<DoubleArray>) =
+        if (all.size <= RING_SAMPLES) all else List(RING_SAMPLES) { all[it * all.size / RING_SAMPLES] }
 
     private fun dist(a: DoubleArray, b: DoubleArray): Double {
         val dl = a[0] - b[0]; val da = a[1] - b[1]; val db = a[2] - b[2]

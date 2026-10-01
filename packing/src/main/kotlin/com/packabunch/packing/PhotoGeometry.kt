@@ -57,6 +57,9 @@ class PhotoGeometry private constructor(
         return doubleArrayOf(k.fx * c[0] / c[2] + k.cx, k.fy * c[1] / c[2] + k.cy)
     }
 
+    /** Distance along the optical axis, metres, at cell (gx, gy) for a camera [heightM] up; 0 where unknown. */
+    fun depthM(gx: Int, gy: Int, heightM: Double) = scale.mm(rel[gy * grid + gx]) / 1000.0 * heightM
+
     /** The camera itself, as a plane point. */
     fun camera(heightM: Double) = PlanePoint(0f, 0f, (heightM * 1000).toFloat())
 
@@ -90,6 +93,32 @@ class PhotoGeometry private constructor(
             return PhotoGeometry(k, u, scale, rel, grid, picW, picH)
         }
 
+        /**
+         * How far the camera was tilted down, for a photo with no gravity reading (one from the
+         * gallery). On a level surface the true inverse depth falls in a straight line up the
+         * picture and reaches zero at the horizon; taking MiDaS's zero as that zero — HarshdeepJ's
+         * own `D = S / r` — the row where the surface's line runs out is the horizon, and the
+         * horizon's height in the picture is the tilt. Rows are fitted by their median, so a thing
+         * on the table does not bend the line. Null when the surface does not slope that way.
+         * ponytail: assumes no roll and MiDaS's offset near zero; a vanishing-point fit if gallery photos come out tilted.
+         */
+        fun estimatePitch(k: PlanarPose.Intrinsics, rel: FloatArray, grid: Int, picH: Int, isSurface: (Int, Int) -> Boolean): Double? {
+            val ys = ArrayList<Double>(); val rs = ArrayList<Double>()
+            for (gy in grid / 2 until grid) {
+                val row = (0 until grid).filter { isSurface(it, gy) }.map { rel[gy * grid + it] }.sorted()
+                if (row.size < grid / 8) continue
+                ys += (gy + 0.5) * picH / grid; rs += row[row.size / 2].toDouble()
+            }
+            if (ys.size < 6) return null
+            val n = ys.size; val my = ys.average(); val mr = rs.average()
+            var sxy = 0.0; var sxx = 0.0
+            for (i in 0 until n) { sxy += (ys[i] - my) * (rs[i] - mr); sxx += (ys[i] - my) * (ys[i] - my) }
+            val slope = sxy / sxx
+            if (!(slope > 0)) return null
+            val horizon = my - mr / slope
+            return Math.toDegrees(kotlin.math.atan2(k.cy - horizon, k.fy)).coerceIn(3.0, 80.0)
+        }
+
         /** Up, in camera axes, for a camera tilted down by [pitchDeg] — when there is no gravity reading. */
         fun upForPitch(pitchDeg: Double): DoubleArray {
             val t = Math.toRadians(pitchDeg)
@@ -108,59 +137,42 @@ class PhotoGeometry private constructor(
  * The camera's height above the surface — the one number a photo leaves open — from the best
  * thing in it.
  *
- * Typical sizes are of the commonest kind of each thing: a mug is about 9.5 cm tall, a computer
- * mouse about 11 cm long. Each recognised thing gives its own answer, and the median of them is
- * used, so one oddly sized cup cannot move everything. All of it is an estimate, and the app says
- * so; a card or sheet of A4 in the photo, when there is one, is used instead.
+ * Only things whose size hardly varies are used, by their longest side, whichever way they lie:
+ * a computer mouse is about 11 cm long standing or on its side. A "bottle" is not used — to the
+ * detector that is anything from a 12 cm can to a 33 cm wine bottle, and a can lying down measured
+ * as a bottle standing up is how a scan came out four times too big. Each recognised thing gives
+ * its own answer and the median is used, so one oddly sized cup cannot move everything. It is
+ * all an estimate, and the app says so; a card or sheet of A4 in the photo is used instead.
  */
 object PhotoScale {
 
-    /** A typical size: of the height, or of the longest side seen from above. */
-    class Prior(val heightMm: Float? = null, val longestMm: Float? = null)
-
-    /** Keyed by YOLOX's COCO label. */
-    val PRIORS: Map<String, Prior> = mapOf(
-        "cup" to Prior(heightMm = 95f),
-        "bottle" to Prior(heightMm = 240f),
-        "wine glass" to Prior(heightMm = 190f),
-        "bowl" to Prior(longestMm = 160f),
-        "mouse" to Prior(longestMm = 110f),
-        "cell phone" to Prior(longestMm = 150f),
-        "remote" to Prior(longestMm = 190f),
-        "keyboard" to Prior(longestMm = 440f),
-        "laptop" to Prior(longestMm = 330f),
-        "book" to Prior(longestMm = 230f),
-        "banana" to Prior(longestMm = 190f),
-        "apple" to Prior(heightMm = 75f),
-        "orange" to Prior(heightMm = 75f),
-        "scissors" to Prior(longestMm = 190f),
-        "toothbrush" to Prior(longestMm = 190f),
-        "spoon" to Prior(longestMm = 170f),
-        "fork" to Prior(longestMm = 190f),
-        "knife" to Prior(longestMm = 220f),
-        "clock" to Prior(longestMm = 280f),
-        "vase" to Prior(heightMm = 250f),
-        "sports ball" to Prior(heightMm = 220f),
-        "backpack" to Prior(heightMm = 450f),
-        "suitcase" to Prior(heightMm = 620f),
-        "chair" to Prior(heightMm = 850f),
+    /** Typical longest side, mm, keyed by YOLOX's COCO label. */
+    val PRIORS: Map<String, Float> = mapOf(
+        "mouse" to 112f,
+        "cell phone" to 150f,
+        "remote" to 190f,
+        "keyboard" to 440f,
+        "laptop" to 330f,
+        "cup" to 100f,
+        "wine glass" to 190f,
+        "banana" to 190f,
+        "apple" to 80f,
+        "orange" to 78f,
+        "scissors" to 190f,
+        "toothbrush" to 190f,
+        "spoon" to 170f,
+        "fork" to 190f,
+        "knife" to 220f,
     )
-
-    /** What a photo's height came from, for the log and the note on screen. */
-    enum class Source { REFERENCE, RECOGNISED, TYPICAL }
 
     /**
      * Camera height, in metres, from recognised things measured as if the camera were 1 m up.
-     * @param measured label to (height, longest) in millimetres at that 1 m.
+     * @param measured label to its longest side, mm, at that 1 m.
      */
-    fun fromPriors(measured: List<Triple<String, Float, Float>>): Double? {
-        val answers = measured.mapNotNull { (label, height, longest) ->
+    fun fromPriors(measured: List<Pair<String, Float>>): Double? {
+        val answers = measured.mapNotNull { (label, longest) ->
             val prior = PRIORS[label] ?: return@mapNotNull null
-            when {
-                prior.heightMm != null && height > 5f -> prior.heightMm / height.toDouble()
-                prior.longestMm != null && longest > 5f -> prior.longestMm / longest.toDouble()
-                else -> null
-            }
+            if (longest > 5f) prior / longest.toDouble() else null
         }.filter { it in MIN_M..MAX_M }
         if (answers.isEmpty()) return null
         val sorted = answers.sorted()
@@ -170,7 +182,7 @@ object PhotoScale {
     const val MIN_M = 0.12
     const val MAX_M = 3.0
 
-    /** Without any reference: arm's length above a table, or chest height into a space. */
+    /** Without any reference: arm's length above a table. */
     const val TYPICAL_ITEMS_M = 0.45
 
     /** Typical height above a space's floor, by what the space is called. */
@@ -182,5 +194,14 @@ object PhotoScale {
             "box" in n || "crate" in n || "carton" in n || "drawer" in n -> 0.45
             else -> 0.8
         }
+    }
+
+    /**
+     * The name to show. The detector knows no "can", so short "bottles" are cans.
+     * @param longestMm the measured longest side.
+     */
+    fun nameFor(label: String, longestMm: Int): String = when {
+        label == "bottle" && longestMm in 1..185 -> "Can"
+        else -> YoloxDecode.itemName(label)
     }
 }

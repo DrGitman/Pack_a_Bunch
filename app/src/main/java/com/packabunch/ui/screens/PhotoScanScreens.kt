@@ -492,12 +492,16 @@ private fun PhotoFindingScreen(
             // Each outline arrives piece by piece: its edges fade in one after another over about a second.
             val seen = remember { mutableStateListOf<Long>() }
             while (seen.size < progress.outlines.size) seen += now
-            OutlineLayer(OutlineScene(progress.outlines.flatMapIndexed { i, o ->
-                val v = o.toView(mapping, picture)
-                val n = v.size / 2 - 1
-                (0 until n).map { j ->
-                    val a = ((now - seen[i] - j * 1000f / n) / 250f).coerceIn(0f, 1f)
-                    OutlineStroke(floatArrayOf(v[2 * j], v[2 * j + 1], v[2 * j + 2], v[2 * j + 3]), OutlineStyle.SCANNING.faded(a))
+            OutlineLayer(OutlineScene(progress.outlines.flatMapIndexed { i, group ->
+                // Every line piece of this group, cut into short spans so even one long curve
+                // (a cup's rim) draws in bit by bit.
+                val spans = group.flatMap { o ->
+                    val v = o.toView(mapping, picture)
+                    (0 until v.size / 2 - 1).map { j -> floatArrayOf(v[2 * j], v[2 * j + 1], v[2 * j + 2], v[2 * j + 3]) }
+                }
+                spans.mapIndexed { j, span ->
+                    val a = ((now - seen[i] - j * 1000f / spans.size.coerceAtLeast(1)) / 250f).coerceIn(0f, 1f)
+                    OutlineStroke(span, OutlineStyle.SCANNING.faded(a))
                 }
             }), LocalDensity.current.density)
         }
@@ -521,7 +525,7 @@ private fun PhotoFindingScreen(
                         Text(text, color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                     }
                 }
-                Text("${shown.toInt()}%", color = Primary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp)
+                Text("${shown.toInt()}%", color = Primary, fontFamily = NumericFamily, fontSize = 32.sp)
             }
             Spacer(Modifier.height(12.dp))
             Box(Modifier.fillMaxWidth().height(6.dp).background(Color(0xFFF0E4D8), RoundedCornerShape(3.dp))) {
@@ -574,7 +578,7 @@ private fun LottieOnce(res: Int, modifier: Modifier, loop: Boolean = false) {
 // ------------------------------------------------------------------------------------- done
 
 @Composable
-private fun PhotoItemsDoneScreen(picture: Bitmap, items: List<PhotoItem>, traced: List<FloatArray>, unit: LengthUnit, onCheck: () -> Unit, onRetake: () -> Unit, onTypeInstead: () -> Unit) {
+private fun PhotoItemsDoneScreen(picture: Bitmap, items: List<PhotoItem>, traced: List<List<FloatArray>>, unit: LengthUnit, onCheck: () -> Unit, onRetake: () -> Unit, onTypeInstead: () -> Unit) {
     if (items.isEmpty()) {
         NothingFound(picture, "Couldn't find anything", "Fit the things in with a gap round each, in good light, and try again.", onRetake, onTypeInstead)
         return
@@ -588,7 +592,7 @@ private fun PhotoItemsDoneScreen(picture: Bitmap, items: List<PhotoItem>, traced
                 com.packabunch.scan.OutlineFill(it.toView(mapping, picture), OutlineStyle.MEASURED_FILL_ARGB)
             }), density, Modifier.fillMaxSize().alpha(phase(t, 250, 400, Motion.Enter)))
             // Dashed outlines fade out as the solid measured ones draw in.
-            OutlineLayer(OutlineScene(traced.map { OutlineStroke(it.toView(mapping, picture), OutlineStyle.SCANNING) }), density,
+            OutlineLayer(OutlineScene(traced.flatten().map { OutlineStroke(it.toView(mapping, picture), OutlineStyle.SCANNING) }), density,
                 Modifier.fillMaxSize().alpha(1f - phase(t, 0, 350, Motion.Standard)))
             OutlineLayer(OutlineScene(items.flatMap { it.outline }.map { OutlineStroke(it.toView(mapping, picture), OutlineStyle.MEASURED) }),
                 density, Modifier.fillMaxSize().alpha(phase(t, 50, 400, androidx.compose.animation.core.FastOutSlowInEasing)))

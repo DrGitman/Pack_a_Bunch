@@ -2,5 +2,6 @@
     <application>
         <activity android:name="com.packabunch.debug.DesignPreviewActivity" android:exported="true" />
         <activity android:name="com.packabunch.debug.GeometryPreviewActivity" android:exported="true" />
+        <activity android:name="com.packabunch.debug.PhotoProbeActivity" android:exported="true" />
     </application>
 </manifest>
