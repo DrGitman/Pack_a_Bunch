@@ -30,13 +30,15 @@ android {
         applicationId = "com.packabunch"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // Python (the measuring engine) ships per processor type; these cover phones and the emulator.
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        // Phones are arm64; x86_64 is for emulators. The website's download is built phone-only,
+        // which halves it: ./gradlew assembleStaging -Pabis=arm64-v8a
+        ndk { abiFilters += (findProperty("abis") as String?)?.split(",") ?: listOf("arm64-v8a", "x86_64") }
     }
 
     // Room writes the schema out so migrations can be written against a real diff rather

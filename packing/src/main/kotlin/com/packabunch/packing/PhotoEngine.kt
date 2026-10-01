@@ -125,10 +125,11 @@ class PhotoEngine(private val math: ScanMath, private val log: (String) -> Unit 
             boxes += d.box to d.label; scoreOf[d.box] = d.score
         }
         for (m in unnamed) if (boxes.none { StandingObjects.overlap(it.first, m) > 0.3f }) { boxes += m to null; scoreOf[m] = UNNAMED_SCORE }
-        // A picture printed on a thing is not a thing: the "donuts" on a box of rusks. A weaker find
-        // lying almost wholly inside a surer, much bigger one is dropped.
+        // A part of a thing, or a picture printed on it, is not a thing of its own: the "donuts" on a
+        // box of rusks, or the top of a tissue pack taken for a remote. A weaker find lying almost
+        // wholly inside a bigger one is dropped.
         val printed = boxes.filter { (b, _) ->
-            boxes.any { (o, _) -> o !== b && inside(b, o) > 0.85f && area(o) > 2.5f * area(b) && scoreOf.getValue(b) < maxOf(scoreOf.getValue(o), PRINTED_MAX_SCORE) }
+            boxes.any { (o, _) -> o !== b && inside(b, o) > 0.8f && area(o) > 1.3f * area(b) && scoreOf.getValue(b) < maxOf(scoreOf.getValue(o), PRINTED_MAX_SCORE) }
         }.toSet()
         boxes.removeAll(printed)
         onProgress(PhotoProgress(0, 0.6f, found = boxes.size))

@@ -39,4 +39,19 @@ class LookupMergeTest {
         assertEquals(SizeSource.PHOTO, out[0].source)
         assertEquals("cup", out[0].name)
     }
+
+    @Test
+    fun `the lookup's usual size beats a detector's wrong guess`() {
+        // A tissue pack taken for a 19 cm remote: the photo's scale came from that wrong name.
+        val measured = listOf(d(73, 51, 105), d(194, 136, 73))
+        val answers = listOf(
+            LookupMerge.Answer("Pocket tissues", exact = false, confidence = 0.7f, size = d(110, 55, 30)),
+            LookupMerge.Answer("Wallet", exact = false, confidence = 0.6f, size = d(115, 95, 20)),
+        )
+        val out = LookupMerge.merge(measured, listOf("remote", "suitcase"), answers, ScaleSource.KNOWN_OBJECT)
+        assertEquals("Pocket tissues", out[0].name)
+        assertEquals(d(55, 30, 110), out[0].dimensions)
+        assertEquals("Wallet", out[1].name)
+        assertEquals(SizeSource.LOOKED_UP, out[1].source)
+    }
 }

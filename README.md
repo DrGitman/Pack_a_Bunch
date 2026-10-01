@@ -296,9 +296,16 @@ adb pull /sdcard/Android/data/com.packabunch.staging/files/probe-out/ .
 
 Add `--es kind space --es name "Car boot"` to the `am start` line to measure a space instead.
 `adb logcat -s PhotoProbe PackScan` shows each result and why it came out that way: what each
-finder saw, where the scale came from, and the tilt. The test screen is only in the staging build.
-It is never in the app people download.
+finder saw, where the scale came from, and the tilt. The test screen is in the staging build,
+so the website's preview download has it too, but it only runs when started over USB with
+`adb`. The Play release never has it.
 
 ## Before a Play release
 
 * **The app id** `com.packabunch` can never change once it is uploaded. Confirm it first.
+
+## Licence
+
+Pack a Bunch is open source under the [MIT licence](LICENSE). The models inside the app keep
+their own licences: MiDaS small (MIT) and YOLOX Tiny (Apache 2.0), with their notices in
+`app/src/main/assets`.

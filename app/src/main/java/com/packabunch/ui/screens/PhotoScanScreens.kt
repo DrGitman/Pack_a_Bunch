@@ -796,7 +796,8 @@ private fun CheckItemScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 for ((i, pair) in listOf(Triple("Width", w, { v: String -> w = v }), Triple("Depth", d, { v: String -> d = v }), Triple("Height", h, { v: String -> h = v })).withIndex()) {
                     Column(Modifier.weight(1f)) {
-                        DimensionField(pair.first, pair.second, { v -> pair.third(v); if (i !in typed) typed += i }, unit,
+                        // Stacked: three across leaves no room for a label, number and unit side by side.
+                        com.packabunch.ui.components.StackedDimensionField(pair.first, pair.second, { v -> pair.third(v); if (i !in typed) typed += i },
                             error = parseLengthToMm(pair.second, unit) == null)
                         Spacer(Modifier.height(6.dp))
                         PhotoBadge(if (i in typed) "TYPED" else if (item.source == com.packabunch.packing.SizeSource.LOOKED_UP) "LOOKED UP" else "PHOTO", typed = i in typed)

@@ -32,29 +32,36 @@ object LookupMerge {
     const val NAME_CONFIDENCE = 0.4f
 
     /**
+     * Trust, highest first: a card in the photo; the maker's size of a product the lookup
+     * recognised; the usual size of what the lookup saw; and last the detector's own guess at
+     * what something is (a tissue pack taken for a 19 cm remote set every size wrong).
+     *
      * @param measured each item's size from the photo.
      * @param names each item's name from the detectors, or null.
      * @param answers the lookup's answer for each item, or null where there was none.
-     * @param scale where the photo's own scale came from. A card beats a typical size, so with one
-     *   only exact products change.
+     * @param scale where the photo's own scale came from. Only a card is kept over the lookup.
      */
     fun merge(measured: List<Dimensions>, names: List<String?>, answers: List<Answer?>, scale: ScaleSource): List<Merged> {
         require(measured.size == names.size && names.size == answers.size)
         val exact = answers.map { it != null && it.exact && it.confidence >= EXACT_CONFIDENCE }
         val typical = answers.map { it != null && !it.exact && it.confidence >= TYPICAL_CONFIDENCE }
+        val exactIdx = measured.indices.filter { exact[it] }
+        // Usual sizes stand in only when no exact product was recognised, and never over a card.
+        val useTypical = scale != ScaleSource.CARD && exactIdx.isEmpty()
         // The factor every other size is out by, from the surest answers available.
         val factor = if (scale == ScaleSource.CARD) null else {
-            val from = measured.indices.filter { exact[it] }.ifEmpty { if (scale == ScaleSource.TYPICAL) measured.indices.filter { typical[it] } else emptyList() }
+            val from = exactIdx.ifEmpty { measured.indices.filter { typical[it] } }
             from.map { longest(answers[it]!!.size).toDouble() / longest(measured[it]).coerceAtLeast(1) }
                 .sorted().let { f -> if (f.isEmpty()) null else f[f.size / 2] }
                 ?.takeIf { it in 0.1..10.0 }
         }
         return measured.indices.map { i ->
             val a = answers[i]
-            val name = if (a != null && (exact[i] || names[i] == null && a.confidence >= NAME_CONFIDENCE)) a.name else names[i]
+            // The lookup saw this very item; the detector only knows 80 kinds of thing.
+            val name = if (a != null && a.confidence >= NAME_CONFIDENCE) a.name else names[i]
             when {
                 exact[i] -> Merged(name, orient(a!!.size, measured[i]), SizeSource.LOOKED_UP)
-                typical[i] && scale == ScaleSource.TYPICAL && factor == null -> Merged(name, orient(a!!.size, measured[i]), SizeSource.LOOKED_UP)
+                typical[i] && useTypical -> Merged(name, orient(a!!.size, measured[i]), SizeSource.LOOKED_UP)
                 factor != null -> Merged(name, scaled(measured[i], factor), SizeSource.PHOTO_SCALED_BY_LOOKUP)
                 else -> Merged(name, measured[i], SizeSource.PHOTO)
             }
