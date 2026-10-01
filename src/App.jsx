@@ -14,7 +14,7 @@ const steps = [
 ];
 
 const questions = [
-  ['Do I need a special phone to scan?', 'No. Any Android phone with a camera works. Take one photo of your things, or type the sizes in by hand. A bank card in the photo makes the sizes more exact, but you never need one.'],
+  ['Do I need a special phone to scan?', 'No. Any Android phone with a camera works. Take one photo of your things, or type the sizes in by hand.'],
   ['Can I leave a pack and come back?', 'Yes. Return to your saved pack and continue from your progress.'],
   ['Does a plan guarantee everything will fit?', 'Plans use your dimensions and settings. Check the real fit as you pack.']
 ];
