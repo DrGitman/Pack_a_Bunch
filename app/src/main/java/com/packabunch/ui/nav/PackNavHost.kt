@@ -879,7 +879,9 @@ fun PackNavHost(
             com.packabunch.ui.screens.PhotoItemsFlow(
                 unit = settings.unit,
                 onUnitChange = viewModel::setUnit,
-                maxItems = minOf(20, (planLimit ?: com.packabunch.packing.PackingEngine.MAX_INSTANCE_COUNT).minus(editor.pieceCount)).coerceAtLeast(1),
+                // Free stops at its piece limit; Pack Plus has no limit of its own.
+                maxItems = (planLimit ?: com.packabunch.packing.PackingEngine.MAX_INSTANCE_COUNT).minus(editor.pieceCount).coerceAtLeast(1),
+                planLimited = planLimit != null,
                 takeScan = { viewModel.tryStartScan().also { if (!it) noScansLeft { navController.popBackStack() } } },
                 onSave = { checked ->
                     scope.launch {

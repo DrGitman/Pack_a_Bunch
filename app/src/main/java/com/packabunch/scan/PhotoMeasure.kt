@@ -55,6 +55,8 @@ class PhotoItem(
     val outline: List<FloatArray>,
     /** Where its name tag goes, 0..1 of the picture: the top of its outline. */
     val tag: Pair<Float, Float>,
+    /** Its footprint on the surface, a closed polygon in 0..1 of the picture, for the faint glow under it. */
+    val footprint: FloatArray?,
     val dimensions: Dimensions,
     val shape: ShapeFamily,
     val form: ItemForm?,
@@ -69,6 +71,8 @@ class PhotoSpace(
     val opening: Pair<Int, Int>?,
     /** The box's edges on the picture, x, y pairs in 0..1, with whether each is part of the opening. */
     val edges: List<Pair<FloatArray, Boolean>>,
+    /** The floor of the space, four corners in 0..1 of the picture, for the faint glow on it; null if off the picture. */
+    val floor: FloatArray?,
     /** Where the W, D, H pills and the opening tag go, 0..1 of the picture; null when off the picture. */
     val widthAt: Pair<Float, Float>?,
     val depthAt: Pair<Float, Float>?,
@@ -183,10 +187,14 @@ class PhotoMeasure(private val context: Context) {
                     floatArrayOf((a[0] / w).toFloat(), (a[1] / h).toFloat(), (c[0] / w).toFloat(), (c[1] / h).toFloat())
                 }
             } else listOf(outlines[i])
+            val footprint = if (fit != null && geo != null) {
+                val pts = OutlineGeometry.footprint(fit).map { geo.pixelOf(it, heightM) }
+                if (pts.all { it != null }) FloatArray(pts.size * 2) { j -> (pts[j / 2]!![j % 2] / (if (j % 2 == 0) w else h)).toFloat() } else null
+            } else null
             val top = outline3d.flatMap { l -> (0 until l.size / 2).map { j -> l[2 * j] to l[2 * j + 1] } }
             val tag = if (top.isEmpty()) ((b[0] + b[2]) / 2 to b[1]) else ((top.minOf { it.first } + top.maxOf { it.first }) / 2 to top.minOf { it.second })
             results += PhotoItem(
-                name = label?.let(YoloxDecode::itemName), box = b, outline = outline3d, tag = tag,
+                name = label?.let(YoloxDecode::itemName), box = b, outline = outline3d, tag = tag, footprint = footprint,
                 dimensions = dims, shape = fit?.shape ?: ShapeFamily.BOX,
                 form = fit?.let(ItemForm::fromFit), crop = crop(pic, b),
             )
@@ -200,7 +208,7 @@ class PhotoMeasure(private val context: Context) {
             if (item.name != null || item.crop == null) item
             else {
                 val guess = runCatching { recogniser.scanCategory(item.crop) }.getOrNull()?.replaceFirstChar { it.uppercase() }
-                if (guess == null) item else PhotoItem(guess, item.box, item.outline, item.tag, item.dimensions,
+                if (guess == null) item else PhotoItem(guess, item.box, item.outline, item.tag, item.footprint, item.dimensions,
                     item.shape, item.form ?: ItemForm.guess(guess), item.crop)
             }
         }
@@ -258,10 +266,12 @@ class PhotoMeasure(private val context: Context) {
         fun mid(a: PlanePoint, b: PlanePoint) = PlanePoint((a.xMm + b.xMm) / 2, (a.yMm + b.yMm) / 2, (a.hMm + b.hMm) / 2)
         fun at(p: PlanePoint) = px(p)?.takeIf { it[0] in 0f..1f && it[1] in 0f..1f }?.let { it[0] to it[1] }
         val opening = box?.opening?.let { it.widthMm to it.heightMm } ?: (cw.toInt() to ch.toInt())
+        val floorCorners = (0..3).map { px(c[it]) }
         PhotoSpace(
             dimensions = Dimensions(cw.toInt().coerceAtLeast(1), cd.toInt().coerceAtLeast(1), ch.toInt().coerceAtLeast(1)),
             opening = opening,
             edges = edges,
+            floor = if (floorCorners.all { it != null }) FloatArray(8) { j -> floorCorners[j / 2]!![j % 2] } else null,
             widthAt = at(mid(c[0], c[1])),
             depthAt = at(mid(c[3], c[0])),
             heightAt = at(mid(c[1], c[2]).let { PlanePoint(it.xMm, it.yMm, ch / 2) }),

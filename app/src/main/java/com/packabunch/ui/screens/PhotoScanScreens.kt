@@ -5,7 +5,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.runtime.State
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -98,7 +109,6 @@ import com.packabunch.ui.components.AnchoredLabel
 import com.packabunch.ui.components.AnchoredLabels
 import com.packabunch.ui.components.DimensionField
 import com.packabunch.ui.components.DimensionPill
-import com.packabunch.ui.components.GlassLottieButton
 import com.packabunch.ui.components.LabelledTextField
 import com.packabunch.ui.components.Note
 import com.packabunch.ui.components.NoteTone
@@ -114,7 +124,6 @@ import com.packabunch.ui.components.ScreenScaffold
 import com.packabunch.ui.components.SecondaryButton
 import com.packabunch.ui.components.Stepper
 import com.packabunch.ui.components.SwitchRow
-import com.packabunch.ui.components.TorchButton
 import com.packabunch.ui.components.UnitToggle
 import com.packabunch.ui.components.fd
 import com.packabunch.ui.components.scanPopIn
@@ -176,6 +185,8 @@ fun PhotoItemsFlow(
     unit: LengthUnit,
     onUnitChange: (LengthUnit) -> Unit,
     maxItems: Int,
+    /** True on the free plan, whose piece limit the status pill shows; false on Pack Plus. */
+    planLimited: Boolean,
     /** Spends one of the day's scans; false when there are none left (the caller says so). */
     takeScan: () -> Boolean,
     onSave: (List<CheckedItem>) -> Unit,
@@ -204,7 +215,7 @@ fun PhotoItemsFlow(
     val photo = input
     when {
         photo == null -> PhotoCaptureScreen(
-            kind = PhotoKind.ITEMS, status = "Photo · up to $maxItems",
+            kind = PhotoKind.ITEMS, status = if (planLimited) "Photo · up to $maxItems" else "Photo",
             guidance = "Fit them all in, with a little gap round each",
             hint = "Arm's length, straight on, good light. One photo measures everything in it.",
             onPhoto = ::start, onTypeInstead = onTypeInstead, onBack = onBack,
@@ -213,7 +224,7 @@ fun PhotoItemsFlow(
             picture = photo.picture, kind = PhotoKind.ITEMS, progress = progress, finished = results != null,
             onFinished = { done = true }, onCancel = ::retake,
         )
-        checking < 0 -> PhotoItemsDoneScreen(photo.picture, results.orEmpty(), unit, onCheck = { checking = 0 }, onRetake = ::retake, onTypeInstead = onTypeInstead)
+        checking < 0 -> PhotoItemsDoneScreen(photo.picture, results.orEmpty(), progress.outlines, unit, onCheck = { checking = 0 }, onRetake = ::retake, onTypeInstead = onTypeInstead)
         else -> {
             val items = results.orEmpty()
             val item = items.getOrNull(checking)
@@ -316,6 +327,28 @@ private fun PhotoCaptureScreen(
         val gallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) scope.launch { photoFromGallery(context, uri)?.let(onPhoto) }
         }
+        // Live guidance: what to change for the best photo to measure from, read from the picture's
+        // brightness and the phone's tilt and steadiness, a few times a second.
+        var brightness by remember { mutableFloatStateOf(128f) }
+        var pitch by remember { mutableStateOf<Double?>(null) }
+        var movingUntil by remember { mutableStateOf(0L) }
+        LaunchedEffect(Unit) {
+            var last: DoubleArray? = null
+            while (true) {
+                val up = gravity.upUpright()
+                if (up != null) {
+                    pitch = Math.toDegrees(kotlin.math.asin((-up[2]).coerceIn(-1.0, 1.0)))
+                    last?.let { l ->
+                        val turn = Math.toDegrees(kotlin.math.acos((l[0] * up[0] + l[1] * up[1] + l[2] * up[2]).coerceIn(-1.0, 1.0)))
+                        if (turn > 2.5) movingUntil = System.currentTimeMillis() + 600
+                    }
+                    last = up
+                }
+                latest?.picture?.let { b -> brightness = lumaOf(b) }
+                delay(150)
+            }
+        }
+        val liveGuide = photoGuidance(kind, brightness, pitch, System.currentTimeMillis() < movingUntil) ?: guidance
         val shutter = rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.photo_shutter))
         val shutterAnim = remember { Animatable(0f) }
 
@@ -328,32 +361,46 @@ private fun PhotoCaptureScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    GlassLottieButton(R.raw.icon_back, "Back", onBack, diameter = 34.fd, iconSize = 20.fd)
+                    PhotoButton(R.raw.photo_back, "Back", 34.fd, onBack)
                     Spacer(Modifier.weight(1f))
                     ScanStatusPill(lead = null, value = status)
                 }
                 Spacer(Modifier.height(7.fd))
-                ScanGuidancePill(error ?: guidance, working = true)
+                ScanGuidancePill(error ?: liveGuide, working = true)
             }
 
             Column(
                 Modifier.align(Alignment.BottomCenter).fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).padding(horizontal = 12.fd, vertical = 8.fd),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Row(
-                    Modifier.fillMaxWidth().background(Color(0xCC2B2622), RoundedCornerShape(12.fd)).padding(horizontal = 12.fd, vertical = 9.fd),
-                    verticalAlignment = Alignment.CenterVertically,
+                // The tip is a pop-up: it springs in as the camera opens, then gets out of the way of
+                // the shot by itself after a few seconds, or at once on a tap.
+                var tipShowing by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { delay(350); tipShowing = true; delay(4500); tipShowing = false }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = tipShowing,
+                    enter = androidx.compose.animation.fadeIn(tween(220)) +
+                        androidx.compose.animation.scaleIn(spring(dampingRatio = 0.62f, stiffness = Spring.StiffnessMediumLow), initialScale = 0.82f) +
+                        androidx.compose.animation.slideInVertically(tween(320, easing = Motion.Enter)) { it / 4 },
+                    exit = androidx.compose.animation.fadeOut(tween(200, easing = Motion.Exit)) +
+                        androidx.compose.animation.slideOutVertically(tween(200, easing = Motion.Exit)) { it / 4 },
                 ) {
-                    Icon(PackIcons.Info, null, tint = Color.White, modifier = Modifier.size(15.fd))
-                    Spacer(Modifier.width(9.fd))
-                    Text(hint, color = Color.White, fontFamily = UiFamily, fontSize = 11.fd.value.sp, lineHeight = 15.fd.value.sp)
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.fd)).background(Color(0xCC2B2622))
+                            .clickable { tipShowing = false }.padding(horizontal = 12.fd, vertical = 9.fd),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(PackIcons.Info, null, tint = Color.White, modifier = Modifier.size(15.fd))
+                        Spacer(Modifier.width(9.fd))
+                        Text(hint, color = Color.White, fontFamily = UiFamily, fontSize = 11.fd.value.sp, lineHeight = 15.fd.value.sp)
+                    }
                 }
                 Spacer(Modifier.height(18.fd))
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Spacer(Modifier.width(12.fd))
-                    GlassLottieButton(R.raw.btn_camera_gallery, "Choose a photo", {
+                    PhotoButton(R.raw.photo_gallery, "Choose a photo", 42.fd, {
                         gallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    }, diameter = 42.fd, iconSize = 22.fd)
+                    })
                     Spacer(Modifier.weight(1f))
                     LottieAnimation(
                         shutter.value, progress = { shutterAnim.value },
@@ -370,7 +417,7 @@ private fun PhotoCaptureScreen(
                         },
                     )
                     Spacer(Modifier.weight(1f))
-                    TorchButton(torch, { torch = feed.setTorch(!torch) && !torch })
+                    PhotoTorch(torch) { torch = feed.setTorch(!torch) && !torch }
                     Spacer(Modifier.width(12.fd))
                 }
                 Spacer(Modifier.height(6.fd))
@@ -442,15 +489,23 @@ private fun PhotoFindingScreen(
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         PhotoWithOverlay(picture) { mapping ->
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)))
-            OutlineLayer(OutlineScene(progress.outlines.map { o ->
-                OutlineStroke(o.toView(mapping, picture), OutlineStyle.SCANNING)
+            // Each outline arrives piece by piece: its edges fade in one after another over about a second.
+            val seen = remember { mutableStateListOf<Long>() }
+            while (seen.size < progress.outlines.size) seen += now
+            OutlineLayer(OutlineScene(progress.outlines.flatMapIndexed { i, o ->
+                val v = o.toView(mapping, picture)
+                val n = v.size / 2 - 1
+                (0 until n).map { j ->
+                    val a = ((now - seen[i] - j * 1000f / n) / 250f).coerceIn(0f, 1f)
+                    OutlineStroke(floatArrayOf(v[2 * j], v[2 * j + 1], v[2 * j + 2], v[2 * j + 3]), OutlineStyle.SCANNING.faded(a))
+                }
             }), LocalDensity.current.density)
         }
         Row(
             Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 14.fd, vertical = 6.fd),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GlassLottieButton(R.raw.icon_close, "Cancel", onCancel, diameter = 34.fd, iconSize = 18.fd)
+            PhotoButton(R.raw.photo_close, "Cancel", 34.fd, onCancel)
             Spacer(Modifier.weight(1f))
             if (kind == PhotoKind.ITEMS && progress.found > 0) ScanStatusPill(lead = null, value = "${progress.found} found", modifier = Modifier.scanPopIn())
             else if (statusLabel != null) ScanStatusPill(lead = null, value = statusLabel)
@@ -462,7 +517,9 @@ private fun PhotoFindingScreen(
                 Column(Modifier.weight(1f)) {
                     Text("FINDING SIZES", color = TextTertiary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 0.8.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text(headings[current], color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                    Crossfade(headings[current], animationSpec = tween(180), label = "heading") { text ->
+                        Text(text, color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                    }
                 }
                 Text("${shown.toInt()}%", color = Primary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp)
             }
@@ -517,37 +574,48 @@ private fun LottieOnce(res: Int, modifier: Modifier, loop: Boolean = false) {
 // ------------------------------------------------------------------------------------- done
 
 @Composable
-private fun PhotoItemsDoneScreen(picture: Bitmap, items: List<PhotoItem>, unit: LengthUnit, onCheck: () -> Unit, onRetake: () -> Unit, onTypeInstead: () -> Unit) {
+private fun PhotoItemsDoneScreen(picture: Bitmap, items: List<PhotoItem>, traced: List<FloatArray>, unit: LengthUnit, onCheck: () -> Unit, onRetake: () -> Unit, onTypeInstead: () -> Unit) {
     if (items.isEmpty()) {
         NothingFound(picture, "Couldn't find anything", "Fit the things in with a gap round each, in good light, and try again.", onRetake, onTypeInstead)
         return
     }
-    val reveal = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { reveal.animateTo(1f, tween(400, delayMillis = 50)) }
+    val t = rememberElapsedMs().value
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         PhotoWithOverlay(picture) { mapping ->
+            val density = LocalDensity.current.density
+            // The faint footprint glow under each measured thing, fading in from 0.25 s (Enter).
+            OutlineLayer(OutlineScene(fills = items.mapNotNull { it.footprint }.map {
+                com.packabunch.scan.OutlineFill(it.toView(mapping, picture), OutlineStyle.MEASURED_FILL_ARGB)
+            }), density, Modifier.fillMaxSize().alpha(phase(t, 250, 400, Motion.Enter)))
+            // Dashed outlines fade out as the solid measured ones draw in.
+            OutlineLayer(OutlineScene(traced.map { OutlineStroke(it.toView(mapping, picture), OutlineStyle.SCANNING) }), density,
+                Modifier.fillMaxSize().alpha(1f - phase(t, 0, 350, Motion.Standard)))
             OutlineLayer(OutlineScene(items.flatMap { it.outline }.map { OutlineStroke(it.toView(mapping, picture), OutlineStyle.MEASURED) }),
-                LocalDensity.current.density, Modifier.fillMaxSize().alpha(reveal.value))
+                density, Modifier.fillMaxSize().alpha(phase(t, 50, 400, androidx.compose.animation.core.FastOutSlowInEasing)))
             AnchoredLabels(items.mapIndexed { i, item ->
                 val (x, y) = mapping.toView(item.tag.first * picture.width.toDouble(), item.tag.second * picture.height.toDouble())
                 AnchoredLabel("t$i", x / mapping.viewW, y / mapping.viewH, AnchorAlign.Above) {
-                    ObjectTag(item.name ?: "Item ${i + 1}", ScanBadge.Measured, 1f, compact = items.size > 2)
+                    Box(Modifier.popAt(t, 350L + 100L * i)) { ObjectTag(item.name ?: "Item ${i + 1}", ScanBadge.Measured, 1f, compact = items.size > 2) }
                 }
             }, Modifier.fillMaxSize())
         }
-        GlassLottieButton(R.raw.icon_restore, "Retake photo", onRetake, diameter = 34.fd, iconSize = 18.fd,
-            modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(14.fd))
-        Sheet(Modifier.align(Alignment.BottomCenter)) {
-            DoneHeading(if (items.size == 1) "Found 1 thing" else "Found ${items.size} things", "Sizes from one photo. Check each one next.")
+        PhotoButton(R.raw.photo_retake, "Retake photo", 34.fd, onRetake,
+            Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(14.fd).alpha(phase(t, 600, 240, LinearEasing)))
+        Sheet(Modifier.align(Alignment.BottomCenter), delayMs = 150) {
+            DoneHeading(if (items.size == 1) "Found 1 thing" else "Found ${items.size} things", "Sizes from one photo. Check each one next.", t)
             Spacer(Modifier.height(14.dp))
-            Column(Modifier.fillMaxWidth().border(1.dp, Outline, RoundedCornerShape(16.dp)).padding(horizontal = 12.dp, vertical = 4.dp)) {
-                items.take(5).forEachIndexed { i, item ->
-                    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            // A fixed card: however many things were found, only the list inside it scrolls.
+            Column(
+                Modifier.fillMaxWidth().height(ROW_HEIGHT * 2 + 10.dp).border(1.dp, Outline, RoundedCornerShape(16.dp)).clip(RoundedCornerShape(16.dp))
+                    .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 5.dp),
+            ) {
+                items.forEachIndexed { i, item ->
+                    Row(Modifier.fillMaxWidth().height(ROW_HEIGHT).appear(t, 650L + 100L * i, 8f), verticalAlignment = Alignment.CenterVertically) {
                         Thumb(item.crop, 40.dp)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(item.name ?: "Item ${i + 1}", color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(item.name ?: "Item ${i + 1}", color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
                                 Spacer(Modifier.width(8.dp))
                                 PhotoBadge("FROM PHOTO")
                             }
@@ -555,27 +623,30 @@ private fun PhotoItemsDoneScreen(picture: Bitmap, items: List<PhotoItem>, unit: 
                         }
                     }
                 }
-                if (items.size > 5) Text("and ${items.size - 5} more", color = TextTertiary, fontFamily = UiFamily, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
             }
             Spacer(Modifier.height(14.dp))
-            PrimaryButton("Check the sizes", onCheck)
-            PackTextButton("Retake photo", onRetake, Modifier.align(Alignment.CenterHorizontally))
+            Box(Modifier.appear(t, 900, 8f)) { PrimaryButton("Check the sizes", onCheck) }
+            PackTextButton("Retake photo", onRetake, Modifier.align(Alignment.CenterHorizontally).alpha(phase(t, 950, 240, LinearEasing)))
         }
     }
 }
 
+private val ROW_HEIGHT = 58.dp
+
+/** The space's floor glow: 12 % white, quieter than an object's 16 %. */
+private const val FLOOR_FILL_ARGB = 0x1FFFFFFFL
+
 @Composable
 private fun PhotoSpaceDoneScreen(picture: Bitmap, space: PhotoSpace, label: String, unit: LengthUnit, onCheck: () -> Unit, onRetake: () -> Unit) {
-    val reveal = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { reveal.animateTo(1f, tween(400, delayMillis = 50)) }
+    val t = rememberElapsedMs().value
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        PhotoWithOverlay(picture) { mapping -> SpaceOverlay(space, picture, mapping, unit, reveal.value) }
-        GlassLottieButton(R.raw.icon_restore, "Retake photo", onRetake, diameter = 34.fd, iconSize = 18.fd,
-            modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(14.fd))
-        Sheet(Modifier.align(Alignment.BottomCenter)) {
-            DoneHeading("$label measured", "Inside size from one photo. Check it next.")
+        PhotoWithOverlay(picture) { mapping -> SpaceOverlay(space, picture, mapping, unit, phase(t, 50, 400, androidx.compose.animation.core.FastOutSlowInEasing), labelsFrom = 500, glow = phase(t, 250, 400, Motion.Enter)) }
+        PhotoButton(R.raw.photo_retake, "Retake photo", 34.fd, onRetake,
+            Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(14.fd).alpha(phase(t, 600, 240, LinearEasing)))
+        Sheet(Modifier.align(Alignment.BottomCenter), delayMs = 150) {
+            DoneHeading("$label measured", "Inside size from one photo. Check it next.", t)
             Spacer(Modifier.height(14.dp))
-            Column(Modifier.fillMaxWidth().background(Color(0xFFF7EFE6), RoundedCornerShape(16.dp)).padding(16.dp)) {
+            Column(Modifier.fillMaxWidth().appear(t, 650, 8f).background(Color(0xFFF7EFE6), RoundedCornerShape(16.dp)).padding(16.dp)) {
                 Row(Modifier.fillMaxWidth()) {
                     for ((name, mm) in listOf("WIDTH" to space.dimensions.widthMm, "DEPTH" to space.dimensions.depthMm, "HEIGHT" to space.dimensions.heightMm)) {
                         Column(Modifier.weight(1f)) {
@@ -598,15 +669,20 @@ private fun PhotoSpaceDoneScreen(picture: Bitmap, space: PhotoSpace, label: Stri
                 }
             }
             Spacer(Modifier.height(14.dp))
-            PrimaryButton("Check the sizes", onCheck)
-            PackTextButton("Retake photo", onRetake, Modifier.align(Alignment.CenterHorizontally))
+            Box(Modifier.appear(t, 850, 8f)) { PrimaryButton("Check the sizes", onCheck) }
+            PackTextButton("Retake photo", onRetake, Modifier.align(Alignment.CenterHorizontally).alpha(phase(t, 900, 240, LinearEasing)))
         }
     }
 }
 
 /** The space's box, opening and W / D / H pills over the photo. */
 @Composable
-private fun SpaceOverlay(space: PhotoSpace, picture: Bitmap, mapping: ViewMapping, unit: LengthUnit, alpha: Float) {
+private fun SpaceOverlay(space: PhotoSpace, picture: Bitmap, mapping: ViewMapping, unit: LengthUnit, alpha: Float, labelsFrom: Int = 0, glow: Float = 1f) {
+    // The faint floor glow, under the lines.
+    space.floor?.let { f ->
+        OutlineLayer(OutlineScene(fills = listOf(com.packabunch.scan.OutlineFill(f.toView(mapping, picture), FLOOR_FILL_ARGB))),
+            LocalDensity.current.density, Modifier.fillMaxSize().alpha(glow))
+    }
     OutlineLayer(OutlineScene(space.edges.map { (e, opening) ->
         OutlineStroke(e.toView(mapping, picture), if (opening) OutlineStyle.OPENING else OutlineStyle.MEASURED)
     }), LocalDensity.current.density, Modifier.fillMaxSize().alpha(alpha))
@@ -614,20 +690,24 @@ private fun SpaceOverlay(space: PhotoSpace, picture: Bitmap, mapping: ViewMappin
         ?.let { (x, y) -> x / mapping.viewW to y / mapping.viewH }
     AnchoredLabels(buildList {
         at(space.openingAt)?.let { (x, y) -> space.opening?.let { (w, h) ->
-            add(AnchoredLabel("o", x, y, AnchorAlign.Above) { DimensionPill("OPENING", "${formatLength(w, unit)} × ${formatLength(h, unit)} ${unit.shortLabel}") })
+            add(AnchoredLabel("o", x, y, AnchorAlign.Above) { DimensionPill("OPENING", "${formatLength(w, unit)} × ${formatLength(h, unit)} ${unit.shortLabel}", appearDelayMillis = labelsFrom) })
         } }
-        at(space.widthAt)?.let { (x, y) -> add(AnchoredLabel("w", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("W", "${formatLength(space.dimensions.widthMm, unit)} ${unit.shortLabel}", appearDelayMillis = 100) }) }
-        at(space.depthAt)?.let { (x, y) -> add(AnchoredLabel("d", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("D", "${formatLength(space.dimensions.depthMm, unit)} ${unit.shortLabel}", appearDelayMillis = 190) }) }
-        at(space.heightAt)?.let { (x, y) -> add(AnchoredLabel("h", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("H", "${formatLength(space.dimensions.heightMm, unit)} ${unit.shortLabel}", highlight = true, appearDelayMillis = 280) }) }
+        at(space.widthAt)?.let { (x, y) -> add(AnchoredLabel("w", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("W", "${formatLength(space.dimensions.widthMm, unit)} ${unit.shortLabel}", appearDelayMillis = labelsFrom + 100) }) }
+        at(space.depthAt)?.let { (x, y) -> add(AnchoredLabel("d", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("D", "${formatLength(space.dimensions.depthMm, unit)} ${unit.shortLabel}", appearDelayMillis = labelsFrom + 190) }) }
+        at(space.heightAt)?.let { (x, y) -> add(AnchoredLabel("h", x, y, AnchorAlign.Centre, movable = false) { DimensionPill("H", "${formatLength(space.dimensions.heightMm, unit)} ${unit.shortLabel}", highlight = true, appearDelayMillis = labelsFrom + 280) }) }
     }, Modifier.fillMaxSize())
 }
 
 @Composable
-private fun DoneHeading(title: String, subtitle: String) {
+private fun DoneHeading(title: String, subtitle: String, t: Long = Long.MAX_VALUE) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        LottieOnce(R.raw.photo_done_check, Modifier.size(48.dp))
+        // The big tick plays at 0.45 s; until then its place is kept.
+        Box(Modifier.size(48.dp)) { if (t >= 450) LottieOnce(R.raw.photo_done_check, Modifier.size(48.dp)) }
         Spacer(Modifier.width(14.dp))
-        Column {
+        Column(Modifier.graphicsLayer {
+            alpha = phase(t, 500, 240, LinearEasing)
+            translationY = (1f - phase(t, 500, 320, Motion.Enter)) * 10.dp.toPx()
+        }) {
             Text(title, color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp)
             Text(subtitle, color = TextSecondary, fontFamily = UiFamily, fontSize = 13.sp)
         }
@@ -686,7 +766,7 @@ private fun CheckItemScreen(
             Row {
                 Box {
                     Thumb(item.crop, 104.dp)
-                    GlassLottieButton(R.raw.icon_restore, "Retake photo", onRetake, diameter = 28.dp, iconSize = 15.dp, modifier = Modifier.align(Alignment.TopEnd).padding(5.dp))
+                    PhotoButton(R.raw.photo_retake, "Retake photo", 28.dp, onRetake, modifier = Modifier.align(Alignment.TopEnd).padding(5.dp))
                 }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
@@ -772,7 +852,7 @@ private fun CheckSpaceScreen(
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp)) {
             Box(Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(18.dp))) {
                 PhotoWithOverlay(picture) { mapping -> SpaceOverlay(space, picture, mapping, unit, 1f) }
-                GlassLottieButton(R.raw.icon_restore, "Retake photo", onRetake, diameter = 30.dp, iconSize = 16.dp, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
+                PhotoButton(R.raw.photo_retake, "Retake photo", 30.dp, onRetake, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp))
                 Text("Your photo · stays on this phone", color = Color.White, fontFamily = UiFamily, fontSize = 11.sp,
                     modifier = Modifier.align(Alignment.BottomStart).padding(10.dp).background(Color(0x992B2622), RoundedCornerShape(999.dp)).padding(horizontal = 10.dp, vertical = 4.dp))
             }
@@ -852,9 +932,10 @@ private fun Thumb(bitmap: Bitmap?, size: androidx.compose.ui.unit.Dp) {
 }
 
 @Composable
-private fun Sheet(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val rise = remember { Animatable(1f) }
-    LaunchedEffect(Unit) { rise.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) }
+private fun Sheet(modifier: Modifier = Modifier, delayMs: Long = 0, content: @Composable ColumnScope.() -> Unit) {
+    val reduce = reduceMotion()
+    val rise = remember { Animatable(if (reduce) 0f else 1f) }
+    LaunchedEffect(Unit) { if (!reduce) { delay(delayMs); rise.animateTo(0f, spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) } }
     Column(
         modifier.fillMaxWidth()
             .offset { androidx.compose.ui.unit.IntOffset(0, (rise.value * 600).toInt()) }
@@ -894,4 +975,112 @@ private fun sizeLine(d: Dimensions, shape: ShapeFamily, unit: LengthUnit): Strin
     else "${formatLength(d.widthMm, unit)} × ${formatLength(d.depthMm, unit)} × ${formatLength(d.heightMm, unit)} ${unit.shortLabel}"
 }
 
-@Suppress("unused") private val keep = listOf(Ground, TextPrimary, mutableFloatStateOf(0f))
+// ------------------------------------------------------------------------------------- motion helpers
+
+/** A glass button that is one of the photo Lotties: resting on its first frame, played once on a tap. */
+@Composable
+private fun PhotoButton(res: Int, description: String, size: Dp, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(res))
+    val progress = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    LottieAnimation(
+        composition, { progress.value },
+        modifier = modifier.size(size).clip(CircleShape)
+            .semantics { contentDescription = description; role = Role.Button }
+            .clickable {
+                scope.launch { progress.snapTo(0f); progress.animateTo(1f, tween((composition?.duration ?: 500f).toInt(), easing = LinearEasing)) }
+                onClick()
+            },
+    )
+}
+
+/**
+ * The torch: the on and off files, chosen by the state it is going to, each holding its last frame.
+ * The files are twice the button so the amber ring can flash out past it.
+ */
+@Composable
+private fun PhotoTorch(on: Boolean, onToggle: () -> Unit) {
+    val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(if (on) R.raw.photo_torch_on else R.raw.photo_torch_off))
+    val progress = remember { Animatable(1f) }
+    var tapped by remember { mutableStateOf(false) }
+    LaunchedEffect(on) { if (tapped) { progress.snapTo(0f); progress.animateTo(1f, tween(600, easing = LinearEasing)) } }
+    Box(
+        Modifier.size(42.fd).semantics { contentDescription = if (on) "Torch on" else "Torch off"; role = Role.Button }
+            .clickable { tapped = true; onToggle() },
+        contentAlignment = Alignment.Center,
+    ) {
+        LottieAnimation(composition, { progress.value }, modifier = Modifier.requiredSize(84.fd), clipToCompositionBounds = false)
+    }
+}
+
+/** True when the system has animations switched off: every motion jumps to its end. */
+@Composable
+private fun reduceMotion(): Boolean {
+    val context = LocalContext.current
+    return remember { android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f }
+}
+
+/** Milliseconds since this screen appeared, every frame — the clock the Done timeline runs on. */
+@Composable
+private fun rememberElapsedMs(): State<Long> {
+    val reduce = reduceMotion()
+    val clock = remember { mutableStateOf(if (reduce) 100_000L else 0L) }
+    if (!reduce) LaunchedEffect(Unit) {
+        val start = withFrameMillis { it }
+        while (clock.value < 4000) clock.value = withFrameMillis { it } - start
+    }
+    return clock
+}
+
+/** 0..1 through a step that starts at [at] ms and lasts [dur] ms, eased. */
+private fun phase(t: Long, at: Long, dur: Int, easing: androidx.compose.animation.core.Easing): Float =
+    easing.transform(((t - at) / dur.toFloat()).coerceIn(0f, 1f))
+
+/** Fades in and rises [riseDp] at [at] ms (Enter easing, 320 ms). */
+private fun Modifier.appear(t: Long, at: Long, riseDp: Float): Modifier = graphicsLayer {
+    alpha = phase(t, at, 240, LinearEasing)
+    translationY = (1f - phase(t, at, 320, Motion.Enter)) * riseDp * density
+}
+
+/** scanPopIn on the timeline: opacity 0→1, scale 0.82→1 with the spring's overshoot, rising 6 dp. */
+private fun Modifier.popAt(t: Long, at: Long): Modifier = graphicsLayer {
+    val f = ((t - at) / 450f).coerceIn(0f, 1f)
+    val spring = 1f - kotlin.math.exp(-6f * f) * kotlin.math.cos(9f * f)
+    alpha = (f * 4f).coerceAtMost(1f)
+    val scale = 0.82f + 0.18f * spring
+    scaleX = scale; scaleY = scale
+    translationY = (1f - spring) * 6f * density
+}
+
+/** The same outline style, [a] as opaque. */
+private fun OutlineStyle.faded(a: Float): OutlineStyle {
+    val alpha = (((argb shr 24) and 0xFF) * a).toLong()
+    return copy(argb = (alpha shl 24) or (argb and 0xFFFFFF))
+}
+
+/** Mean brightness 0..255 of a picture, from a coarse grid of its pixels. */
+private fun lumaOf(b: Bitmap): Float {
+    var sum = 0f; var n = 0
+    for (gy in 1..12) for (gx in 1..16) {
+        val p = b.getPixel(gx * (b.width - 1) / 17, gy * (b.height - 1) / 13)
+        sum += ((p shr 16) and 0xFF) * 0.299f + ((p shr 8) and 0xFF) * 0.587f + (p and 0xFF) * 0.114f; n++
+    }
+    return sum / n
+}
+
+/**
+ * What to change for a better photo to measure from, or null when the shot is good. Light first,
+ * then steadiness, then the angle: things on a table need it in view; a space needs its floor.
+ */
+private fun photoGuidance(kind: PhotoKind, brightness: Float, pitchDeg: Double?, moving: Boolean): String? = when {
+    brightness < 40f -> if (kind == PhotoKind.SPACE) "Too dark inside — turn the torch on" else "Too dark — turn the torch on"
+    moving -> "Hold still for the photo"
+    pitchDeg == null -> null
+    kind == PhotoKind.ITEMS && pitchDeg < 15 -> "Tilt down a little, so the table shows"
+    kind == PhotoKind.ITEMS && pitchDeg > 80 -> "Tilt up a little, so their sides show too"
+    kind == PhotoKind.SPACE && pitchDeg < 5 -> "Point a little down, so the floor is in"
+    kind == PhotoKind.SPACE && pitchDeg > 65 -> "Step back and point straight in"
+    else -> null
+}
+
+@Suppress("unused") private val keep = listOf(Ground, TextPrimary)

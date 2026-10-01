@@ -119,6 +119,15 @@ object PackIcons {
         circle(12f, 13.4f, 3.2f),
     )
 
+    /** A picture — rounded frame, hills and a sun — for choosing a photo from the gallery. */
+    val Gallery: ImageVector = strokeIcon(
+        "Gallery",
+        "M5.5 3.5h13a2 2 0 012 2v13a2 2 0 01-2 2h-13a2 2 0 01-2-2v-13a2 2 0 012-2z",
+        "M3.5 17l5-5.5 4.5 4.5 2.5-2.5 5 5",
+        circle(15.5f, 8.5f, 1.6f),
+        strokeWidth = 2f,
+    )
+
     /** Download: an arrow into a tray. */
     val Download: ImageVector = strokeIcon(
         "Download",
