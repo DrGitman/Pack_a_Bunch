@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { siteConfig } from './config';
 const content = {
-  support: ['Support', 'For help testing the preview, check the installation steps in the download section. Camera measurement depends on your phone; you can always enter sizes by hand.'],
+  support: ['Support', 'For help testing the preview, check the installation steps in the download section. To measure with the camera, take one photo of your things in good light, with a little space round each. You can always enter sizes by hand.'],
   privacy: ['Website privacy', 'This website has no advertising, analytics scripts or tracking cookies. The download is served by the website host, which may process standard request information such as your IP address. The Android app has its own privacy policy: read it in the app before creating an account.'],
   terms: ['Preview terms', 'This Android download is a testing preview, not a Google Play release. Features may be incomplete. Packing plans depend on the dimensions you provide: check the real fit, stability and weight before packing. The app’s full terms are available inside the app.'],
   deletion: ['Delete your account', 'In Pack-a-Bunch, open your profile and choose Delete account. The app schedules deletion after 30 days; signing in during that period cancels the request.']

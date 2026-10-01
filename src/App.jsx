@@ -14,7 +14,7 @@ const steps = [
 ];
 
 const questions = [
-  ['Do I need a depth-scanning phone?', 'No. You can enter dimensions by hand. Camera support varies by device.'],
+  ['Do I need a special phone to scan?', 'No. Any Android phone with a camera works. Take one photo of your things, or type the sizes in by hand. A bank card in the photo makes the sizes more exact, but you never need one.'],
   ['Can I leave a pack and come back?', 'Yes. Return to your saved pack and continue from your progress.'],
   ['Does a plan guarantee everything will fit?', 'Plans use your dimensions and settings. Check the real fit as you pack.']
 ];
@@ -133,8 +133,8 @@ export default function App() {
 
         <section className="measurement-strip">
           <div className="container">
-            <h2>Camera when supported.<br/>Manual measurements anytime.</h2>
-            <p>Review dimensions before you pack. Camera measurement depends on your phone and conditions.</p>
+            <h2>One photo.<br/>Or type it in.</h2>
+            <p>Take one photo and the app finds your things, traces each one and works out its size, looking up the ones it recognises. Check every size before you pack.</p>
           </div>
         </section>
 

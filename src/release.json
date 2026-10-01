@@ -1,8 +1,8 @@
 {
-  "version": "0.1.0-staging",
+  "version": "0.1.1-staging",
   "applicationId": "com.packabunch.staging",
-  "sha256": "885f0918f939a983ff562a96fdfe3b256328d6498bb3fabafafd8ca5e5ceb870",
-  "builtAt": "2026-09-29",
-  "bytes": 126864215,
+  "sha256": "5569d3908eba8c4e09c5f360f1c4a1840c9ed4d11a55c6e5e101f1c93b44b6e6",
+  "builtAt": "2026-10-01",
+  "bytes": 186796373,
   "url": "/downloads/pack-a-bunch-preview.apk"
 }
