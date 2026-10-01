@@ -882,6 +882,7 @@ fun PackNavHost(
                 // Free stops at its piece limit; Pack Plus has no limit of its own.
                 maxItems = (planLimit ?: com.packabunch.packing.PackingEngine.MAX_INSTANCE_COUNT).minus(editor.pieceCount).coerceAtLeast(1),
                 planLimited = planLimit != null,
+                lookup = remember { viewModel.itemLookup() },
                 takeScan = { viewModel.tryStartScan().also { if (!it) noScansLeft { navController.popBackStack() } } },
                 onSave = { checked ->
                     scope.launch {
@@ -1203,6 +1204,7 @@ fun PackNavHost(
                 email = account.email,
                 avatarUrl = settings.avatarUrl ?: account.providerPhoto,
                 onCameraMeasuringChange = viewModel::setCameraMeasuring,
+                onLookUpItemsChange = viewModel::setLookUpItems,
                 onDefaultEdgeGapChange = viewModel::setDefaultEdgeGap,
                 onManageSubscription = { navController.navigate(Routes.PACK_PLAN) },
                 onRestorePurchases = { navController.navigate(Routes.RESTORE) },

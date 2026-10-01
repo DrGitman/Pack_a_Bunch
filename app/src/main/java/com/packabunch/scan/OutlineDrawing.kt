@@ -61,15 +61,17 @@ class OutlineScene(val strokes: List<OutlineStroke> = emptyList(), val fills: Li
 
 /**
  * From the camera picture (sensor orientation, as the engine measures it) to the preview on
- * screen: turned upright, then scaled to fill the view and centre-cropped, as PreviewView does.
+ * screen: turned upright, then scaled to fill the view and centre-cropped, as PreviewView does —
+ * or, with [fit], scaled to show the whole picture and centred, as ContentScale.Fit does.
  */
 class ViewMapping(
     private val rotation: Int, private val picW: Int, private val picH: Int,
     val viewW: Int, val viewH: Int,
+    fit: Boolean = false,
 ) {
     private val uw = if (rotation % 180 == 0) picW else picH
     private val uh = if (rotation % 180 == 0) picH else picW
-    private val scale = maxOf(viewW.toFloat() / uw, viewH.toFloat() / uh)
+    private val scale = if (fit) minOf(viewW.toFloat() / uw, viewH.toFloat() / uh) else maxOf(viewW.toFloat() / uw, viewH.toFloat() / uh)
     private val offX = (uw * scale - viewW) / 2
     private val offY = (uh * scale - viewH) / 2
 

@@ -9,6 +9,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.runtime.State
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.graphics.graphicsLayer
@@ -99,8 +100,8 @@ import com.packabunch.scan.OutlineStyle
 import com.packabunch.scan.PhotoInput
 import com.packabunch.scan.PhotoItem
 import com.packabunch.scan.PhotoMeasure
-import com.packabunch.scan.PhotoProgress
-import com.packabunch.scan.PhotoSpace
+import com.packabunch.packing.PhotoProgress
+import com.packabunch.packing.PhotoSpace
 import com.packabunch.scan.ViewMapping
 import com.packabunch.scan.photoFromGallery
 import com.packabunch.scan.toPhotoInput
@@ -192,9 +193,11 @@ fun PhotoItemsFlow(
     onSave: (List<CheckedItem>) -> Unit,
     onTypeInstead: () -> Unit,
     onBack: () -> Unit,
+    /** The online item lookup, when switched on and signed in. */
+    lookup: com.packabunch.data.cloud.ItemLookup? = null,
 ) {
     val context = LocalContext.current
-    val measure = remember { PhotoMeasure(context) }
+    val measure = remember { PhotoMeasure(context, lookup) }
     var input by remember { mutableStateOf<PhotoInput?>(null) }
     var progress by remember { mutableStateOf(PhotoProgress(0, 0f)) }
     var results by remember { mutableStateOf<List<PhotoItem>?>(null) }
@@ -487,7 +490,7 @@ private fun PhotoFindingScreen(
 
     val scrim by animateFloatAsState(0.28f, tween(300, easing = Motion.Standard), label = "scrim")
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        PhotoWithOverlay(picture) { mapping ->
+        PhotoWithOverlay(picture, SHEET_FRACTION) { mapping ->
             Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)))
             // Each outline arrives piece by piece: its edges fade in one after another over about a second.
             val seen = remember { mutableStateListOf<Long>() }
@@ -543,7 +546,7 @@ private fun PhotoFindingScreen(
                 if (i < 3) Spacer(Modifier.height(12.dp))
             }
             Spacer(Modifier.height(14.dp))
-            Text("About ten seconds. The photo stays on your phone.", color = TextTertiary, fontFamily = UiFamily, fontSize = 12.sp)
+            Text("About ten seconds. The whole photo stays on your phone.", color = TextTertiary, fontFamily = UiFamily, fontSize = 12.sp)
         }
     }
 }
@@ -585,7 +588,7 @@ private fun PhotoItemsDoneScreen(picture: Bitmap, items: List<PhotoItem>, traced
     }
     val t = rememberElapsedMs().value
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        PhotoWithOverlay(picture) { mapping ->
+        PhotoWithOverlay(picture, SHEET_FRACTION) { mapping ->
             val density = LocalDensity.current.density
             // The faint footprint glow under each measured thing, fading in from 0.25 s (Enter).
             OutlineLayer(OutlineScene(fills = items.mapNotNull { it.footprint }.map {
@@ -621,7 +624,7 @@ private fun PhotoItemsDoneScreen(picture: Bitmap, items: List<PhotoItem>, traced
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(item.name ?: "Item ${i + 1}", color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
                                 Spacer(Modifier.width(8.dp))
-                                PhotoBadge("FROM PHOTO")
+                                PhotoBadge(if (item.source == com.packabunch.packing.SizeSource.LOOKED_UP) "LOOKED UP" else "FROM PHOTO")
                             }
                             Text(sizeLine(item.dimensions, item.shape, unit), color = TextSecondary, fontFamily = NumericFamily, fontSize = 12.5.sp)
                         }
@@ -644,7 +647,7 @@ private const val FLOOR_FILL_ARGB = 0x1FFFFFFFL
 private fun PhotoSpaceDoneScreen(picture: Bitmap, space: PhotoSpace, label: String, unit: LengthUnit, onCheck: () -> Unit, onRetake: () -> Unit) {
     val t = rememberElapsedMs().value
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        PhotoWithOverlay(picture) { mapping -> SpaceOverlay(space, picture, mapping, unit, phase(t, 50, 400, androidx.compose.animation.core.FastOutSlowInEasing), labelsFrom = 500, glow = phase(t, 250, 400, Motion.Enter)) }
+        PhotoWithOverlay(picture, SHEET_FRACTION) { mapping -> SpaceOverlay(space, picture, mapping, unit, phase(t, 50, 400, androidx.compose.animation.core.FastOutSlowInEasing), labelsFrom = 500, glow = phase(t, 250, 400, Motion.Enter)) }
         PhotoButton(R.raw.photo_retake, "Retake photo", 34.fd, onRetake,
             Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(14.fd).alpha(phase(t, 600, 240, LinearEasing)))
         Sheet(Modifier.align(Alignment.BottomCenter), delayMs = 150) {
@@ -721,7 +724,7 @@ private fun DoneHeading(title: String, subtitle: String, t: Long = Long.MAX_VALU
 @Composable
 private fun NothingFound(picture: Bitmap, title: String, body: String, onRetake: () -> Unit, onTypeInstead: () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        PhotoWithOverlay(picture) { Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f))) }
+        PhotoWithOverlay(picture, 0.36f) { Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f))) }
         Sheet(Modifier.align(Alignment.BottomCenter)) {
             Text(title, color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.ExtraBold, fontSize = 19.sp)
             Spacer(Modifier.height(6.dp))
@@ -779,7 +782,8 @@ private fun CheckItemScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(PackIcons.Sparkle, null, tint = Primary, modifier = Modifier.size(13.dp))
                         Spacer(Modifier.width(5.dp))
-                        Text("Named from the photo. Tap to change.", color = TextTertiary, fontFamily = UiFamily, fontSize = 12.sp)
+                        Text(if (item.source == com.packabunch.packing.SizeSource.PHOTO) "Named from the photo. Tap to change." else "Identified online. Tap to change.",
+                            color = TextTertiary, fontFamily = UiFamily, fontSize = 12.sp)
                     }
                 }
             }
@@ -795,12 +799,13 @@ private fun CheckItemScreen(
                         DimensionField(pair.first, pair.second, { v -> pair.third(v); if (i !in typed) typed += i }, unit,
                             error = parseLengthToMm(pair.second, unit) == null)
                         Spacer(Modifier.height(6.dp))
-                        PhotoBadge(if (i in typed) "TYPED" else "PHOTO", typed = i in typed)
+                        PhotoBadge(if (i in typed) "TYPED" else if (item.source == com.packabunch.packing.SizeSource.LOOKED_UP) "LOOKED UP" else "PHOTO", typed = i in typed)
                     }
                 }
             }
             Spacer(Modifier.height(14.dp))
-            Note("Photo sizes are estimates. If the fit will be tight, check with a tape and type the number.", tone = NoteTone.Caution, icon = PackIcons.Warning)
+            Note(if (item.source == com.packabunch.packing.SizeSource.LOOKED_UP) "This is the size it is sold at. If yours differs or the fit will be tight, check with a tape and type the number."
+                else "Photo sizes are estimates. If the fit will be tight, check with a tape and type the number.", tone = NoteTone.Caution, icon = PackIcons.Warning)
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth().background(SurfaceField, RoundedCornerShape(18.dp)).padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("How many", color = TextPrimary, fontFamily = UiFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.5.sp, modifier = Modifier.weight(1f))
@@ -950,18 +955,32 @@ private fun Sheet(modifier: Modifier = Modifier, delayMs: Long = 0, content: @Co
     )
 }
 
-/** The photo filling its box, centre-cropped, with [overlay] drawn in the same coordinates. */
+/**
+ * The whole photo, never cropped — a gallery photo of any shape shows all of what was measured —
+ * fitted into the part of the screen above the sheet ([sheetFraction] of the height is covered),
+ * with [overlay] drawn in the same coordinates.
+ */
 @Composable
-private fun PhotoWithOverlay(picture: Bitmap, overlay: @Composable (ViewMapping) -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val density = LocalDensity.current
-        val vw = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
-        val vh = with(density) { maxHeight.roundToPx() }.coerceAtLeast(1)
-        val image = remember(picture) { picture.asImageBitmap() }
-        Image(image, null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-        overlay(remember(picture, vw, vh) { ViewMapping(0, picture.width, picture.height, vw, vh) })
+private fun PhotoWithOverlay(picture: Bitmap, sheetFraction: Float = 0f, overlay: @Composable (ViewMapping) -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxSize().background(PhotoBackdrop)) {
+        Box(Modifier.fillMaxWidth().height(maxHeight * (1f - sheetFraction)).windowInsetsPadding(WindowInsets.statusBars)) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val density = LocalDensity.current
+                val vw = with(density) { maxWidth.roundToPx() }.coerceAtLeast(1)
+                val vh = with(density) { maxHeight.roundToPx() }.coerceAtLeast(1)
+                val image = remember(picture) { picture.asImageBitmap() }
+                Image(image, null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+                overlay(remember(picture, vw, vh) { ViewMapping(0, picture.width, picture.height, vw, vh, fit = true) })
+            }
+        }
     }
 }
+
+/** Behind a photo that does not fill the screen. */
+private val PhotoBackdrop = Color(0xFF16130F)
+
+/** How much of the screen the result sheets cover; the photo fits in the rest. */
+private const val SHEET_FRACTION = 0.48f
 
 /** 0..1 picture polyline to view pixels. */
 private fun FloatArray.toView(mapping: ViewMapping, picture: Bitmap): FloatArray {

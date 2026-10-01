@@ -95,24 +95,41 @@ private val privacySections = listOf(
         "What we keep",
         listOf(
             "Your email address, so you can sign in and reset your password.",
-            "Your packs: the spaces you measure, the items you add, their sizes, and the plans " +
-                "the app works out for you.",
+            "Your packs, so they are on every phone you sign in on: the spaces you measure, the " +
+                "items you add with their names, sizes and the shapes the scan measured, and the " +
+                "plans the app works out for you. Item photos are not part of this; they stay on " +
+                "the phone they were taken on.",
+            "Your profile picture, if you add one.",
             "Your settings, such as whether you measure in centimetres or inches.",
         ),
     ),
     Section(
         "What never leaves your phone",
         listOf(
-            "Photos you take of your items. They are saved on your phone only, and are never " +
-                "uploaded to us or to anyone else.",
-            "Camera scans. When you measure with the camera, the app reads the shape of what is " +
-                "in front of you and keeps only the measurements. No video or picture of the " +
-                "room is recorded or sent.",
-            "Item recognition. When the app suggests a name for something you photograph, that " +
-                "happens on your phone.",
+            "Your item and scan photos. A photo you take or pick to measure is measured on your " +
+                "phone, and the item photos are saved there only. They are not backed up with " +
+                "your packs, and the whole photo is never uploaded to us or to anyone else.",
+            "Photos of spaces. When you measure a space, the app works out its size on your " +
+                "phone and keeps only the measurements. No picture of the space is sent.",
+            "Item recognition on the phone. The app's own suggestions for what something is are " +
+                "worked out on your phone. The one exception is the online lookup below.",
             "\"It doesn't fit\" reports. When you tell us why a planned item didn't fit, we keep " +
                 "the reason you picked and the sizes of the item and the space, so we can make plans " +
                 "better. Never the item's name or anything you typed.",
+        ),
+    ),
+    Section(
+        "Looking items up online",
+        listOf(
+            "When you scan items, the app can look each one up to find its real size. It is on " +
+                "unless you switch off \"Look up items online\" in Settings, and it only works " +
+                "when you are signed in.",
+            "For each item it found, the app sends a small cut-out of that item, never the whole " +
+                "photo, with the name it guessed and the size it measured. Our server passes them " +
+                "to Google's Gemini service, which says what the item is and how big it usually " +
+                "is. We do not keep the cut-outs.",
+            "Google handles them under the Gemini API terms, which may allow Google to use them " +
+                "to improve its services.",
         ),
     ),
     Section(
@@ -124,6 +141,7 @@ private val privacySections = listOf(
                 "only whether your subscription is active. We never see your card details.",
             "If you choose to sign in with Google, Google confirms who you are. We receive your " +
                 "email address and nothing more.",
+            "Google's Gemini service identifies items for the online lookup, as described above.",
         ),
     ),
     Section(

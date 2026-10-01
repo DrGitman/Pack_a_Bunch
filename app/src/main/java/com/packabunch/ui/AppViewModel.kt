@@ -391,6 +391,7 @@ class AppViewModel(
             ?: LengthUnit.CENTIMETRES,
         packingHabit = PackingHabit.entries.firstOrNull { it.name == preferences.getString("habit", null) },
         cameraMeasuring = preferences.getBoolean("cameraMeasuring", true),
+        lookUpItems = preferences.getBoolean("lookUpItems", true),
         defaultEdgeGapMm = preferences.getInt("defaultEdgeGapMm", 5).coerceIn(0, 50),
         avatarUrl = preferences.getString("avatar", null),
     ))
@@ -508,6 +509,15 @@ class AppViewModel(
             _purchaseOutcome.value = com.packabunch.ui.screens.PurchaseAttempt(com.packabunch.ui.screens.PurchaseOutcome.Succeeded)
         }
     }
+
+    fun setLookUpItems(enabled: Boolean) {
+        preferences.edit().putBoolean("lookUpItems", enabled).apply()
+        _settings.update { it.copy(lookUpItems = enabled) }
+    }
+
+    /** The online item lookup, when it is switched on and someone is signed in; null otherwise. */
+    fun itemLookup(): com.packabunch.data.cloud.ItemLookup? =
+        account?.takeIf { _settings.value.lookUpItems && it.configured && it.userId != null }?.let { com.packabunch.data.cloud.ItemLookup(it) }
 
     fun setCameraMeasuring(enabled: Boolean) {
         preferences.edit().putBoolean("cameraMeasuring", enabled).apply()
@@ -1021,6 +1031,8 @@ private const val REMOTE_SETTLE_MS = 500L
 
 data class AppSettings(
     val cameraMeasuring: Boolean = true,
+    /** Send each found item's cut-out to be identified, for its real size. Never the whole photo. */
+    val lookUpItems: Boolean = true,
     val defaultEdgeGapMm: Int = 5,
     val unit: LengthUnit = LengthUnit.CENTIMETRES,
     /** The photo this account shows: the person's own, or the one their provider gave us. */

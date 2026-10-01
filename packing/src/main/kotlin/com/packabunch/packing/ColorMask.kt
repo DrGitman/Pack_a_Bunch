@@ -197,7 +197,7 @@ object ColorMask {
                 if (!outside[j] && label[j] != best) { outside[j] = true; queue[tail++] = j }
             }
         }
-        val inBox = BooleanArray(bw * bh) { !outside[it] }
+        val inBox = smooth(BooleanArray(bw * bh) { !outside[it] }, bw, bh)
         val area = inBox.count { it }
         if (area < bw * bh * MIN_SHARE || area > bw * bh * MAX_SHARE) return null
         return inBox
@@ -316,6 +316,22 @@ object ColorMask {
         fun f(t: Double) = if (t > 0.008856) cbrt(t) else 7.787 * t + 16.0 / 116
         val fx = f(x); val fy = f(y); val fz = f(z)
         return doubleArrayOf(116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+    }
+
+    /**
+     * A 5 × 5 majority vote: each pixel becomes what most of its neighbours are. Clears the
+     * saw-tooth a noisy edge leaves (a leather wallet's outline came out as zigzags) without
+     * moving a clean edge.
+     */
+    private fun smooth(src: BooleanArray, w: Int, h: Int): BooleanArray {
+        val sum = IntArray((w + 1) * (h + 1)) // integral image
+        for (y in 0 until h) { var row = 0; for (x in 0 until w) { if (src[y * w + x]) row++; sum[(y + 1) * (w + 1) + x + 1] = sum[y * (w + 1) + x + 1] + row } }
+        return BooleanArray(src.size) { i ->
+            val x = i % w; val y = i / w
+            val x0 = maxOf(0, x - 2); val x1 = minOf(w, x + 3); val y0 = maxOf(0, y - 2); val y1 = minOf(h, y + 3)
+            val on = sum[y1 * (w + 1) + x1] - sum[y0 * (w + 1) + x1] - sum[y1 * (w + 1) + x0] + sum[y0 * (w + 1) + x0]
+            on * 2 > (x1 - x0) * (y1 - y0)
+        }
     }
 
     private fun erode(src: BooleanArray, w: Int, h: Int) = BooleanArray(src.size) { i ->

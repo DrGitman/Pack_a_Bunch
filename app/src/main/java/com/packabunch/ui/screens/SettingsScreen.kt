@@ -49,6 +49,7 @@ fun SettingsScreen(
     /** The same photo the account page shows, so the two never disagree. */
     avatarUrl: String? = null,
     onCameraMeasuringChange: (Boolean) -> Unit = {},
+    onLookUpItemsChange: (Boolean) -> Unit = {},
     onDefaultEdgeGapChange: (Int) -> Unit = {},
 ) {
     var showDelete by rememberSaveable { mutableStateOf(false) }
@@ -119,10 +120,20 @@ fun SettingsScreen(
                     Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             SettingsLabel("Camera measuring")
-                            Text(if (settings.cameraMeasuring) "With a bank card for scale" else "Typed measurements only",
+                            Text(if (settings.cameraMeasuring) "From one photo" else "Typed measurements only",
                                 color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp)
                         }
                         com.packabunch.ui.components.PackSwitch(settings.cameraMeasuring, onCameraMeasuringChange)
+                    }
+                    SettingsDivider()
+                    Row(Modifier.fillMaxWidth().padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f).padding(end = 12.dp)) {
+                            SettingsLabel("Look up items online")
+                            Text(if (settings.lookUpItems) "Sends each item's cut-out, never the whole photo, to find its real size"
+                                else "Sizes come from the photo alone",
+                                color = TextSecondary, fontFamily = UiFamily, fontSize = 12.5.sp, lineHeight = 17.sp)
+                        }
+                        com.packabunch.ui.components.PackSwitch(settings.lookUpItems, onLookUpItemsChange)
                     }
                     SettingsDivider()
                     Row(Modifier.fillMaxWidth().pressScale(pressedScale = 0.98f).clickable { showGap = true }.padding(vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {

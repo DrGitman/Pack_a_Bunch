@@ -168,14 +168,18 @@ object PhotoScale {
     /**
      * Camera height, in metres, from recognised things measured as if the camera were 1 m up.
      * @param measured label to its longest side, mm, at that 1 m.
+     * @param scores how sure the detector was of each; with one or two answers the surest wins,
+     *   since a median of two is just the bigger one.
      */
-    fun fromPriors(measured: List<Pair<String, Float>>): Double? {
-        val answers = measured.mapNotNull { (label, longest) ->
+    fun fromPriors(measured: List<Pair<String, Float>>, scores: List<Float> = emptyList()): Double? {
+        val answers = measured.indices.mapNotNull { i ->
+            val (label, longest) = measured[i]
             val prior = PRIORS[label] ?: return@mapNotNull null
-            if (longest > 5f) prior / longest.toDouble() else null
-        }.filter { it in MIN_M..MAX_M }
+            if (longest > 5f) (prior / longest.toDouble()) to scores.getOrElse(i) { 0f } else null
+        }.filter { it.first in MIN_M..MAX_M }
         if (answers.isEmpty()) return null
-        val sorted = answers.sorted()
+        if (answers.size < 3) return answers.maxBy { it.second }.first
+        val sorted = answers.map { it.first }.sorted()
         return sorted[sorted.size / 2]
     }
 

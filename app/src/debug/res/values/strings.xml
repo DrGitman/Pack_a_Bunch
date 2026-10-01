@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Tells the debug copy apart from staging on the home screen. -->
-    <string name="app_name">Pack Debug</string>
-</resources>

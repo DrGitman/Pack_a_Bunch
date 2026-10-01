@@ -5,8 +5,7 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
+import com.packabunch.packing.PhotoEngine
 import com.packabunch.packing.YoloxDecode
 import java.io.Closeable
 import java.nio.FloatBuffer
@@ -32,30 +31,8 @@ class YoloxDetector(context: Context) : Closeable {
     @Synchronized
     fun detect(picture: Bitmap, minScore: Float = YoloxDecode.MIN_SCORE): List<YoloxDecode.Detection> {
         val size = YoloxDecode.INPUT
-        val r = YoloxDecode.ratio(picture.width, picture.height)
-        // YOLOX's own preprocessing: scale to fit, top-left aligned, pad with grey 114.
-        val canvas = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        Canvas(canvas).apply {
-            drawColor(Color.rgb(114, 114, 114))
-            val scaled = Bitmap.createScaledBitmap(
-                picture, (picture.width * r).toInt().coerceAtLeast(1), (picture.height * r).toInt().coerceAtLeast(1), true,
-            )
-            drawBitmap(scaled, 0f, 0f, null)
-            if (scaled !== picture) scaled.recycle()
-        }
-        val pixels = IntArray(size * size)
-        canvas.getPixels(pixels, 0, size, 0, 0, size, size)
-        canvas.recycle()
-
-        // Channels first, BGR (the order it was trained in), 0..255 unnormalised.
-        val plane = size * size
-        val input = FloatBuffer.allocate(3 * plane)
-        for (i in 0 until plane) {
-            val p = pixels[i]
-            input.put(i, (p and 0xFF).toFloat())                 // B
-            input.put(plane + i, ((p shr 8) and 0xFF).toFloat())  // G
-            input.put(2 * plane + i, ((p shr 16) and 0xFF).toFloat()) // R
-        }
+        // YOLOX's own preprocessing, shared with the computer test so both see the same pixels.
+        val input = FloatBuffer.wrap(PhotoEngine.yoloxInput(picture.toRaster()))
         OnnxTensor.createTensor(env, input, longArrayOf(1, 3, size.toLong(), size.toLong())).use { tensor ->
             session.run(mapOf(inputName to tensor)).use { result ->
                 @Suppress("UNCHECKED_CAST")

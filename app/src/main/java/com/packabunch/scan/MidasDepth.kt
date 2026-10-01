@@ -5,6 +5,7 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.graphics.Bitmap
+import com.packabunch.packing.PhotoEngine
 import java.io.Closeable
 import java.nio.FloatBuffer
 
@@ -31,20 +32,9 @@ class MidasDepth(context: Context) : Closeable {
     /** Relative inverse depth on a [SIZE]×[SIZE] grid stretched over the whole [picture]. */
     @Synchronized
     fun run(picture: Bitmap): FloatArray {
-        val scaled = Bitmap.createScaledBitmap(picture, SIZE, SIZE, true)
-        val pixels = IntArray(SIZE * SIZE)
-        scaled.getPixels(pixels, 0, SIZE, 0, 0, SIZE, SIZE)
-        if (scaled !== picture) scaled.recycle()
-
-        // RGB, channels first, ImageNet normalisation — MiDaS's own transform.
+        // MiDaS's own transform, shared with the computer test so both see the same pixels.
         val plane = SIZE * SIZE
-        val input = FloatBuffer.allocate(3 * plane)
-        for (i in 0 until plane) {
-            val p = pixels[i]
-            input.put(i, (((p shr 16) and 0xFF) / 255f - 0.485f) / 0.229f)
-            input.put(plane + i, (((p shr 8) and 0xFF) / 255f - 0.456f) / 0.224f)
-            input.put(2 * plane + i, ((p and 0xFF) / 255f - 0.406f) / 0.225f)
-        }
+        val input = FloatBuffer.wrap(PhotoEngine.midasInput(picture.toRaster(), SIZE))
         OnnxTensor.createTensor(env, input, longArrayOf(1, 3, SIZE.toLong(), SIZE.toLong())).use { tensor ->
             session.run(mapOf(inputName to tensor)).use { result ->
                 val out = (result[0] as OnnxTensor).floatBuffer

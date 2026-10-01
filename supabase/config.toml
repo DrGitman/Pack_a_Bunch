@@ -1,3 +1,7 @@
 # This diagnostic authenticates server keys inside the handler; never make it public.
 [functions.paddle-sandbox-check]
 verify_jwt = false
+
+# Signed-in people only: Supabase checks their access token before the handler runs.
+[functions.identify-item]
+verify_jwt = true

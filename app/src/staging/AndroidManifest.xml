@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Test screen for the photo engine: staging only, never in the release app. -->
+        <activity android:name="com.packabunch.debug.PhotoProbeActivity" android:exported="true" />
+    </application>
+</manifest>

@@ -21,8 +21,11 @@ All you need is your phone's camera. Or type the sizes in. Both give you the sam
    and says why.
 4. **Pack it.** Numbered steps, one item at a time, from the bottom up.
 
-Packs are kept on the phone and backed up to your account. Photos stay on the phone. They are
-never uploaded.
+Packs are kept on the phone and backed up to your account: names, sizes, the shapes scans
+measured, and plans. Item and scan photos are not backed up; they stay on the phone, and the
+whole photo is never uploaded. The two things that do leave the phone: a profile picture, if
+someone adds one, and, with "Look up items online" on, each found item's small cut-out, sent
+to find its real size (see below).
 
 ## What it will not do
 
@@ -88,8 +91,25 @@ inside size.
 Every scanned item and space gets an outline that is drawn in piece by piece, whatever its
 shape. You then check each size, and change any that look wrong, before anything is saved.
 
-Everything runs on the phone. The models are inside the app, so nothing is downloaded and
-nothing is sent anywhere. Photos never leave the phone. It works with no internet connection.
+All the measuring runs on the phone. The models are inside the app, so nothing is downloaded,
+and it works with no internet connection.
+
+**Looking items up online.** A photo alone cannot tell a toy car from a real one: with nothing
+of known size in it, every size can be off by the same amount. So, when "Look up items online"
+is on in Settings (it is by default, for signed-in people), each found item's cut-out, never the
+whole photo, is sent to the `identify-item` Supabase function. That asks Google's Gemini what
+the item is and its real size: the maker's size when it recognises the exact product, otherwise
+the usual size of that kind of thing. The app then:
+
+* gives a recognised product its real size, laid onto the sides the photo measured;
+* rescales everything else in the photo by how far off the photo was for that product, since
+  every size in one photo is off by the same factor;
+* keeps the card's scale when a card is in the photo, and only swaps in exact products.
+
+The badge beside a size says where it came from: **PHOTO**, or **LOOKED UP**. The function keeps
+nothing. Set it up once: get a key at aistudio.google.com, then
+`supabase secrets set GEMINI_API_KEY=...` and `supabase functions deploy identify-item`.
+Optionally `GEMINI_MODEL` picks the model (`gemini-2.5-flash` by default).
 
 ### What photo measuring is good and not so good at
 
@@ -263,20 +283,20 @@ If something goes wrong:
 
 ### Checking the photo engine with test pictures
 
-The debug build has a hidden test screen that runs the app's own photo engine on pictures you
+The staging build has a hidden test screen that runs the app's own photo engine on pictures you
 give it. It draws what it found onto each one: outlines in green, with the name and sizes. Use
 it to see how a change does on real photos.
 
 ```powershell
-.\gradlew.bat installDebug
-adb push my_photo.jpg /sdcard/Android/data/com.packabunch.debug/files/probe-in/
-adb shell am start -n com.packabunch.debug/com.packabunch.debug.PhotoProbeActivity
-adb pull /sdcard/Android/data/com.packabunch.debug/files/probe-out/ .
+.\gradlew.bat installStaging
+adb push my_photo.jpg /sdcard/Android/data/com.packabunch.staging/files/probe-in/
+adb shell am start -n com.packabunch.staging/com.packabunch.debug.PhotoProbeActivity
+adb pull /sdcard/Android/data/com.packabunch.staging/files/probe-out/ .
 ```
 
 Add `--es kind space --es name "Car boot"` to the `am start` line to measure a space instead.
 `adb logcat -s PhotoProbe PackScan` shows each result and why it came out that way: what each
-finder saw, where the scale came from, and the tilt. The test screen is only in debug builds.
+finder saw, where the scale came from, and the tilt. The test screen is only in the staging build.
 It is never in the app people download.
 
 ## Before a Play release

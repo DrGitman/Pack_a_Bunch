@@ -102,6 +102,13 @@ class PhotoGeometryTest {
     }
 
     @Test
+    fun `with two references the surer one sets the scale, not the bigger`() {
+        // A mouse found surely, and a dark corner taken for a laptop at low confidence.
+        val h = PhotoScale.fromPriors(listOf("mouse" to 224f, "laptop" to 220f), listOf(0.9f, 0.3f))
+        assertTrue(abs(h!! - 0.5) < 0.01, "$h")
+    }
+
+    @Test
     fun `a bottle is never a reference, and a short one is a can`() {
         // The scan that came out four times too big: a can lying down, taken for a bottle.
         assertTrue(PhotoScale.fromPriors(listOf("bottle" to 66f)) == null)
